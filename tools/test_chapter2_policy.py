@@ -9,6 +9,7 @@ luau = Path(sys.argv[1] if len(sys.argv) > 1 else '.tools/luau/build/release/lua
 if not luau.is_file():
     raise SystemExit('Luau CLI not found; pass its path as the first argument.')
 prelude = r'''
+local C=function(...) return {...} end
 local clock=100
 local game={GetService=function() return {} end}
 local Enum={HumanoidStateType={Running="Running"}}
@@ -41,7 +42,8 @@ local Instance={new=function(kind)
  assert(kind=="ProximityPrompt")
  return {Triggered=signal(),PromptButtonHoldBegan=signal(),PromptButtonHoldEnded=signal()}
 end}
-local task={defer=function(fn) fn() end}
+local queued,timers={},{}
+local task={defer=function(fn) fn() end,spawn=function(fn) table.insert(queued,fn) end,delay=function(_,fn) table.insert(timers,fn) end}
 '''
 checks = r'''
 -- The same post-outfit finalizer used by spawned enemies must unanchor ALL parts.
@@ -159,7 +161,7 @@ print("PASS: executed authoritative pistol/SMG/shotgun/rifle grants and explicit
 C2.active=true; C2.finished=false; C2.escaping=false; C2.stage=3; C2.challenges={}; C2.challengeSerial=0
 C2.party={artem,demid}; ah.Health=180; dh.Health=180; artem.Parent=true
 local completed=0
-local zone={index=3,kind="hack",panel={Position=Vector3.new(0,0,0)},complete=function() completed+=1 end}
+local zone={cleared=true,keyCollected=true,index=3,kind="hack",panel={Position=Vector3.new(0,0,0)},complete=function() completed+=1 end}
 local function session(p)
  local board=c2CircuitBoard(rng); for i=1,9 do board.rotations[i]=0 end; board.rotations[4]=3
  local ch={token="real-token",zone=zone,board=board,progress=0,expires=clock+90,last=0,start=clock,target=0.5}
@@ -188,6 +190,84 @@ local token=C2.challenges[artem].token
 for i=1,8 do clock+=0.2; chapterHandler(artem,"turn",token,i%2==1 and -1 or 1) end
 assert(completed==2 and not C2.challenges[artem])
 print("PASS: executed engineering protocol: actual solution, replay/token/role/range/timeout rejects, E alone cannot win")
+
+-- Door gates are a conjunction, not merely a completed terminal timer.
+for clear=0,1 do for card=0,1 do for hack=0,1 do
+ local z={cleared=clear==1,keyCollected=card==1,hacked=hack==1}
+ assert(C2.GateReady(z)==(clear==1 and card==1 and hack==1))
+ assert(C2.CanUseTerminal(z)==(clear==1 and card==1))
+ z.deploying=true; assert(not C2.CanUseTerminal(z))
+end end end
+print("PASS: executed all clearance/keycard/hack gate combinations and deployment lock")
+
+zone.kind="hack"; zone.keyCollected=false; zone.cleared=true; zone.owner=nil
+C2.challenges={}; C2.party={artem,demid}
+c2Engineering(artem,zone); assert(not C2.challenges[artem],"engineer bypassed keycard")
+zone.keyCollected=true; zone.cleared=false
+c2Engineering(artem,zone); assert(not C2.challenges[artem],"engineer bypassed guard waves")
+zone.cleared=true
+c2Engineering(artem,zone)
+local fast=C2.challenges[artem]; assert(fast.fast and not fast.board and fast.required==18)
+local previous=completed
+for _=1,100 do chapterHandler(artem,"type",fast.token) end
+assert(C2.challenges[artem] and C2.challenges[artem].progress<=1,"typing rate limiter bypassed")
+for _=1,18 do clock+=0.06; chapterHandler(artem,"type",fast.token) end
+assert(completed==previous+1 and not C2.challenges[artem],"engineer keyboard hack did not complete")
+c2Engineering(artem,zone); local lost=C2.challenges[artem]; zone.keyCollected=false
+clock+=1; chapterHandler(artem,"type",lost.token)
+assert(not C2.challenges[artem] and completed==previous+1,"card removal during typing ignored")
+zone.keyCollected=true; C2.party={demid}
+-- Test the actual non-engineer handler with a genuine non-fast session.
+local normal=session(demid); normal.fast=false
+clock+=1; chapterHandler(demid,"type",normal.token)
+assert(normal.progress==0 and C2.challenges[demid],"Demid obtained fast keyboard hacking")
+c2EndEngineering(demid)
+print("PASS: executed fast engineer typing, keycard/clearance/rate-limit checks, card loss and non-engineer denial")
+
+C2.party={artem}; C2.active=true; C2.finished=false; C2.challenges={}
+ah.MoveDirection={Magnitude=1}
+C2.sprint={[artem]={held=true,stamina=100,publish=0,rest=0}}
+C2.SprintTick(1); assert(ah.WalkSpeed==28 and C2.sprint[artem].stamina==78)
+C2.SprintTick(4); assert(ah.WalkSpeed==16 and C2.sprint[artem].stamina==0)
+C2.SprintTick(0.1); assert(ah.WalkSpeed==16,"exhausted sprint oscillates")
+C2.sprint[artem].held=false; C2.SprintTick(2); assert(C2.sprint[artem].stamina>0)
+C2.challenges[artem]={}; ah.WalkSpeed=0; C2.SprintTick(1); assert(ah.WalkSpeed==0,"sprint unlocked terminal movement")
+C2.challenges={}
+print("PASS: executed server sprint speed, stamina drain, exhaustion hysteresis, regeneration and terminal lock")
+
+-- Actual wave transition callback: only the last guard schedules the next round.
+local savedDrop,savedDoor=C2.DropCard,C2.Door
+local cards=0
+C2.DropCard=function() cards+=1 end; C2.Door=function() end
+C2.stage=3; C2.escaping=false; C2.zones[3]={index=3,x=320,wave=1,rounds=2,waveActive=true,deploying=false}
+local zw=C2.zones[3]; C2.mobs={}; queued={}; timers={}
+local down={wave=1,root={Position=Vector3.new(350,3,0)}}
+C2.OnEnemyDown(3,down,nil)
+assert(cards==1 and not zw.waveActive and not zw.cleared and #timers==1)
+C2.OnEnemyDown(3,down,nil); assert(cards==1 and #timers==1,"duplicate final death scheduled two waves")
+timers[1](); assert(zw.wave==2 and zw.waveActive and zw.deploying and #queued==1)
+zw.deploying=false
+C2.OnEnemyDown(3,{wave=2,root=down.root},nil)
+assert(cards==2 and zw.cleared and not C2.GateReady(zw))
+zw.keyCollected=true; assert(C2.CanUseTerminal(zw) and not C2.GateReady(zw))
+zw.hacked=true; assert(C2.GateReady(zw))
+C2.DropCard=savedDrop; C2.Door=savedDoor
+print("PASS: executed last-enemy keycards, duplicate-death protection, next wave and final clear/hack progression")
+
+local savedSpark=C2.Spark; C2.Spark=function() end
+C2.stage=10; C2.zones[10]={cleared=false}; C2.bossPhase="guarded"; C2.shieldHP=900; C2.shieldMax=900
+C2.shield={}; C2.cracks={{},{},{}}; C2.boss={Parent=true,Humanoid={Health=750}}
+C2.mobs={[C2.boss]={boss=true,defeated=false,zone=10,hum=C2.boss.Humanoid}}
+C2.HitBoss(99999,Vector3.new(0,0,0),nil); assert(C2.shieldHP==900,"guarded boss took damage")
+C2.bossPhase="exposed"; C2.HitBoss(100,Vector3.new(0,0,0),nil); assert(C2.shieldHP==900,"phase string bypassed live guards")
+C2.zones[10].cleared=true; C2.HitBoss(600,Vector3.new(0,0,0),nil)
+assert(C2.shieldHP==300 and C2.cracks[1].Transparency==0.1 and C2.cracks[2].Transparency==0.1)
+queued={}
+C2.HitBoss(300,Vector3.new(0,0,0),nil)
+assert(C2.bossPhase=="broken" and C2.shieldHP==0 and C2.boss.Humanoid.Health==30 and #queued==1)
+C2.HitBoss(300,Vector3.new(0,0,0),nil); assert(#queued==1,"shield break scheduled two endings")
+C2.Spark=savedSpark
+print("PASS: executed boss invulnerability, exposed shield damage/cracks and one-shot defeat transition")
 
 '''
 path = Path('.tools/chapter2-policy-test.luau')

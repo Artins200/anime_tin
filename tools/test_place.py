@@ -154,7 +154,9 @@ assert 'local view=new("ViewportFrame"' in client
 assert 'cameraPlan(basePoint' not in intro
 assert 'MissionMenu' in client and 'lobbyRemote:FireServer("join",lobby.owner)' in client
 assert 'conversationalSubtitle(text)' in client
-assert chr(0x2014) not in server and chr(0x2014) not in client
+assert server.count(chr(0x2014)) == 1  # exact requested post-escape dialogue
+assert 'так — всё довольно плачевно' in server
+assert client.count(chr(0x2014)) == 2  # compact sprint HUD, not narrative sanitizer output
 print('PASS: coop/menu retained, original combat lighting retained, enclosed factory, separated floor elevations and subtitle policy')
 
 assert 'local function sceneLine(text,minimum)' in server

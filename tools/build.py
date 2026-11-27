@@ -3,6 +3,11 @@ from pathlib import Path
 import struct
 from rbxl import chunks, string, enc
 # Keep the standalone chapter source and embedded server in sync.
+chapter_path=Path('src/Chapter2.luau')
+chapter=chapter_path.read_text()
+start=chapter.index('-- BEGIN CAMPAIGN DIRECTOR')
+end=chapter.index('-- END CAMPAIGN DIRECTOR',start)
+chapter_path.write_text(chapter[:start]+'-- BEGIN CAMPAIGN DIRECTOR\n'+Path('src/Chapter2Campaign.luau').read_text()+'\n'+chapter[end:])
 server_path=Path('src/Script_0.luau')
 server=server_path.read_text()
 start=server.index('-- BEGIN CHAPTER TWO')

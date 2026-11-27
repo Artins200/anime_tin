@@ -64,8 +64,8 @@ assert 'behind and not e.boss and not e.mech' in attack
 assert 'e.root.CFrame.LookVector:Dot' in attack
 assert 'if weld and not e.mech and not e.boss then e.blind=' in attack
 assert 'if weld and e.mech then damage=4' in attack
-assert 'if e.boss and e.hum.Health-damage<=30' in attack
-assert 'e.hum.Health=30; e.defeated=true; C2.bossDefeated=true' in attack
+assert 'C2.HitBoss(damage,hit.Position,origin)' in attack
+assert 'C2.boss.Humanoid.Health=30' in chapter
 assert 'RocketWarning' in chapter and 'goal).Magnitude<11' in chapter
 assert 'task.wait(1.15)' in chapter and 'task.wait(0.65)' in chapter
 assert 'e.root.AssemblyLinearVelocity.Magnitude' in chapter
@@ -73,24 +73,25 @@ assert 'os.clock()-held[player]<hold-0.3' in chapter
 assert 'prompt.MaxActivationDistance=9' in chapter
 print('PASS: validated attacks/holds, rear stealth kills, welding blind with mech immunity, telegraphed rockets, weapon progression')
 
-assert 'C2.stage==10 and C2.bossDefeated and c2Count(10)==0' in chapter
+assert 'if C2.shieldHP==0 then' in chapter
+assert 'C2.RunProtected(c2Escape)' in chapter
 assert 'C2.deadline=workspace:GetServerTimeNow()+300' in chapter
-assert chapter.index('sceneLine("Мафия: Это не конец.') < chapter.index('C2.deadline=workspace:GetServerTimeNow()+300')
+assert chapter.index('C2.Literal("Мафия","Это не конец.') < chapter.index('C2.deadline=workspace:GetServerTimeNow()+300')
 assert 'workspace:GetServerTimeNow()>=C2.deadline then c2Finish(false)' in chapter
 assert 'if allSafe and survivors>0 then c2Finish(true)' in chapter
 assert 'if not c2Alive() then c2Finish(false)' in chapter
-assert 'if c2Count(zone)<2 then c2Spawn' in chapter
+assert 'if c2Count(zone)<2 then C2.Pursuit(zone)' in chapter
 assert 'os.clock()-lastEscape>18' in chapter
-assert 'FactoryDetonation' in chapter and 'FinalReactorFlash' in chapter
+assert 'FactoryFireball' in chapter and 'FallingCeiling' in chapter and 'FallingWall' in chapter
 assert 'worldState.deadline-workspace:GetServerTimeNow()' in client
 assert 'returnToMenu()' in chapter
 assert 'conn:Disconnect()' in chapter
 # Intro is third person until the explicit eyes-only approach.
 intro = chapter.split('local function startChapter2(', 1)[1].split('c2Attack=function', 1)[0]
 assert intro.index('cameraPlan(') < intro.index('CutsceneRE:FireClient(p,"pov"')
-assert 'CutsceneRE:FireAllClients("pov",C2.boss.Head,55)' in chapter
-assert 'CutsceneRE:FireAllClients("pov",c2Origin+' in chapter
-print('PASS: automatic near-death boss escape, exact five-minute server deadline, sparse pursuit, both endings, POV policy and menu cleanup')
+assert 'CutsceneRE:FireAllClients("pov",C2.boss.Head,54)' in chapter
+assert 'CutsceneRE:FireAllClients("pov",C2.cyberHand,48)' in chapter
+print('PASS: shield-break boss escape, exact five-minute server deadline, sparse pursuit, both endings, POV policy and menu cleanup')
 
 # User-reported regressions: do not reintroduce billboard instructions or a hold-to-win panel.
 assert 'Instance.new("BillboardGui")' not in chapter

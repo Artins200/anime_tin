@@ -9,6 +9,7 @@ local SoundService = game:GetService("SoundService")
 
 local plr = Players.LocalPlayer
 local engineeringActive=false
+local chapterSpectatorHead
 local GAME_TITLE=workspace:GetAttribute("GameTitle") or "Уничтожь Тянку 3"
 local cam = workspace.CurrentCamera
 local Remotes = RS:WaitForChild("Remotes")
@@ -58,7 +59,7 @@ local hitmark = new("TextLabel", {Size=UDim2.fromOffset(36,36), Position=UDim2.f
 
 local vignette = new("Frame", {Size=UDim2.fromScale(1,1), BackgroundColor3=Color3.fromRGB(255,0,40), BackgroundTransparency=1, BorderSizePixel=0}, gui)
 
-local hpBg = new("Frame", {Size=UDim2.fromOffset(280,22), Position=UDim2.new(0,30,1,-55), BackgroundColor3=Color3.fromRGB(15,15,20), BorderSizePixel=0}, gui)
+local hpBg = new("Frame", {Size=UDim2.fromOffset(280,22), Position=UDim2.new(0,30,1,-94), BackgroundColor3=Color3.fromRGB(15,15,20), BorderSizePixel=0}, gui)
 new("UIStroke", {Color=NEON, Thickness=2}, hpBg)
 local hpFill = new("Frame", {Size=UDim2.fromScale(1,1), BackgroundColor3=Color3.fromRGB(0,220,120), BorderSizePixel=0}, hpBg)
 local hpText = new("TextLabel", {Size=UDim2.fromScale(1,1), BackgroundTransparency=1, Text="100", TextColor3=Color3.new(1,1,1),
@@ -829,9 +830,9 @@ RunService:BindToRenderStep("ViewModel", Enum.RenderPriority.Camera.Value + 1, f
 		end
   if firstPersonTarget then
    local head=char and char:FindFirstChild("Head")
-   local eye=head and head.Position or cam.CFrame.Position
+   local eye=(chapterSpectatorHead and chapterSpectatorHead.Parent and (not hum or hum.Health<=0)) and chapterSpectatorHead.Position or (head and head.Position or cam.CFrame.Position)
    local focus
-   if firstPersonForward then focus=eye+(hrp and hrp.CFrame.LookVector or cam.CFrame.LookVector)*12
+   if firstPersonForward then focus=eye+((chapterSpectatorHead and chapterSpectatorHead.Parent and (not hum or hum.Health<=0)) and chapterSpectatorHead.CFrame.LookVector or (hrp and hrp.CFrame.LookVector or cam.CFrame.LookVector))*12
    elseif firstPersonRide and firstPersonRide.Parent then focus=firstPersonRide:GetPivot():PointToWorldSpace(Vector3.new(35,0,0))
    elseif typeof(firstPersonTarget)=="Instance" then focus=firstPersonTarget.Parent and firstPersonTarget.Position or eye+cam.CFrame.LookVector*12
    else focus=firstPersonTarget end
@@ -1236,7 +1237,24 @@ do
    RunService:BindToRenderStep("EngineeringPointer",Enum.RenderPriority.Last.Value+2,function() UIS.MouseIconEnabled=true; UIS.MouseBehavior=Enum.MouseBehavior.Default end)
   end
   for _,child in ipairs(body:GetChildren()) do child:Destroy() end; cursor=nil
-  if data.kind=="hack" then
+  if data.fast then
+   title.Text="АРТЕМ / ИНЖЕНЕРНЫЙ ДОСТУП"
+   info.Text="Нажимай любые клавиши: инженер обходит защиту. Ключ-карта подтверждена."
+   local code=[[local link = ntyan.connect("maintenance");
+access.authorize(keycard.signature);
+for node in facility.bus:scan() do
+    node:patch({watchdog=false, audit="local"});
+    crypto.route(node, access.token);
+end
+security.release("bulkhead");
+conveyor.override("safe_stop");
+return link:commit("engineer");
+]]
+   local terminal=new("TextLabel",{Size=UDim2.fromScale(1,0.78),BackgroundColor3=Color3.fromRGB(8,18,18),TextColor3=Color3.fromRGB(90,225,155),TextSize=15,Font=Enum.Font.Code,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,Text=(code..code):sub(1,data.progress*math.ceil(#code/data.required))},body)
+   new("UIPadding",{PaddingLeft=UDim.new(0,10),PaddingTop=UDim.new(0,10)},terminal)
+   local track=new("Frame",{Size=UDim2.fromScale(1,0.07),Position=UDim2.fromScale(0,0.86),BackgroundColor3=Color3.fromRGB(35,49,55)},body)
+   new("Frame",{Size=UDim2.fromScale(math.clamp(data.progress/data.required,0,1),1),BackgroundColor3=Color3.fromRGB(70,205,150),BorderSizePixel=0},track)
+  elseif data.kind=="hack" then
    title.Text="ТЕРМИНАЛ / СОЕДИНЕНИЕ ЦЕПИ"
    info.Text="Поворачивай контакты. Соедини вход слева с выходом справа."
    local grid=new("Frame",{Size=UDim2.fromScale(0.64,0.96),Position=UDim2.fromScale(0.18,0.02),BackgroundTransparency=1},body)
@@ -1272,8 +1290,20 @@ do
    end
   end
  end
- local timer=new("TextLabel",{Size=UDim2.fromOffset(310,45),Position=UDim2.new(0.5,-155,0,65),BackgroundColor3=Color3.fromRGB(70,28,25),TextColor3=Color3.fromRGB(255,205,170),Font=Enum.Font.GothamBold,TextSize=25,Visible=false},gui)
+ local timer=new("TextLabel",{Size=UDim2.fromOffset(310,45),Position=UDim2.new(0.5,-155,0,76),BackgroundColor3=Color3.fromRGB(70,28,25),TextColor3=Color3.fromRGB(255,205,170),Font=Enum.Font.GothamBold,TextSize=25,Visible=false},gui)
  chapterRemote.OnClientEvent:Connect(function(action,data)
+  if action=="cinemaEye" then chapterSpectatorHead=data; return end
+  if action=="chapterCredits" then
+   showCredits(data)
+   if data and creditsText then creditsText.Text="Уничтожь Тянку 3\n\nГЛАВА II\nНе скрытая база тянок\n\nАртем • инженер\nДемид • штурм\n\nОперация завершена\nАрхив центра сохранен\n\nНо история еще не закончена…\n\nСпасибо за игру" end
+   return
+  end
+  if action=="run" then enLabel.Text="БЕГИ!  SHIFT — СПРИНТ"; return end
+  if action=="terminalLocked" then
+   enLabel.Text=not data.cleared and "Панель заблокирована до зачистки волн" or "Нужна ключ-карта последнего охранника"
+   task.delay(3,function() if not cutsceneActive then enLabel.Text="" end end)
+   return
+  end
   if action=="engineering" then draw(data); return end
   if action=="engineeringClose" then closeEngineering(false); lastToken=nil; return end
   if action=="loadout" then
@@ -1283,7 +1313,7 @@ do
    return
   end
   if action=="clear" or action=="ending" then
-   closeEngineering(false); chapterLoadout=nil; worldState=nil; timer.Visible=false; lastToken=nil
+   closeEngineering(false); chapterLoadout=nil; worldState=nil; timer.Visible=false; lastToken=nil; chapterSpectatorHead=nil
    if action=="ending" then enLabel.Text=data.good and "ХОРОШАЯ КОНЦОВКА" or "ПЛОХАЯ КОНЦОВКА" end
    return
   end
@@ -1291,11 +1321,12 @@ do
   worldState=data; timer.Visible=data.escaping and not cutsceneActive
   if not chapterLoadout or chapterLoadout.level~=data.weaponLevel then chapterLoadout={level=data.weaponLevel,hero=data.role}; refreshSlots(); selectWeapon(WD.Order[data.weaponLevel]) end
   lvlLabel.Text=(data.role=="Artem" and "АРТЕМ" or "ДЕМИД").."  ·  "..data.stage.." / 10"
-  enLabel.Text=""
+  enLabel.Text=data.escaping and "БЕГИ!  SHIFT — СПРИНТ" or (("ВОЛНА %d / %d  •  ОХРАНА: %d  •  КАРТА: %s"):format(data.wave or 0,data.rounds or 2,data.enemies,data.keycard and "ЕСТЬ" or "НЕТ"))
  end)
  UIS.InputBegan:Connect(function(input,processed)
   if not engineeringActive then return end
   if input.KeyCode==Enum.KeyCode.Escape then closeEngineering(true)
+  elseif challenge and challenge.fast and input.UserInputType==Enum.UserInputType.Keyboard then send("type")
   elseif not processed and input.KeyCode==Enum.KeyCode.Space and challenge and challenge.kind=="weld" then send("pulse") end
  end)
  UIS.InputChanged:Connect(function(input,processed)
@@ -1307,16 +1338,45 @@ do
  RunService.RenderStepped:Connect(function()
   if challenge then
    local seconds=math.max(0,math.ceil(challenge.expires-workspace:GetServerTimeNow()))
-   footer.Text=("%02d сек.  ·  %d %s"):format(seconds,challenge.progress,challenge.kind=="hack" and "поворотов" or "точных действий")
+   footer.Text=("%02d сек.  ·  %d %s"):format(seconds,challenge.progress,challenge.fast and "пакетов доступа" or challenge.kind=="hack" and "поворотов" or "точных действий")
    if cursor then cursor.Position=UDim2.new((math.sin((workspace:GetServerTimeNow()-challenge.start)*2.2)+1)/2,-2,0,-5) end
    local h=plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
    if not h or h.Health<=0 or cutsceneActive then closeEngineering(true) end
   end
   if worldState and worldState.escaping then
    local seconds=math.max(0,math.ceil(worldState.deadline-workspace:GetServerTimeNow()))
-   timer.Text=("ЭВАКУАЦИЯ  %02d:%02d"):format(math.floor(seconds/60),seconds%60)
+   timer.Text=("БЕГИ!  %02d:%02d"):format(math.floor(seconds/60),seconds%60)
   end
  end)
+ local stamina=new("Frame",{Size=UDim2.fromOffset(180,7),Position=UDim2.new(0,30,1,-108),BackgroundColor3=Color3.fromRGB(28,44,49),Visible=false,BorderSizePixel=0},gui)
+ local staminaFill=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(100,195,165),BorderSizePixel=0},stamina)
+ local shieldTrack=new("Frame",{Size=UDim2.new(0.42,0,0,10),Position=UDim2.new(0.29,0,0,135),BackgroundColor3=Color3.fromRGB(32,43,58),Visible=false},gui)
+ local shieldFill=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(75,165,220),BorderSizePixel=0},shieldTrack)
+ local shieldText=new("TextLabel",{Size=UDim2.new(1,0,0,23),Position=UDim2.fromOffset(0,14),BackgroundTransparency=1,TextColor3=Color3.fromRGB(180,210,225),Font=Enum.Font.GothamBold,TextSize=14},shieldTrack)
+ local function sprint(held) chapterRemote:FireServer("sprint",held) end
+ UIS.InputBegan:Connect(function(input,processed)
+  if not processed and not engineeringActive and not cutsceneActive and plr:GetAttribute("Chapter")==2 and (input.KeyCode==Enum.KeyCode.LeftShift or input.KeyCode==Enum.KeyCode.RightShift) then sprint(true) end
+ end)
+ UIS.InputEnded:Connect(function(input)
+  if input.KeyCode==Enum.KeyCode.LeftShift or input.KeyCode==Enum.KeyCode.RightShift then sprint(UIS:IsKeyDown(Enum.KeyCode.LeftShift) or UIS:IsKeyDown(Enum.KeyCode.RightShift)) end
+ end)
+ UIS.WindowFocusReleased:Connect(function() sprint(false) end)
+ RunService.RenderStepped:Connect(function(dt)
+  local playing=plr:GetAttribute("Chapter")==2 and not cutsceneActive and not menu.Enabled
+  stamina.Visible=playing
+  staminaFill.Size=UDim2.fromScale((plr:GetAttribute("SprintStamina") or 100)/100,1)
+  if playing and not engineeringActive then
+   local target=plr:GetAttribute("IsSprinting") and 76 or 70
+   cam.FieldOfView+=(target-cam.FieldOfView)*(1-math.exp(-dt*5))
+  end
+  shieldTrack.Visible=playing and worldState and worldState.stage==10 and worldState.bossPhase~="waiting" and worldState.bossPhase~="broken" or false
+  if shieldTrack.Visible then
+   shieldFill.Size=UDim2.fromScale(math.clamp((worldState.shieldHP or 0)/(worldState.shieldMax or 1),0,1),1)
+   shieldFill.BackgroundColor3=worldState.bossPhase=="exposed" and Color3.fromRGB(230,135,70) or Color3.fromRGB(75,165,220)
+   shieldText.Text=worldState.bossPhase=="exposed" and "ЩИТ ОСЛАБЛЕН • ОТКРЫВАЙ ОГОНЬ" or "ЩИТ НЕУЯЗВИМ • ОХРАНА АКТИВНА"
+  end
+ end)
+
 end
 
 -- END CHAPTER TWO CLIENT

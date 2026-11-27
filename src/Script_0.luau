@@ -2068,7 +2068,7 @@ local function c2Alive()
 end
 local function c2Count(zone)
  local n=0
- for m,e in pairs(C2.mobs) do if m.Parent and e.hum.Health>0 and not e.defeated and e.zone==zone then n+=1 end end
+ for m,e in pairs(C2.mobs) do if m.Parent and e.hum.Health>0 and not e.defeated and not e.boss and e.zone==zone then n+=1 end end
  return n
 end
 c2Send=function()
@@ -2077,7 +2077,7 @@ c2Send=function()
   local displayStage=C2.stage
   local root=c2Root(p)
   if C2.escaping and root then displayStage=math.clamp(math.floor((root.Position.X-c2Origin.X+75)/160)+1,1,10) end
-  C2RE:FireClient(p,"state",{stage=displayStage,name=C2_ZONES[displayStage].name,weaponLevel=p:GetAttribute("WeaponLevel") or 2,role=p:GetAttribute("Hero"),escaping=C2.escaping,deadline=C2.deadline,alarm=C2.alarm,enemies=c2Count(displayStage)})
+  C2RE:FireClient(p,"state",{stage=displayStage,name=C2_ZONES[displayStage].name,weaponLevel=p:GetAttribute("WeaponLevel") or 2,role=p:GetAttribute("Hero"),escaping=C2.escaping,deadline=C2.deadline,alarm=C2.alarm,enemies=c2Count(displayStage),wave=z and z.wave or 0,rounds=z and z.rounds or 2,keycard=z and z.keyCollected==true,bossPhase=C2.bossPhase,shieldHP=C2.shieldHP,shieldMax=C2.shieldMax})
  end end
 end
 local function c2Dress(m,mech)
@@ -2136,14 +2136,14 @@ local function c2Rocket(e,target,serial)
  if not C2.active or C2.serial~=serial or e.hum.Health<=0 then marker:Destroy(); return end
  local rocket=c2Part(C2.map,"Rocket",Vector3.new(0.7,0.7,2.3),from,C(230,145,65),Enum.Material.Neon); rocket.CanCollide=false
  TweenService:Create(rocket,TweenInfo.new(0.65),{Position=goal}):Play(); task.wait(0.65)
- if not C2.active or C2.serial~=serial then return end
+ if not C2.active or C2.serial~=serial or introActive or C2.finished or e.hum.Health<=0 then rocket:Destroy(); marker:Destroy(); return end
  rocket:Destroy(); marker:Destroy()
  local flash=c2Part(C2.map,"Blast",Vector3.new(10,10,10),goal,C(245,125,55),Enum.Material.Neon); flash.Shape=Enum.PartType.Ball; flash.CanCollide=false; Debris:AddItem(flash,0.25)
  for _,p in ipairs(C2.party) do local r,h=c2Root(p); if r and (r.Position-goal).Magnitude<11 then h:TakeDamage(48) end end
 end
 local function c2Mobilize(model,hum,root)
  for _,body in ipairs(model:GetDescendants()) do
-  if body:IsA("BasePart") then body.Anchored=false; body.CanCollide=body.Name=="Torso" end
+  if body:IsA("BasePart") then body.Anchored=false; body.CanCollide=body.Name=="Torso"; body.CollisionGroup="C2Enemy" end
  end
  hum.PlatformStand=false; hum.AutoRotate=true; hum:ChangeState(Enum.HumanoidStateType.Running)
  root:SetNetworkOwner(nil)
@@ -2160,10 +2160,15 @@ local function c2Spawn(zone,pos,mech,boss)
  if not boss then c2Dress(m,mech) end
  c2Mobilize(m,h,r)
  local e={hum=h,root=r,zone=zone,mech=mech,boss=boss,blind=0,last=0,patrol=pos,alertUntil=0,pathAt=0,waypoints=nil,waypoint=1,stuckAt=os.clock(),lastPosition=pos,joints=j,base={RH=j.RH.C0,LH=j.LH.C0,LS=j.LS.C0,RS=j.RS.C0}}; C2.mobs[m]=e
- h.Died:Connect(function() if C2.active then c2Send() end; ragdoll(m); Debris:AddItem(m,boss and 60 or 12) end)
+ h.Died:Connect(function() if C2.active then c2Send(); C2.OnEnemyDown(zone,e,m) end; ragdoll(m); Debris:AddItem(m,boss and 60 or 12) end)
+ if boss then anchorAll(m); return m end
  local serial=C2.serial
  task.spawn(function()
   while C2.active and serial==C2.serial and m.Parent and h.Health>0 and not e.defeated do
+   if e.deployGoal and (r.Position-e.deployGoal).Magnitude>5 then
+    h:MoveTo(e.deployGoal); task.wait(0.25); continue
+   end
+   e.deployGoal=nil
    local target,dist=nil,math.huge
    for _,p in ipairs(C2.party) do local root=c2Root(p); if root then local d=(root.Position-r.Position).Magnitude; if d<dist then target=root; dist=d end end end
    if target and workspace:GetServerTimeNow()>e.blind then
@@ -2179,7 +2184,11 @@ local function c2Spawn(zone,pos,mech,boss)
     local pursuing=os.clock()<e.alertUntil or (C2.alarm and dist<140)
     if pursuing then
      local goal=visible and target.Position or e.lastSeen or target.Position
-     if not visible or dist>18 then
+     local zoneInfo=C2.zones[zone]
+     if e.tactic=="cover" and e.cover and visible then goal=e.cover+Vector3.new(0,0,math.sin(os.clock()*1.2)*4)
+     elseif e.tactic=="flank" and visible then goal=Vector3.new(math.clamp(target.Position.X+9,c2Origin.X+zoneInfo.x-60,c2Origin.X+zoneInfo.x+60),target.Position.Y,math.clamp(target.Position.Z+(e.side or 1)*14,-C2_LAYOUT[zone][1]+5,C2_LAYOUT[zone][1]-5)) end
+     local advance=e.tactic=="rush" and dist>8 or e.tactic~="rush" and (goal-r.Position).Magnitude>4
+     if not visible or advance then
       if os.clock()-e.pathAt>1.3 then
        e.pathAt=os.clock()
        local path=PathfindingService:CreatePath({AgentRadius=2,AgentHeight=5,AgentCanJump=true,WaypointSpacing=5})
@@ -2275,14 +2284,16 @@ end
 local function c2EngineeringState(player,ch)
  local connected={}
  if ch.board then local _,visited=c2CircuitSolved(ch.board); for cell in pairs(visited) do table.insert(connected,cell) end end
- C2RE:FireClient(player,"engineering",{token=ch.token,kind=ch.zone.kind,board=ch.board,connected=connected,progress=ch.progress,expires=ch.expires,start=ch.start,target=ch.target})
+ C2RE:FireClient(player,"engineering",{token=ch.token,kind=ch.zone.kind,board=ch.board,connected=connected,progress=ch.progress,expires=ch.expires,start=ch.start,target=ch.target,fast=ch.fast,required=ch.required})
 end
 local function c2Engineering(player,z)
  if C2.challenges[player] or (z.owner and z.owner~=player) or introActive then return end
+ if not C2.CanUseTerminal(z) then C2RE:FireClient(player,"terminalLocked",{keycard=z.keyCollected==true,cleared=z.cleared==true}); return end
  local r,h=c2Root(player); if not r or (r.Position-z.panel.Position).Magnitude>10 then return end
  C2.challengeSerial+=1
  local ch={zone=z,token=tostring(C2.serial)..":"..tostring(C2.challengeSerial),progress=0,expires=workspace:GetServerTimeNow()+90,last=0,start=workspace:GetServerTimeNow(),target=0.3+math.random()*0.4}
- if z.kind=="hack" then ch.board=c2CircuitBoard(Random.new()) end
+ ch.fast=z.kind=="hack" and player:GetAttribute("Hero")=="Artem"; ch.required=18
+ if z.kind=="hack" and not ch.fast then ch.board=c2CircuitBoard(Random.new()) end
  z.owner=player; C2.challenges[player]=ch
  h.WalkSpeed=0; h.JumpPower=0
  c2EngineeringState(player,ch)
@@ -2326,6 +2337,10 @@ local function c2Grant(player,level)
 end
 C2RE.OnServerEvent:Connect(function(player,action,token,value)
  if not C2.active or C2.finished or not table.find(C2.party,player) then return end
+ if action=="sprint" then
+  if typeof(token)=="boolean" and C2.sprint and C2.sprint[player] then C2.sprint[player].held=token end
+  return
+ end
  if action=="equip" then
   local index=table.find(WD.Order,token)
   if index and index<=(player:GetAttribute("WeaponLevel") or 1) and not introActive and not C2.challenges[player] then c2WorldWeapon(player,token) end
@@ -2334,10 +2349,12 @@ C2RE.OnServerEvent:Connect(function(player,action,token,value)
  local ch=C2.challenges[player]; if not ch or ch.token~=token then return end
  if action=="cancel" then c2EndEngineering(player); return end
  local root=c2Root(player)
- if not root or not c2Allowed(player,"engineering") or C2.stage~=ch.zone.index or C2.escaping or ch.expires<workspace:GetServerTimeNow() or (root.Position-ch.zone.panel.Position).Magnitude>12 then c2EndEngineering(player); return end
- if os.clock()-ch.last<0.14 then return end; ch.last=os.clock()
+ if not root or not C2.CanUseTerminal(ch.zone) or not c2Allowed(player,"engineering") or C2.stage~=ch.zone.index or C2.escaping or ch.expires<workspace:GetServerTimeNow() or (root.Position-ch.zone.panel.Position).Magnitude>12 then c2EndEngineering(player); return end
+ if os.clock()-ch.last<(ch.fast and 0.055 or 0.14) then return end; ch.last=os.clock()
  local solved=false
- if action=="rotate" and ch.board and typeof(value)=="number" and value%1==0 and value>=1 and value<=9 then
+ if action=="type" and ch.fast then
+  ch.progress+=1; solved=ch.progress>=ch.required
+ elseif action=="rotate" and ch.board and typeof(value)=="number" and value%1==0 and value>=1 and value<=9 then
   ch.board.rotations[value]=(ch.board.rotations[value]+1)%4
   ch.progress+=1; solved=c2CircuitSolved(ch.board)
  elseif action=="pulse" and ch.zone.kind=="weld" then
@@ -2370,6 +2387,7 @@ local function c2Contain(player,root)
  end
 end
 local function c2Home()
+ if C2.home and C2.home.Parent then return C2.home end
  local home=Instance.new("Model"); home.Name="HeroesHome"; home.Parent=C2.map
  local base=Vector3.new(-180,0,0)
  local function object(name,size,pos,color,material)
@@ -2402,6 +2420,388 @@ local function c2Home()
  return home
 end
 
+-- BEGIN CAMPAIGN DIRECTOR
+-- Chapter-II campaign director. Pure predicates are also executed by the Luau regression suite.
+function C2.GateReady(zone)
+ return zone.cleared==true and zone.keyCollected==true and zone.hacked==true
+end
+function C2.CanUseTerminal(zone)
+ return zone.cleared==true and zone.keyCollected==true and not zone.waveActive and not zone.deploying
+end
+function C2.ShieldCanTakeDamage()
+ return C2.bossPhase=="exposed" and C2.zones[10].cleared==true
+end
+function C2.RunProtected(callback)
+ local ok,err=xpcall(callback,debug.traceback)
+ if not ok then
+  warn("[Chapter2 campaign] "..tostring(err))
+  C2.active=false; C2.serial+=1; Players.RespawnTime=3
+  for _,connection in ipairs(C2.connections) do connection:Disconnect() end; table.clear(C2.connections)
+  if C2.restoreHeroes then pcall(C2.restoreHeroes) end
+  CreditsRE:FireAllClients(false); C2RE:FireAllClients("chapterCredits",false); C2RE:FireAllClients("clear")
+  returnToMenu()
+ end
+end
+function C2.SitRig(rig)
+ for _,motor in ipairs(rig:GetDescendants()) do
+  if motor:IsA("Motor6D") then
+   if motor.Name:find("Hip") then motor.C0*=CFrame.Angles(-1.25,0,0)
+   elseif motor.Name:find("Knee") then motor.C0*=CFrame.Angles(1.25,0,0) end
+  end
+ end
+ for _=1,4 do for _,motor in ipairs(rig:GetDescendants()) do if motor:IsA("Motor6D") and motor.Part0 and motor.Part1 then motor.Part1.CFrame=motor.Part0.CFrame*motor.C0*motor.C1:Inverse() end end end
+end
+function C2.Literal(name,text,minimum)
+ local duration=math.max(minimum or 3,(utf8.len(text) or #text)*0.045+1.8)
+ CutsceneRE:FireAllClients("dialogue",{name=name,text=text,duration=duration})
+ task.wait(duration+0.2)
+end
+function C2.InitCampaign()
+ C2.sprint={}; C2.bossPhase="waiting"; C2.shieldMax=#C2.party>1 and 1400 or 900; C2.shieldHP=C2.shieldMax; C2.spawnSequence=0; C2.home=nil
+ local physics=game:GetService("PhysicsService")
+ for _,name in ipairs({"C2Enemy","C2Field"}) do pcall(function() physics:RegisterCollisionGroup(name) end) end
+ physics:CollisionGroupSetCollidable("C2Enemy","C2Field",false)
+ physics:CollisionGroupSetCollidable("C2Enemy","C2Enemy",false)
+ physics:CollisionGroupSetCollidable("Default","C2Field",true)
+ for _,p in ipairs(C2.party) do C2.sprint[p]={held=false,stamina=100,publish=0,rest=0}; p:SetAttribute("SprintStamina",100); p:SetAttribute("IsSprinting",false) end
+end
+function C2.SprintTick(dt)
+ for p,state in pairs(C2.sprint or {}) do
+  local root,h=c2Root(p)
+  local enabled=C2.active and not C2.finished and not introActive and not C2.challenges[p]
+  if not state.held or state.stamina>=25 then state.exhausted=false end
+  local running=enabled and root and state.held and not state.exhausted and state.stamina>1 and h.MoveDirection.Magnitude>0.1
+  if running then state.stamina=math.max(0,state.stamina-dt*22); state.rest=0.7
+  else state.rest=math.max(0,state.rest-dt); if state.rest==0 then state.stamina=math.min(100,state.stamina+dt*15) end end
+  if state.stamina<=0 then state.exhausted=true; running=false end
+  if h and enabled then h.WalkSpeed=running and 28 or 16 end
+  state.publish+=dt
+  if state.publish>=0.15 then state.publish=0; if p.Parent then p:SetAttribute("SprintStamina",state.stamina); p:SetAttribute("IsSprinting",running==true) end end
+ end
+end
+function C2.Door(zone,open)
+ local doors=zone.index==10 and zone.sideDoors or {zone.gate}
+ for _,door in ipairs(doors) do
+  local closed=door:GetAttribute("ClosedFrame")
+  if not closed then closed=door.CFrame; door:SetAttribute("ClosedFrame",closed) end
+  TweenService:Create(door,TweenInfo.new(1.1,Enum.EasingStyle.Sine),{CFrame=open and closed*CFrame.new(0,15,0) or closed}):Play()
+ end
+end
+function C2.AddField(parent,cf,size)
+ local field=c2Part(parent,"DeploymentForcefield",size,cf.Position,C(65,145,185),Enum.Material.ForceField)
+ field.CFrame=cf; field.Transparency=0.82; field.CanCollide=true; field.CanQuery=false; field.CanTouch=false; field.CollisionGroup="C2Field"
+ return field
+end
+function C2.SetupRoom(zone,height,depth)
+ zone.wave=0; zone.rounds=zone.index==10 and 3 or 2; zone.cleared=false; zone.keyCollected=false; zone.hacked=false
+ zone.field=C2.AddField(zone.model,zone.gate.CFrame,Vector3.new(1.2,14,20)); zone.covers={}
+ for _,side in ipairs({-1,1}) do for k=1,2 do
+  local pos=c2Origin+Vector3.new(zone.x-32+k*24,2.1,side*math.min(20,depth-8))
+  local cover=c2Part(zone.model,"TacticalCover",Vector3.new(7,3.5,4),pos,C(58,66,72),Enum.Material.Metal)
+  table.insert(zone.covers,cover.Position+Vector3.new(-2,1,side*4))
+ end end
+ if zone.index==10 then
+  zone.sideDoors={}; zone.sideFields={}
+  for _,side in ipairs({-1,1}) do
+   local center=c2Origin+Vector3.new(zone.x+10,7,side*depth)
+   local door=c2Part(zone.model,"BodyguardSideDoor",Vector3.new(18,14,1.2),center,C(38,45,54),Enum.Material.Metal)
+   table.insert(zone.sideDoors,door); table.insert(zone.sideFields,C2.AddField(zone.model,door.CFrame,door.Size))
+   c2Part(zone.model,"GuardVestibuleFloor",Vector3.new(20,0.35,22),c2Origin+Vector3.new(zone.x+10,0.18,side*(depth+10)),C(42,47,54),Enum.Material.Concrete)
+   c2Part(zone.model,"GuardVestibuleRoof",Vector3.new(20,1,22),c2Origin+Vector3.new(zone.x+10,height+0.5,side*(depth+10)),C(27,33,40))
+   c2Part(zone.model,"GuardVestibuleEnd",Vector3.new(20,height,2),c2Origin+Vector3.new(zone.x+10,height/2,side*(depth+20)),C(35,41,47))
+   for _,edge in ipairs({-1,1}) do c2Part(zone.model,"GuardVestibuleWall",Vector3.new(2,height,22),c2Origin+Vector3.new(zone.x+10+edge*10,height/2,side*(depth+10)),C(35,41,47)) end
+  end
+ end
+end
+function C2.DropCard(zone,position)
+ local model=Instance.new("Model"); model.Name="WaveKeycard"; model.Parent=C2.map
+ local card=c2Part(model,"Keycard",Vector3.new(1.8,0.12,1.1),position+Vector3.new(0,1,0),C(35,51,66),Enum.Material.Metal)
+ local strip=c2Part(model,"AccessStripe",Vector3.new(1.5,0.03,0.22),card.Position+Vector3.new(0,0.08,0.2),C(70,210,160),Enum.Material.Neon)
+ c2Part(model,"CardChip",Vector3.new(0.35,0.035,0.3),card.Position+Vector3.new(-0.45,0.08,-0.2),C(200,170,85),Enum.Material.Metal)
+ for _,p in ipairs(model:GetChildren()) do p.CanCollide=false; p.CanQuery=false end
+ light(strip,C(75,220,160),9,0.7)
+ model.PrimaryPart=card
+ local x=math.clamp(position.X,c2Origin.X+zone.x-60,c2Origin.X+zone.x+63)
+ local z=math.clamp(position.Z,c2Origin.Z-C2_LAYOUT[zone.index][1]+5,c2Origin.Z+C2_LAYOUT[zone.index][1]-5)
+ local landing=Vector3.new(x,1.1,z); local from=position+Vector3.new(0,1.5,0); local start=os.clock()
+ local prompt=c2Prompt(card,"Подобрать ключ-карту",0,function(player)
+  zone.keyCollected=true; model:Destroy(); c2Send()
+ end); prompt.ObjectText="КЛЮЧ-КАРТА"; prompt.Enabled=false
+ local connection
+ connection=RunService.Heartbeat:Connect(function()
+  if not model.Parent or not C2.active or C2.finished or (zone.done and os.clock()-start>3) then if model.Parent then model:Destroy() end; connection:Disconnect(); return end
+  local t=math.clamp((os.clock()-start)/0.9,0,1)
+  local p=from:Lerp(landing,t)+Vector3.new(0,math.sin(t*math.pi)*2.5+math.sin(os.clock()*2)*0.12*t,0)
+  model:PivotTo(CFrame.new(p)*CFrame.Angles(0,(os.clock()-start)*2.4,0)); prompt.Enabled=t>=1
+ end)
+ table.insert(C2.connections,connection)
+end
+function C2.Deploy(zone,count,wave)
+ local serial=C2.serial
+ zone.deploying=true
+ C2.Door(zone,false); task.wait(1.15)
+ if not C2.active or C2.finished or C2.serial~=serial then return end
+ for k=1,count do
+  local side=k%2==0 and -1 or 1
+  local pos
+  if zone.index==10 then pos=c2Origin+Vector3.new(zone.x+6+(k%3)*3,3.5,side*(C2_LAYOUT[10][1]+9))
+  else pos=c2Origin+Vector3.new(zone.x+89+math.floor((k-1)/3)*4,3.5,((k-1)%3-1)*4) end
+  local m=c2Spawn(zone.index,pos,zone.index>=7 and k==count,false)
+  local e=C2.mobs[m]; e.wave=wave; e.tactic=({"rush","cover","flank"})[(k-1)%3+1]; e.side=side
+  e.cover=zone.covers[(k-1)%#zone.covers+1]
+  e.deployGoal=c2Origin+Vector3.new(zone.x+(zone.index==10 and 10 or 56),3.5,side*(zone.index==10 and 19 or 8))
+ end
+ C2.Door(zone,true); task.wait(1.2)
+ if C2.serial~=serial or not C2.active then return end
+ zone.deploying=false
+ if wave and c2Count(zone.index)==0 then C2.OnEnemyDown(zone.index,{wave=wave},nil) end
+end
+function C2.BeginWave(index)
+ local zone=C2.zones[index]
+ if C2.finished or C2.escaping then return end
+ zone.wave+=1; zone.waveActive=true; zone.deploying=true
+ local count=math.min(5,2+math.floor(index/3)+zone.wave)
+ task.spawn(function() C2.Deploy(zone,count,zone.wave) end)
+ c2Send()
+end
+function C2.OnEnemyDown(index,enemy,model)
+ if not C2.active or C2.finished or C2.escaping then return end
+ local zone=C2.zones[index]
+ if not zone or not enemy.wave or enemy.wave~=zone.wave or not zone.waveActive or zone.deploying or c2Count(index)>0 then return end
+ zone.waveActive=false
+ local pos=enemy.root and enemy.root.Position or c2Origin+Vector3.new(zone.x+50,3,0)
+ C2.DropCard(zone,pos); C2.Door(zone,false)
+ if zone.wave<zone.rounds then
+  local serial=C2.serial
+  task.delay(3,function() if C2.active and not C2.finished and C2.serial==serial then C2.BeginWave(index) end end)
+ else
+  zone.cleared=true
+  if index==10 then C2.bossPhase="exposed"; C2.shield.Color=C(230,135,70); C2.shield.Transparency=0.6 end
+ end
+ c2Send()
+end
+function C2.Spark(position,color)
+ local p=c2Part(fxFolder,"ShieldImpact",Vector3.new(0.4,0.4,0.4),position,color,Enum.Material.Neon); p.CanCollide=false; p.CanQuery=false
+ local particles=Instance.new("ParticleEmitter"); particles.Rate=0; particles.Lifetime=NumberRange.new(0.2,0.55); particles.Speed=NumberRange.new(7,15); particles.SpreadAngle=Vector2.new(130,130); particles.Color=ColorSequence.new(color); particles.LightEmission=1; particles.Parent=p; particles:Emit(18)
+ light(p,color,12,2); Debris:AddItem(p,0.7)
+end
+function C2.CreateBoss()
+ local zone=C2.zones[10]; local x=zone.x
+ local model=c2Spawn(10,c2Origin+Vector3.new(x+43,3.5,0),false,true)
+ model.Name="Киборг-Мафиози"; C2.boss=model
+ model:PivotTo(CFrame.lookAt(c2Origin+Vector3.new(x+43,3.5,0),c2Origin+Vector3.new(x-40,3.5,0)))
+ for _,p in ipairs(model:GetChildren()) do if p:IsA("BasePart") and (p.Name=="Hair" or p.Name=="Eye") then p:Destroy() end end
+ local root=model.HumanoidRootPart
+ local function armor(name,size,offset,color,material)
+  local p=c2Part(model,name,size,root.CFrame:PointToWorldSpace(offset),color,material or Enum.Material.Metal); p.CFrame=root.CFrame*CFrame.new(offset); p.CanCollide=false; return p
+ end
+ armor("BallisticChest",Vector3.new(2.6,2.1,1.4),Vector3.new(0,0,0),C(24,28,35))
+ armor("DarkCloak",Vector3.new(2.9,4.5,0.35),Vector3.new(0,-0.7,0.8),C(13,16,23),Enum.Material.Fabric)
+ armor("MechanicalFaceplate",Vector3.new(1.1,1.05,0.24),Vector3.new(0.48,1.5,-0.55),C(71,80,90))
+ local visor=armor("CyborgVisor",Vector3.new(1.9,0.2,0.18),Vector3.new(0,1.65,-0.7),C(225,60,55),Enum.Material.Neon); light(visor,C(220,55,50),9,0.7)
+ armor("CyberForearm",Vector3.new(0.9,1.3,1.1),Vector3.new(1.5,-0.2,-0.25),C(62,73,87))
+ C2.cyberHand=armor("CyberHand",Vector3.new(0.8,0.65,0.9),Vector3.new(1.5,-0.7,-0.55),C(80,92,105))
+ for k=1,3 do armor("ImplantContact",Vector3.new(0.08,0.6,0.1),Vector3.new(1.99,-0.2,-0.55+k*0.24),C(190,65,55),Enum.Material.Neon) end
+ local entry=C2.mobs[model]
+ entry.joints.RH.C0=entry.base.RH*CFrame.Angles(-math.pi/2,0,0); entry.joints.LH.C0=entry.base.LH*CFrame.Angles(-math.pi/2,0,0)
+ anchorAll(model)
+ for _=1,3 do for _,motor in ipairs(model:GetDescendants()) do if motor:IsA("Motor6D") and motor.Part0 and motor.Part1 then motor.Part1.CFrame=motor.Part0.CFrame*motor.C0*motor.C1:Inverse() end end end
+ local chair=c2Part(zone.model,"ExecutiveChair",Vector3.new(7,1,7),c2Origin+Vector3.new(x+43,1.8,0),C(20,23,30),Enum.Material.Fabric)
+ c2Part(zone.model,"ChairBack",Vector3.new(1,8,7),chair.Position+Vector3.new(3.2,3,0),C(23,26,34),Enum.Material.Fabric)
+ C2.bossButton=c2Part(zone.model,"SelfDestructButton",Vector3.new(1,0.25,1),C2.cyberHand.Position+Vector3.new(0,-0.7,0),C(95,26,26),Enum.Material.Metal)
+ C2.shield=c2Part(model,"BossEnergyShield",Vector3.new(13,13,13),root.Position+Vector3.new(0,1,0),C(60,150,220),Enum.Material.ForceField)
+ C2.shield.Shape=Enum.PartType.Ball; C2.shield.CanCollide=false; C2.shield.Transparency=1
+ C2.cracks={}
+ for k=1,9 do
+  local theta=k*2.399
+  local crack=c2Part(model,"ShieldCrack",Vector3.new(0.08,2.2,0.1),C2.shield.Position+Vector3.new(-6,math.sin(theta)*4,math.cos(theta)*4),C(250,165,85),Enum.Material.Neon)
+  crack.CFrame*=CFrame.Angles(theta,0,theta*0.4); crack.CanCollide=false; crack.CanQuery=false; crack.Transparency=1; table.insert(C2.cracks,crack)
+ end
+ C2.bossPhase="guarded"
+end
+function C2.ScriptedShot(target,deflected)
+ CutsceneRE:FireAllClients("blaster",true); task.wait(0.5)
+ if deflected then C2.shield.Transparency=0.3 end
+ CutsceneRE:FireAllClients("pulse")
+ for _,p in ipairs(C2.party) do
+  local head=p.Character and p.Character:FindFirstChild("Head")
+  if head then tracer(head.Position,target,C(255,210,130)) end
+ end
+ C2.Spark(target,deflected and C(100,200,255) or C(245,170,105))
+ if deflected then tracer(target,target+Vector3.new(-5,4,10),C(100,200,255)) end
+ task.wait(0.55); CutsceneRE:FireAllClients("blaster",false)
+end
+function C2.BossIntro()
+ local serial=C2.serial
+ introActive=true; canFight=false; sceneLock(true); CutsceneRE:FireAllClients("start")
+ C2.CreateBoss(); CutsceneRE:FireAllClients("pov",C2.boss.Head,54)
+ prepareView(C2.boss.Head.Position)
+ C2.Literal("Мафия","Так-так-так, кто же это?",3)
+ if C2.serial~=serial or C2.finished then return end
+ C2.ScriptedShot(C2.shield.Position+Vector3.new(-6,0,0),true)
+ if C2.serial~=serial or C2.finished then return end
+ C2.Literal("Мафия","Хах, технологии тянок быстро развиваются, спасибо Нейро-тян. Кстати, я бы так же поступил. Ну-у, так что, сразу к делу перейдём?",9)
+ if C2.serial~=serial or C2.finished then return end
+ local hand=C2.cyberHand; local cf=hand.CFrame
+ TweenService:Create(hand,TweenInfo.new(0.25),{CFrame=cf*CFrame.new(0,0.5,-0.3)*CFrame.Angles(0,0,0.5)}):Play(); task.wait(0.3)
+ C2.Spark(hand.Position,C(195,100,75)); TweenService:Create(hand,TweenInfo.new(0.2),{CFrame=cf}):Play()
+ CutsceneRE:FireAllClients("end"); sceneLock(false); introActive=false; canFight=true; C2.BeginWave(10)
+end
+function C2.HitBoss(damage,position,origin)
+ if C2.bossPhase=="broken" then return end
+ C2.Spark(position,C(115,200,250))
+ if not C2.ShieldCanTakeDamage() then
+  if origin then tracer(position,position+(origin-position).Unit*6+Vector3.new(0,3,0),C(110,200,255)) end
+  return
+ end
+ C2.shieldHP=math.max(0,C2.shieldHP-damage)
+ local broken=math.floor((1-C2.shieldHP/C2.shieldMax)*#C2.cracks)
+ for k,p in ipairs(C2.cracks) do p.Transparency=k<=broken and 0.1 or 1 end
+ C2.shield.Transparency=0.45+(1-C2.shieldHP/C2.shieldMax)*0.4
+ if C2.shieldHP==0 then
+  C2.bossPhase="broken"; C2.shield.Transparency=1; C2.shield.CanQuery=false
+  for _,p in ipairs(C2.cracks) do p.Transparency=1 end
+  C2.mobs[C2.boss].defeated=true; C2.boss.Humanoid.Health=30
+  task.spawn(function() C2.RunProtected(c2Escape) end)
+ end
+ c2Send()
+end
+function C2.Collapse(zone,major)
+ if not zone or zone.collapsed then return end
+ zone.collapsed=true
+ local ceiling=zone.model:FindFirstChild("Ceiling"); if ceiling then ceiling.Transparency=1; ceiling.CanCollide=false end
+ if major then for _,p in ipairs(zone.model:GetChildren()) do if p:IsA("BasePart") and (p.Name=="SideWall" or p.Name=="BossWallLeft" or p.Name=="BossWallRight" or p.Name=="ArmoredOfficePanel") then p.Transparency=1; p.CanCollide=false end end end
+ local center=c2Origin+Vector3.new(zone.x,major and 28 or 10,0)
+ local flash=c2Part(C2.map,"FactoryFireball",Vector3.new(3,3,3),center,C(255,150,55),Enum.Material.Neon); flash.Shape=Enum.PartType.Ball; flash.CanCollide=false; flash.CanQuery=false
+ light(flash,C(255,150,55),120,5)
+ local sound=Instance.new("Sound"); sound.SoundId="rbxasset://sounds/impact_explosion_03.mp3"; sound.Volume=major and 1 or 0.6; sound.RollOffMaxDistance=1200; sound.Parent=flash; sound:Play()
+ TweenService:Create(flash,TweenInfo.new(1.4),{Size=Vector3.new(major and 100 or 42,major and 100 or 42,major and 100 or 42),Transparency=1}):Play(); Debris:AddItem(flash,2)
+ for k=1,6 do
+  local rubble=c2Part(C2.map,k%2==0 and "FallingWall" or "FallingCeiling",Vector3.new(12,0.7,9),c2Origin+Vector3.new(zone.x-45+k*13,C2_LAYOUT[zone.index][2],k%2==0 and 14 or -14),C(48,49,53),Enum.Material.Concrete)
+  rubble.CanCollide=false; rubble.CanQuery=false
+  TweenService:Create(rubble,TweenInfo.new(0.8+k*0.1,Enum.EasingStyle.Quad,Enum.EasingDirection.In),{CFrame=rubble.CFrame*CFrame.new(0,-C2_LAYOUT[zone.index][2]+1,0)*CFrame.Angles(0.3*k,0.4,0.6)}):Play()
+  if k<=3 then
+   local fire=Instance.new("Fire"); fire.Size=major and 22 or 12; fire.Heat=18; fire.Parent=rubble
+   local smoke=Instance.new("Smoke"); smoke.Size=major and 35 or 18; smoke.RiseVelocity=18; smoke.Opacity=0.35; smoke.Parent=rubble
+  end
+  Debris:AddItem(rubble,45)
+ end
+ for _,p in ipairs(C2.party) do local root=c2Root(p); if root then ShakeRE:FireClient(p,math.clamp(900/math.max(80,(root.Position-center).Magnitude),1,8)) end end
+end
+function C2.CollapseTick()
+ local highest=1
+ for _,p in ipairs(C2.party) do local root=c2Root(p); if root then highest=math.max(highest,math.clamp(math.floor((root.Position.X-c2Origin.X+75)/160)+1,1,10)) end end
+ C2.Collapse(C2.zones[highest+1],false)
+end
+function C2.Pursuit(index)
+ local zone=C2.zones[index]
+ if zone.collapsed or zone.deploying then return end
+ for _,p in ipairs(C2.party) do local root=c2Root(p); if root and root.Position.X>c2Origin.X+zone.x+65 then return end end
+ task.spawn(function() C2.Deploy(zone,2,nil) end)
+end
+function C2.DefeatSequence()
+ for p in pairs(C2.challenges) do c2EndEngineering(p) end
+ introActive=true; canFight=false; sceneLock(true); CutsceneRE:FireAllClients("start")
+ FadeRE:FireAllClients(true,""); task.wait(0.6)
+ local zone=C2.zones[10]
+ for i,p in ipairs(C2.party) do if c2Root(p) then p.Character:PivotTo(CFrame.lookAt(c2Origin+Vector3.new(zone.x+8,4,-12-i*2),C2.boss.Head.Position)) end end
+ CutsceneRE:FireAllClients("pov",C2.boss.Head,58); CutsceneRE:FireAllClients("reveal")
+ for i,p in ipairs(C2.party) do if c2Root(p) then tweenCharTo(p.Character,CFrame.lookAt(c2Origin+Vector3.new(zone.x+35,4,-8-i*2),C2.boss.Head.Position),2) end end
+ CutsceneRE:FireAllClients("pov",C2.cyberHand,48); task.wait(0.8)
+ TweenService:Create(C2.cyberHand,TweenInfo.new(0.65),{Position=C2.bossButton.Position+Vector3.new(0,0.3,0)}):Play(); task.wait(0.7)
+ C2.bossButton.Material=Enum.Material.Neon; C2.bossButton.Color=C(245,45,35); C2.Spark(C2.bossButton.Position,C(240,60,35))
+ C2.Literal("Мафия","Это не конец.",2.2)
+ CutsceneRE:FireAllClients("pov",c2Origin+Vector3.new(zone.x-35,10,-24),68); ShakeRE:FireAllClients(3); task.wait(0.9)
+ CutsceneRE:FireAllClients("pov",c2Origin+Vector3.new(zone.x+15,12,25),68); task.wait(0.9)
+ CutsceneRE:FireAllClients("pov",C2.boss.Head,56); C2.ScriptedShot(C2.boss.Head.Position,false)
+ C2.boss.Humanoid.Health=0
+ moveModel(C2.boss,C2.boss:GetPivot()*CFrame.new(0,-1.1,0)*CFrame.Angles(0,0,0.6),0.55)
+ C2.escaping=true; C2.escapeStarting=false; C2.deadline=workspace:GetServerTimeNow()+300
+ for _,z in ipairs(C2.zones) do z.done=true; z.field.CanCollide=false; z.field.Transparency=1; z.gate.CanCollide=false; TweenService:Create(z.gate,TweenInfo.new(0.6),{CFrame=(z.gate:GetAttribute("ClosedFrame") or z.gate.CFrame)*CFrame.new(0,15,0)}):Play() end
+ CutsceneRE:FireAllClients("end"); sceneLock(false); introActive=false; canFight=true
+ MusicRE:FireAllClients("finalSlow"); C2RE:FireAllClients("run"); c2Send()
+end
+function C2.CarScene()
+ FadeRE:FireAllClients(true,""); task.wait(0.7)
+ local road=c2Part(C2.map,"EscapeRoad",Vector3.new(1000,1,32),Vector3.new(-460,-0.2,100),C(32,35,40),Enum.Material.Asphalt)
+ for k=0,14 do c2Part(C2.map,"RoadMarking",Vector3.new(16,0.03,0.2),Vector3.new(-50-k*60,0.34,100),C(175,168,140)) end
+ local car=Instance.new("Model"); car.Name="GetawayCar"; car.Parent=C2.map
+ local function body(name,size,pos,color) return c2Part(car,name,size,pos,color,Enum.Material.Metal) end
+ body("CarBody",Vector3.new(13,2.5,7),Vector3.new(-70,2.4,100),C(28,39,52))
+ body("CarRoof",Vector3.new(7,0.4,7),Vector3.new(-70,7.7,100),C(23,33,45))
+ body("Hood",Vector3.new(4,1,7),Vector3.new(-75,3.8,100),C(28,39,52))
+ for _,side in ipairs({-1,1}) do body("DoorPanel",Vector3.new(8,2,0.3),Vector3.new(-69,3.1,100+side*3.4),C(32,44,57)) end
+ for _,axle in ipairs({-74,-66}) do for _,side in ipairs({-1,1}) do local wheel=body("Wheel",Vector3.new(1,2.8,2.8),Vector3.new(axle,1.3,100+side*3.5),C(18,21,25)); wheel.Shape=Enum.PartType.Cylinder; wheel.CFrame*=CFrame.Angles(0,math.pi/2,0) end end
+ local seats={}
+ for _,side in ipairs({-1,1}) do
+  local seat=Instance.new("Seat"); seat.Name="CinematicSeat"; seat.Size=Vector3.new(2,0.5,2); seat.Anchored=true; seat.CanCollide=false; seat.CFrame=CFrame.lookAt(Vector3.new(-70,2.8,100+side*1.7),Vector3.new(-90,2.8,100+side*1.7)); seat.Color=C(24,28,34); seat.Parent=car; table.insert(seats,seat)
+ end
+ local survivors={}; for _,p in ipairs(C2.party) do if c2Root(p) then table.insert(survivors,p) end end
+ local lead=survivors[1] or C2.party[1]
+ for _,p in ipairs(C2.party) do if not c2Root(p) then C2RE:FireClient(p,"cinemaEye",lead.Character.Head) end end
+ local other=lead:GetAttribute("Hero")=="Artem" and "Демид" or "Артем"
+ for i,p in ipairs(survivors) do if c2Root(p) then p.Character:PivotTo(CFrame.lookAt(Vector3.new(-66,3.7,94+i*2),Vector3.new(-70,3.7,100))) end end
+ focusStreaming(Vector3.new(-70,5,100)); prepareView(Vector3.new(-70,5,100)); CutsceneRE:FireAllClients("pov",seats[1],62); CutsceneRE:FireAllClients("reveal")
+ for i,p in ipairs(survivors) do
+  local root,h=c2Root(p)
+  if root then tweenCharTo(p.Character,CFrame.new(seats[i].Position+Vector3.new(0,2,0)),1); root.Anchored=false; local animate=p.Character:FindFirstChild("Animate"); if animate and animate:GetAttribute("SceneOriginalDisabled")~=true then animate.Disabled=false end; seats[i]:Sit(h) end
+ end
+ if #C2.party==1 then
+  local source=other=="Артем" and "eurtyoeyrntiu" or "ZamestitelDiomchica"
+  local buddy=secretActor(car,source,other,CFrame.lookAt(Vector3.new(-70,1.1,101.7),Vector3.new(-90,1.1,101.7))); C2.SitRig(buddy)
+ end
+ task.wait(0.4)
+ CutsceneRE:FireAllClients("pov",Vector3.new(400,50,-83),72)
+ local serial=C2.serial
+ task.delay(2.7,function() if C2.active and C2.serial==serial then CutsceneRE:FireAllClients("povForward") end end)
+ task.spawn(function() moveModel(car,car:GetPivot()+Vector3.new(-580,0,0),8) end)
+ task.spawn(function() task.wait(0.8); for i=2,10 do C2.Collapse(C2.zones[i],true); task.wait(0.12) end end)
+ C2.Literal(other,"На самом деле это было неплохо, отличная работа. Но скажу тебе так — всё довольно плачевно. В плане, это же их мини-центр, мы даже и половину не уничтожили",10)
+ C2.Literal(lead:GetAttribute("Hero")=="Artem" and "Артем" or "Демид","Это было легко, но если бы мне кто-то помогал...",4)
+ FadeRE:FireAllClients(true,""); task.wait(0.8)
+ for _,p in ipairs(C2.party) do local root,h=c2Root(p); if h then h.Sit=false end; if root then root.Anchored=true end; local weld=p.Character and p.Character:FindFirstChild("SeatWeld",true); if weld then weld:Destroy() end end
+ for _,seat in ipairs(seats) do local weld=seat:FindFirstChild("SeatWeld"); if weld then weld:Destroy() end end
+end
+function C2.NewsTwist()
+ CreditsRE:FireAllClients(false)
+ local home=c2Home(); local screen=home:FindFirstChild("TVScreen")
+ local gui=Instance.new("SurfaceGui"); gui.Name="NTyanBreakingNews"; gui.Face=Enum.NormalId.Front; gui.CanvasSize=Vector2.new(1024,576); gui.Parent=screen
+ local background=Instance.new("Frame"); background.Size=UDim2.fromScale(1,1); background.BackgroundColor3=C(12,22,35); background.Parent=gui
+ local headline=Instance.new("TextLabel"); headline.Size=UDim2.fromScale(1,0.16); headline.Text="НТЯН • ЭКСТРЕННЫЕ НОВОСТИ"; headline.Font=Enum.Font.GothamBlack; headline.TextScaled=true; headline.TextColor3=C(240,235,220); headline.BackgroundColor3=C(135,35,40); headline.Parent=background
+ local caption=headline:Clone(); caption.Position=UDim2.fromScale(0,0.83); caption.Size=UDim2.fromScale(1,0.17); caption.Text="АРТЕМ И ДЕМИД • ОБЪЯВЛЕНЫ В РОЗЫСК"; caption.Parent=background
+ for side=0,1 do
+  local view=Instance.new("ViewportFrame"); view.Size=UDim2.fromScale(0.49,0.65); view.Position=UDim2.fromScale(side*0.51,0.17); view.BackgroundColor3=C(25,39,52); view.Ambient=C(180,180,185); view.Parent=background
+  local world=Instance.new("WorldModel"); world.Parent=view
+  local camera=Instance.new("Camera"); camera.Parent=view; view.CurrentCamera=camera
+  if side==0 then
+   local cfg=table.clone(Types.Commander); cfg.Male=false; cfg.Name="Представительница Нтян"; cfg.Shirt=C(55,67,91)
+   local rep=buildRig(cfg,CFrame.new(0,3,0)); rep.Parent=world; c2Dress(rep,false); anchorAll(rep)
+   camera.CFrame=CFrame.lookAt(Vector3.new(0,5,-8),Vector3.new(0,4.5,0)); camera.FieldOfView=42
+  else
+   c2Part(world,"RuinsGround",Vector3.new(36,1,26),Vector3.new(0,-0.5,0),C(47,47,48))
+   for k=1,12 do local ruin=c2Part(world,"RuinedCenter",Vector3.new(3+(k%3),1+(k%4),6),Vector3.new((k%4-1.5)*7,k%3*0.5,math.floor(k/4)*5-7),C(65,63,63)); ruin.CFrame*=CFrame.Angles(0,k,0.12*k) end
+   camera.CFrame=CFrame.lookAt(Vector3.new(25,22,-30),Vector3.new(0,0,0)); camera.FieldOfView=48
+  end
+ end
+ local present={}
+ for _,p in ipairs(C2.party) do
+  local root,h=c2Root(p)
+  if root then
+   local hero=p:GetAttribute("Hero"); present[hero]=true
+   local pos=Vector3.new(hero=="Artem" and -191 or -185,3,-4)
+   p.Character:PivotTo(CFrame.lookAt(pos,Vector3.new(pos.X,3,22))); h.Sit=true; root.Anchored=true
+  end
+ end
+ if not present.Artem then C2.SitRig(secretActor(home,"eurtyoeyrntiu","Артем",CFrame.lookAt(Vector3.new(-191,0.4,-4),Vector3.new(-191,0.4,22)))) end
+ if not present.Demid then C2.SitRig(secretActor(home,"ZamestitelDiomchica","Демид",CFrame.lookAt(Vector3.new(-185,0.4,-4),Vector3.new(-185,0.4,22)))) end
+ focusStreaming(Vector3.new(-180,5,0)); prepareView(Vector3.new(-180,5,0)); CutsceneRE:FireAllClients("pov",screen,65); CutsceneRE:FireAllClients("reveal")
+ C2.Literal("Нтян","Чувствую, появились новые злодеи, и их планы нам пока не понять. Мы объявили их в розыск. Чувствую, они явно имеют технологии не хуже наших",9)
+ ShakeRE:FireAllClients(1.3); task.wait(1)
+ C2.Literal("Демид","Эмм... нас объявили в розыск, когда мы сделали доброе дело? Я чёт разочарован...",6)
+ task.wait(1); FadeRE:FireAllClients(true,""); task.wait(1)
+end
+
+-- END CAMPAIGN DIRECTOR
 local function c2Build()
  C2.map=Instance.new("Model"); C2.map.Name="Chapter2Factory"; C2.map.Parent=levelFolder; C2.zones={}
  local function prop(parent,name,size,offset,color,mat) return c2Part(parent,name,size,c2Origin+offset,color,mat) end
@@ -2414,21 +2814,30 @@ local function c2Build()
  prop(C2.map,"FactoryEndWall",Vector3.new(4,64,140),Vector3.new(1520,31,0),C(50,57,63),Enum.Material.Concrete)
  for i,def in ipairs(C2_ZONES) do
   local room=Instance.new("Model"); room.Name=def.name; room.Parent=C2.map
-  local x=(i-1)*160; local indoor=i>=3
+  local x=(i-1)*160; local indoor=true
   local halfDepth,height=table.unpack(C2_LAYOUT[i])
   local z={model=room,x=x,done=false,entered=false,machines={}}; C2.zones[i]=z
   prop(room,"Floor",Vector3.new(150,0.35,halfDepth*2),Vector3.new(x,0.18,0),i%2==0 and C(62,68,73) or C(53,59,66),Enum.Material.Concrete)
   for _,s in ipairs({-1,1}) do
-   prop(room,"SideWall",Vector3.new(150,height,2),Vector3.new(x,height/2,s*halfDepth),C(57,65,74),Enum.Material.Metal)
+   if i==10 then
+    prop(room,"BossWallLeft",Vector3.new(76,height,2),Vector3.new(x-37,height/2,s*halfDepth),C(25,30,39),Enum.Material.Metal)
+    prop(room,"BossWallRight",Vector3.new(56,height,2),Vector3.new(x+47,height/2,s*halfDepth),C(25,30,39),Enum.Material.Metal)
+    prop(room,"SideDoorLintel",Vector3.new(18,height-14,2),Vector3.new(x+10,14+(height-14)/2,s*halfDepth),C(25,30,39),Enum.Material.Metal)
+   else prop(room,"SideWall",Vector3.new(150,height,2),Vector3.new(x,height/2,s*halfDepth),C(57,65,74),Enum.Material.Metal) end
    prop(room,"GateWall",Vector3.new(2,height,halfDepth-10),Vector3.new(x+75,height/2,s*(halfDepth+10)/2),C(55,63,72),Enum.Material.Metal)
    if i>1 then prop(room,"EntryWall",Vector3.new(2,height,halfDepth-10),Vector3.new(x-75,height/2,s*(halfDepth+10)/2),C(57,65,74),Enum.Material.Metal) end
   end
   prop(room,"ExitLintel",Vector3.new(2,height-14,20),Vector3.new(x+75,14+(height-14)/2,0),C(57,65,74),Enum.Material.Metal)
   if i>1 then prop(room,"EntryLintel",Vector3.new(2,height-14,20),Vector3.new(x-75,14+(height-14)/2,0),C(57,65,74),Enum.Material.Metal) end
-  if indoor then prop(room,"Ceiling",Vector3.new(150,1,halfDepth*2),Vector3.new(x,height+0.5,0),C(42,48,57),Enum.Material.Metal) end
+  prop(room,"Ceiling",Vector3.new(150,1,halfDepth*2),Vector3.new(x,height+0.5,0),C(42,48,57),Enum.Material.Metal)
+  if i<=2 then
+   local roof=room:FindFirstChild("Ceiling"); roof.Material=Enum.Material.Glass; roof.Transparency=0.48
+   for beam=-2,2 do prop(room,"RoofSupportBeam",Vector3.new(1,1.2,halfDepth*2),Vector3.new(x+beam*27,height-0.3,0),C(45,52,61),Enum.Material.Metal) end
+  end
   z.gate=prop(room,"CheckpointGate",Vector3.new(1,14,20),Vector3.new(x+75,7,0),C(95,110,120),Enum.Material.DiamondPlate)
   -- Ten-stud connectors have tall side rails, so locked gates cannot be bypassed outside.
   prop(room,"Connector",Vector3.new(10,0.35,20),Vector3.new(x+80,0.18,0),C(60,67,73))
+  prop(room,"ConnectorCeiling",Vector3.new(10,1,20),Vector3.new(x+80,18.5,0),C(37,43,51),Enum.Material.Metal)
   for _,s in ipairs({-1,1}) do prop(room,"ConnectorWall",Vector3.new(10,18,1),Vector3.new(x+80,9,s*10),C(50,58,65)) end
   for k=-2,2 do
    local lamp=prop(room,"IndustrialLight",Vector3.new(5,0.3,3),Vector3.new(x+k*26,indoor and height-1 or 12,0),C(205,215,220)); light(lamp,C(205,220,230),43,1.1)
@@ -2453,6 +2862,10 @@ local function c2Build()
     for monitor=1,4 do prop(room,"CommandMonitor",Vector3.new(7,4,0.4),Vector3.new(x-25+monitor*10,5,side*22),C(55,110,125)) end
    end
   elseif i==10 then
+   for _,side in ipairs({-1,1}) do
+    prop(room,"CyberOfficeLight",Vector3.new(105,0.14,0.18),Vector3.new(x,2,side*(halfDepth-1.2)),C(180,48,50),Enum.Material.Neon)
+    prop(room,"ArmoredOfficePanel",Vector3.new(85,10,0.3),Vector3.new(x,10,side*(halfDepth-1.1)),C(22,27,36),Enum.Material.Metal)
+   end
    prop(room,"OfficeCarpet",Vector3.new(90,0.1,34),Vector3.new(x,0.42,0),C(73,33,42),Enum.Material.Fabric)
    prop(room,"OfficeSofa",Vector3.new(17,3,5),Vector3.new(x-28,1.8,-24),C(58,52,50),Enum.Material.Fabric)
    for k=-1,1 do prop(room,"Bookcase",Vector3.new(12,13,3),Vector3.new(x+k*23,6.7,29),C(65,46,34),Enum.Material.Wood) end
@@ -2488,7 +2901,10 @@ local function c2Build()
     machine.CanCollide=false; table.insert(z.machines,{part=machine,origin=machine.Position})
    end
   end
-  if i==10 then prop(room,"BossDesk",Vector3.new(15,3,6),Vector3.new(x+30,1.7,23),C(65,43,39),Enum.Material.Wood) end
+  if i==10 then
+   prop(room,"BossDesk",Vector3.new(7,3,14),Vector3.new(x+25,1.7,0),C(22,27,34),Enum.Material.Metal)
+   prop(room,"DeskHologram",Vector3.new(1.8,0.05,9),Vector3.new(x+25,3.25,0),C(75,145,175),Enum.Material.Neon)
+  end
   -- Service panel sits at the far end of the engineering lane.
   local med=prop(room,"MedicalStation",Vector3.new(2,2,2),Vector3.new(x-48,1.3,17),C(70,145,115))
   local used={}
@@ -2501,12 +2917,14 @@ local function c2Build()
   local panel=prop(room,"EngineeringPanel",Vector3.new(3,4,2),Vector3.new(x+45,2.3,-math.min(23,halfDepth-6)),C(45,115,125),Enum.Material.Metal)
   z.panel=panel; z.kind=def.kind; z.index=i
   prop(room,"TerminalScreen",Vector3.new(2.4,1.3,0.15),Vector3.new(x+45,3,-math.min(23,halfDepth-6)+1.05),C(45,115,125),Enum.Material.Glass)
+  C2.SetupRoom(z,height,halfDepth)
   z.complete=function()
+   z.hacked=true
+   if not C2.GateReady(z) then return end
    local prompt=z.prompt
-   z.done=true; prompt.Enabled=false
+   z.done=true; prompt.Enabled=false; z.field.CanCollide=false; z.field.Transparency=1
    z.gate.CanCollide=false; TweenService:Create(z.gate,TweenInfo.new(1.2),{Position=z.gate.Position+Vector3.new(0,15,0)}):Play()
    for _,object in ipairs(room:GetDescendants()) do if object:IsA("BasePart") and object.Name=="PressHead" then object.Color=C(40,48,53) end end
-   if i==10 then c2Escape() end
    c2Send()
   end
   z.prompt=c2Prompt(panel,"Подключиться",0,function(player)
@@ -2515,6 +2933,7 @@ local function c2Build()
    if i==10 and c2Count(10)>0 then return end
    c2Engineering(player,z)
   end)
+  z.prompt.Enabled=i~=10
  end
  -- Big factory silhouette can be read from the approach, behind playable buildings.
  for k=1,5 do
@@ -2529,22 +2948,9 @@ local function c2Build()
  end end
 end
 c2Escape=function()
- if C2.escaping or C2.finished then return end
- C2.escaping=true; C2.escapeStarting=true
- C2.deadline=workspace:GetServerTimeNow()+330
- -- Discard the old garrison. Retreat contains only sparse newly spawned pursuers.
- for model,e in pairs(C2.mobs) do if not e.defeated then model:Destroy(); C2.mobs[model]=nil end end
- task.spawn(function()
-  introActive=true; canFight=false; sceneLock(true)
-  CutsceneRE:FireAllClients("start")
-  if C2.boss and C2.boss.Parent then CutsceneRE:FireAllClients("pov",C2.boss.Head,55) end
-  sceneLine("Мафия: Это не конец. Через пять минут от завода ничего не останется. Вы останетесь здесь вместе со мной.",9)
-  C2.deadline=workspace:GetServerTimeNow()+300; C2.escapeStarting=false
-  MusicRE:FireAllClients("finalSlow")
-  CutsceneRE:FireAllClients("end"); sceneLock(false); introActive=false; canFight=true
-  NotifyRE:FireAllClients("САМОУНИЧТОЖЕНИЕ • 05:00. Вернитесь через все десять зон к машине у въезда. Шлюзы открыты.",7)
-  c2Send()
- end)
+ if C2.escaping or C2.escapeStarting or C2.finished then return end
+ C2.escapeStarting=true
+ C2.DefeatSequence()
 end
 c2Activate=function(index)
  C2.stage=index; local z=C2.zones[index]; if z.entered then return end; z.entered=true
@@ -2553,10 +2959,8 @@ c2Activate=function(index)
   local artem=p:GetAttribute("Hero")=="Artem"
   c2Grant(p,artem and math.min(3,2+math.floor((index-1)/5)) or math.min(5,2+math.floor((index-1)/2)))
  end
- local count=index==1 and 2 or math.min(5,2+math.floor(index/3))
- for k=1,count do c2Spawn(index,c2Origin+Vector3.new(z.x-12+k*10,3.5,(k%2==0 and 1 or -1)*math.min(17,C2_LAYOUT[index][1]-8)),index>=7 and k==1,false) end
- if index==10 then C2.boss=c2Spawn(index,c2Origin+Vector3.new(z.x+30,3.5,18),false,true) end
  currentSpawn=CFrame.lookAt(c2Origin+Vector3.new(z.x-60,4,10),c2Origin+Vector3.new(z.x,4,10))
+ if index==10 then task.spawn(function() C2.RunProtected(C2.BossIntro) end) else C2.BeginWave(index) end
  c2Send()
 end
 local function c2Hero(player)
@@ -2606,56 +3010,52 @@ local function c2RestoreHeroes()
 end
 c2Finish=function(good)
  if C2.finished then return end
+ C2.RunProtected(function()
  MusicRE:FireAllClients("stop")
  for player in pairs(C2.challenges) do c2EndEngineering(player) end
  C2.finished=true; C2.escaping=false; C2.serial+=1
  canFight=false; sceneLock(true); introActive=true
  C2RE:FireAllClients("ending",{good=good})
- task.wait(1)
- CutsceneRE:FireAllClients("start")
- CutsceneRE:FireAllClients("pov",c2Origin+Vector3.new(230,22,0))
+ task.wait(0.5); CutsceneRE:FireAllClients("start")
  if good then
-  -- Visible distant blast from the survivor's eyes, not a detached ending camera.
-  task.wait(1)
-  local blast=c2Part(C2.map,"FactoryDetonation",Vector3.new(8,8,8),c2Origin+Vector3.new(280,14,0),C(255,150,65),Enum.Material.Neon)
-  blast.Shape=Enum.PartType.Ball; blast.CanCollide=false; blast.CanQuery=false; light(blast,C(255,140,65),140,4)
-  TweenService:Create(blast,TweenInfo.new(2.5),{Size=Vector3.new(100,100,100),Transparency=1}):Play(); Debris:AddItem(blast,3)
-  ShakeRE:FireAllClients(7)
-  say("Артем: Успели. Архив у нас, а их мини-завода больше нет.",6)
-  say("Демид: Вот теперь можно и в Blade Ball. Только сначала поспим.",6)
+  C2.CarScene()
  else
-  ShakeRE:FireAllClients(16)
-  local deathFlash=c2Part(C2.map,"FinalReactorFlash",Vector3.new(20,20,20),c2Origin+Vector3.new((C2.stage-1)*160,9,0),C(255,180,95),Enum.Material.Neon)
-  deathFlash.Shape=Enum.PartType.Ball; deathFlash.CanCollide=false; deathFlash.CanQuery=false
-  TweenService:Create(deathFlash,TweenInfo.new(1.5),{Size=Vector3.new(160,160,160),Transparency=0.5}):Play()
-  say("Связь оборвалась. Завод уничтожил и доказательства, и тех, кто пришел за ними.",7) end
- FadeRE:FireAllClients(true,good and "ГЛАВА II ПРОЙДЕНА • ХОРОШАЯ КОНЦОВКА" or "ГЛАВА II • ПЛОХАЯ КОНЦОВКА")
- task.wait(6)
+  CutsceneRE:FireAllClients("povForward"); ShakeRE:FireAllClients(14)
+  for i=1,10 do C2.Collapse(C2.zones[i],true) end
+  C2.Literal("Операция","Связь оборвалась. Никто не успел выбраться из центра.",5)
+ end
+ FadeRE:FireAllClients(true,good and "ГЛАВА II ПРОЙДЕНА" or "ГЛАВА II • ПЛОХАЯ КОНЦОВКА"); task.wait(1)
+ C2RE:FireAllClients("chapterCredits",true); task.wait(35); C2RE:FireAllClients("chapterCredits",false)
+ if good then C2.NewsTwist() end
  C2.active=false
  for _,conn in ipairs(C2.connections) do conn:Disconnect() end
  table.clear(C2.connections); table.clear(C2.mobs)
- for _,p in ipairs(C2.party) do p:SetAttribute("Chapter",1) end
+ for _,p in ipairs(C2.party) do p:SetAttribute("Chapter",1); p:SetAttribute("IsSprinting",false); p:SetAttribute("SprintStamina",100) end
+ C2.sprint={}
  C2RE:FireAllClients("clear")
  Players.RespawnTime=3
  c2RestoreHeroes()
  returnToMenu()
+ end)
 end
 local function startChapter2(party)
  C2.challenges={}; C2.safe={}; C2.challengeSerial=0; C2.originals={}; C2.bossDefeated=false; C2.escapeStarting=false; C2.shots={}; C2.active=true; C2.finished=false; C2.escaping=false; C2.alarm=false; C2.stage=1; C2.serial+=1; C2.party=table.clone(party); C2.mobs={}
  local serial=C2.serial
+ C2.InitCampaign(); C2.restoreHeroes=c2RestoreHeroes
  levelToken+=1; canFight=false; introActive=true; sceneLock(true)
  FadeRE:FireAllClients(true,"ГЛАВА II • НЕ СКРЫТАЯ БАЗА ТЯНОК"); task.wait(1)
  clearLevel(); newFolders(); applyPreset("Base",0.1); c2Build(); c2Home()
  local animTime=0
  table.insert(C2.connections,RunService.Heartbeat:Connect(function(dt)
   if not C2.active or C2.finished then return end
+  C2.SprintTick(dt)
   animTime+=dt; if animTime<0.05 then return end; animTime=0
   local z=C2.zones[C2.stage]
   if z and not z.done then for _,machine in ipairs(z.machines) do
    if machine.part.Parent then machine.part.Position=machine.origin+Vector3.new(0,-math.abs(math.sin(os.clock()*1.2))*5,0) end
   end end
   for model,e in pairs(C2.mobs) do
-   if model.Parent and e.hum.Health>0 then
+   if model.Parent and e.hum.Health>0 and not e.boss then
     local speed=e.root.AssemblyLinearVelocity.Magnitude
     local swing=math.sin(os.clock()*9)*math.clamp(speed/12,0,1)*0.45
     e.joints.RH.C0=e.base.RH*CFrame.Angles(swing,0,0); e.joints.LH.C0=e.base.LH*CFrame.Angles(-swing,0,0)
@@ -2696,7 +3096,7 @@ local function startChapter2(party)
  focusStreaming(c2Origin)
  -- From the approach onwards camera remains at the player's eye position.
  for _,p in ipairs(party) do local root=c2Root(p); local head=p.Character and p.Character:FindFirstChild("Head"); if root and head then
-  CutsceneRE:FireClient(p,"pov",c2Origin+Vector3.new(600,65,-83),65)
+  CutsceneRE:FireClient(p,"pov",c2Origin+Vector3.new(600,120,-83),65)
  end end
  prepareView(c2Origin); CutsceneRE:FireAllClients("reveal")
  sceneLine("Артем: Вон он, за терминалом. Я иду по сервисным проходам, ты забираешь охрану. Панель открывает общий шлюз.",7)
@@ -2714,6 +3114,7 @@ local function startChapter2(party)
    if not c2Alive() then c2Finish(false); break end
    if C2.escapeStarting then task.wait(0.5); continue end
    if C2.escaping then
+    C2.CollapseTick()
     if workspace:GetServerTimeNow()>=C2.deadline then c2Finish(false); break end
     local allSafe=true; local survivors=0
     for _,p in ipairs(party) do local r=c2Root(p); if r then survivors+=1; if (r.Position-(c2Origin+Vector3.new(-58,3,24))).Magnitude>22 then allSafe=false end end end
@@ -2722,17 +3123,12 @@ local function startChapter2(party)
      lastEscape=os.clock()
      for _,p in ipairs(party) do local r=c2Root(p); if r then
       local zone=math.clamp(math.floor((r.Position.X-c2Origin.X+75)/160)+1,1,10)
-      if c2Count(zone)<2 then c2Spawn(zone,c2Origin+Vector3.new((zone-1)*160-15,3.5,28),false,false) end
+      if c2Count(zone)<2 then C2.Pursuit(zone) end
       break
      end end
     end
    else
     local z=C2.zones[C2.stage]
-    if C2.stage==10 and C2.bossDefeated and c2Count(10)==0 and not z.done then
-     z.done=true; z.prompt.Enabled=false; z.gate.CanCollide=false
-     TweenService:Create(z.gate,TweenInfo.new(1.2),{Position=z.gate.Position+Vector3.new(0,15,0)}):Play()
-     c2Escape()
-    end
     if z.done and C2.stage<10 then
      local allAcross=true
      for _,p in ipairs(party) do local r=c2Root(p); if r and r.Position.X<c2Origin.X+z.x+80 then allAcross=false end end
@@ -2780,14 +3176,11 @@ c2Attack=function(player,wname,origin,dir,charge)
  if weld and not e.mech and not e.boss then e.blind=workspace:GetServerTimeNow()+2.5; e.hum:MoveTo(e.root.Position) end
  if weld and e.mech then damage=4; NotifyRE:FireClient(player,"Меха-тян не ослепляется сваркой. Уходи из зоны ракеты!",2) end
  if e.defeated then return end
- if e.boss and e.hum.Health-damage<=30 then
-  e.hum.Health=30; e.defeated=true; C2.bossDefeated=true
-  e.hum.WalkSpeed=0; anchorAll(model)
-  local cf=model:GetPivot()
-  -- Use the existing rigid-model mover so limbs stay with the anchored root.
-  task.spawn(function() moveModel(model,cf*CFrame.new(0,-1.8,0)*CFrame.Angles(math.rad(78),0,0),0.8) end)
-  NotifyRE:FireAllClients("Мафия повержен. Добейте его личную охрану!",5)
- else e.hum:TakeDamage(damage) end
+ if e.boss then
+  if not melee then C2.HitBoss(damage,hit.Position,origin) else C2.Spark(hit.Position,C(110,175,220)) end
+  return
+ end
+ e.hum:TakeDamage(damage)
  HitRE:FireClient(player,e.hum.Health<=0 or e.defeated==true)
 end
 
