@@ -1,0 +1,664 @@
+local Players = game:GetService("Players")
+local RS = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
+local Debris = game:GetService("Debris")
+local SoundService = game:GetService("SoundService")
+
+local plr = Players.LocalPlayer
+local cam = workspace.CurrentCamera
+local Remotes = RS:WaitForChild("Remotes")
+local WD = require(RS:WaitForChild("WeaponData"))
+
+-- === ИМЕНА SOUND-ОБЪЕКТОВ В WORKSPACE ===
+local SOUND_NAMES = {
+	intro         = "Running Faster A",
+	final         = "Evil Morty Rap",
+	pickup_pistol = "Gun Shot",
+	pickup_other  = "Realistic Gun shot",
+}
+
+-- рекурсивный поиск Sound по имени в Workspace / SoundService
+local function findSoundTemplate(name)
+	if not name or name == "" then return nil end
+	local s = workspace:FindFirstChild(name, true)
+	if s and s:IsA("Sound") then return s end
+	s = SoundService:FindFirstChild(name, true)
+	if s and s:IsA("Sound") then return s end
+	return nil
+end
+
+plr.CameraMode = Enum.CameraMode.LockFirstPerson
+UIS.MouseIconEnabled = false
+pcall(function()
+	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, false)
+	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
+end)
+
+------------------------------------------------------------------ UI
+local function new(class, props, parent)
+	local o = Instance.new(class)
+	for k, v in pairs(props) do o[k] = v end
+	o.Parent = parent
+	return o
+end
+local gui = new("ScreenGui", {Name="HUD", ResetOnSpawn=false, IgnoreGuiInset=true}, plr:WaitForChild("PlayerGui"))
+local NEON = Color3.fromRGB(0,220,200)
+
+new("Frame", {Size=UDim2.fromOffset(3,3), Position=UDim2.fromScale(0.5,0.5), AnchorPoint=Vector2.new(0.5,0.5),
+	BackgroundColor3=Color3.new(1,1,1), BorderSizePixel=0}, gui)
+local hitmark = new("TextLabel", {Size=UDim2.fromOffset(36,36), Position=UDim2.fromScale(0.5,0.5), AnchorPoint=Vector2.new(0.5,0.5),
+	BackgroundTransparency=1, Text="✕", TextSize=30, Font=Enum.Font.GothamBlack, TextColor3=Color3.new(1,1,1), TextTransparency=1}, gui)
+
+local vignette = new("Frame", {Size=UDim2.fromScale(1,1), BackgroundColor3=Color3.fromRGB(255,0,40), BackgroundTransparency=1, BorderSizePixel=0}, gui)
+
+local hpBg = new("Frame", {Size=UDim2.fromOffset(280,22), Position=UDim2.new(0,30,1,-55), BackgroundColor3=Color3.fromRGB(15,15,20), BorderSizePixel=0}, gui)
+new("UIStroke", {Color=NEON, Thickness=2}, hpBg)
+local hpFill = new("Frame", {Size=UDim2.fromScale(1,1), BackgroundColor3=Color3.fromRGB(0,220,120), BorderSizePixel=0}, hpBg)
+local hpText = new("TextLabel", {Size=UDim2.fromScale(1,1), BackgroundTransparency=1, Text="100", TextColor3=Color3.new(1,1,1),
+	Font=Enum.Font.GothamBold, TextSize=15, ZIndex=2}, hpBg)
+
+local lvlLabel = new("TextLabel", {Size=UDim2.fromOffset(500,28), Position=UDim2.new(0.5,0,0,16), AnchorPoint=Vector2.new(0.5,0),
+	BackgroundTransparency=1, Text="", TextColor3=NEON, Font=Enum.Font.GothamBlack, TextSize=22}, gui)
+local enLabel = new("TextLabel", {Size=UDim2.fromOffset(500,24), Position=UDim2.new(0.5,0,0,46), AnchorPoint=Vector2.new(0.5,0),
+	BackgroundTransparency=1, Text="", TextColor3=Color3.fromRGB(230,110,170), Font=Enum.Font.GothamBold, TextSize=18}, gui)
+
+local sub = new("TextLabel", {Size=UDim2.new(0.6,0,0,70), Position=UDim2.new(0.5,0,1,-140), AnchorPoint=Vector2.new(0.5,1),
+	BackgroundColor3=Color3.new(0,0,0), BackgroundTransparency=0.4, TextColor3=Color3.new(1,1,1), Font=Enum.Font.GothamMedium,
+	TextSize=20, TextWrapped=true, Visible=false, BorderSizePixel=0}, gui)
+
+local doorPrompt = new("TextLabel", {Size=UDim2.fromOffset(340,44), Position=UDim2.new(0.5,0,0.72,0), AnchorPoint=Vector2.new(0.5,0),
+	BackgroundColor3=Color3.fromRGB(15,20,15), BackgroundTransparency=0.2, TextColor3=Color3.fromRGB(100,255,150),
+	Font=Enum.Font.GothamBold, TextSize=18, Text="[E] — ВЫБИТЬ ДВЕРЬ", Visible=false, BorderSizePixel=0}, gui)
+new("UIStroke", {Color=Color3.fromRGB(100,255,150), Thickness=2}, doorPrompt)
+
+local chargeBg = new("Frame", {Size=UDim2.fromOffset(200,10), Position=UDim2.new(0.5,0,0.62,0), AnchorPoint=Vector2.new(0.5,0),
+	BackgroundColor3=Color3.fromRGB(20,20,30), BackgroundTransparency=0.3, Visible=false, BorderSizePixel=0}, gui)
+new("UIStroke", {Color=Color3.fromRGB(255,80,200), Thickness=1}, chargeBg)
+local chargeFill = new("Frame", {Size=UDim2.fromScale(0,1), BackgroundColor3=Color3.fromRGB(255,80,200), BorderSizePixel=0}, chargeBg)
+
+local slots = {}
+for i, name in ipairs(WD.Order) do
+	local f = new("Frame", {Size=UDim2.fromOffset(108,40), Position=UDim2.new(0.5,(i-3)*115,1,-12), AnchorPoint=Vector2.new(0.5,1),
+		BackgroundColor3=Color3.fromRGB(15,15,20), BackgroundTransparency=0.2, BorderSizePixel=0}, gui)
+	local st = new("UIStroke", {Color=WD.Stats[name].Color, Thickness=1}, f)
+	local tl = new("TextLabel", {Size=UDim2.fromScale(1,1), BackgroundTransparency=1, Text=i..". "..WD.Stats[name].Display,
+		TextColor3=Color3.new(1,1,1), Font=Enum.Font.GothamBold, TextSize=13}, f)
+	slots[name] = {f=f, st=st, tl=tl}
+end
+
+local fade = new("Frame", {Size=UDim2.fromScale(1,1), BackgroundColor3=Color3.new(0,0,0), BackgroundTransparency=1, BorderSizePixel=0, ZIndex=50}, gui)
+local fadeText = new("TextLabel", {Size=UDim2.fromScale(1,1), BackgroundTransparency=1, Text="", TextColor3=NEON, Font=Enum.Font.GothamBlack,
+	TextSize=42, TextWrapped=true, ZIndex=51}, fade)
+local function showFade(on, text, t)
+	fadeText.Text = on and (text or "") or ""
+	TweenService:Create(fade, TweenInfo.new(t or 0.5), {BackgroundTransparency = on and 0 or 1}):Play()
+end
+
+------------------------------------------------------------------ МУЗЫКА (из Workspace по имени)
+local currentMusic
+local function playMusic(key)
+	if currentMusic then currentMusic:Destroy(); currentMusic = nil end
+	local name = SOUND_NAMES[key]
+	local template = findSoundTemplate(name)
+	if not template then
+		warn("[Music] Sound '" .. tostring(name) .. "' не найден в Workspace/SoundService")
+		return
+	end
+	if template.IsPlaying then template:Stop() end
+	currentMusic = template:Clone()
+	currentMusic.Name = "_PlayingMusic"
+	currentMusic.Looped = (key == "intro" or key == "final")
+	currentMusic.Volume = 0.5
+	currentMusic.Parent = workspace
+	currentMusic:Play()
+end
+local function stopMusic()
+	if currentMusic then currentMusic:Destroy(); currentMusic = nil end
+end
+
+------------------------------------------------------------------ ТИТРЫ
+local creditsGui, creditsText
+local function showCredits(on)
+	if on then
+		if creditsGui then creditsGui:Destroy() end
+		creditsGui = Instance.new("ScreenGui")
+		creditsGui.Name = "Credits"
+		creditsGui.IgnoreGuiInset = true
+		creditsGui.DisplayOrder = 100
+		creditsGui.Parent = plr:WaitForChild("PlayerGui")
+		local bg = Instance.new("Frame")
+		bg.Size = UDim2.fromScale(1, 1)
+		bg.BackgroundColor3 = Color3.new(0, 0, 0)
+		bg.BackgroundTransparency = 0.65
+		bg.BorderSizePixel = 0
+		bg.Parent = creditsGui
+		creditsText = Instance.new("TextLabel")
+		creditsText.Size = UDim2.new(1, 0, 3, 0)
+		creditsText.Position = UDim2.new(0, 0, 1, 0)
+		creditsText.BackgroundTransparency = 1
+		creditsText.TextColor3 = Color3.fromRGB(0, 220, 200)
+		creditsText.Font = Enum.Font.GothamBlack
+		creditsText.TextSize = 30
+		creditsText.TextWrapped = true
+		creditsText.Text = [[
+
+
+    КАРТЕЛЬ ТЯНОК: КОНЕЦ?
+
+    ────────────
+
+    Разработка
+    ТЫ
+
+    Сценарий
+    ТЫ
+
+    Программирование
+    ТЫ
+
+    Дизайн уровней
+    ТЫ
+
+    Моделирование
+    ТЫ
+
+    ────────────
+
+    Музыка
+    Running Faster A
+    Evil Morty Rap
+
+    Звуки
+    Gun Shot
+    Realistic Gun Shot
+
+    ────────────
+
+    В ролях
+
+    Агент — Ты
+    Командир — Голос
+    Нейро-тянка — Она
+    Тянки — Они
+    Цитадель — Они все
+
+    ────────────
+
+    Спасибо за игру!
+
+    АГЕНТ ЖИВ. ПРОТОКОЛ ЦИТАДЕЛИ АКТИВЕН.
+
+    ПРОДОЛЖЕНИЕ СЛЕДУЕТ
+
+
+
+
+
+]]
+		creditsText.Parent = creditsGui
+		TweenService:Create(creditsText, TweenInfo.new(33, Enum.EasingStyle.Linear), {
+			Position = UDim2.new(0, 0, -3, 0)
+		}):Play()
+	else
+		if creditsGui then creditsGui:Destroy(); creditsGui = nil end
+	end
+end
+
+------------------------------------------------------------------ КАТСЦЕНЫ
+local vm
+local cutsceneActive = false
+local shotFrom, shotTarget, shotStart, shotDuration
+local hiddenHUD = {}
+local bars = {}
+for _, bottom in ipairs({false,true}) do
+ table.insert(bars,new("Frame",{Size=UDim2.fromScale(1,0.1),Position=UDim2.fromScale(0,bottom and 0.9 or 0),BackgroundColor3=Color3.new(0,0,0),BorderSizePixel=0,ZIndex=20,Visible=false},gui))
+end
+sub.ZIndex=25
+local function cinematicHUD(on)
+ for _, bar in ipairs(bars) do bar.Visible=on end
+ if on then
+  for _, item in ipairs(gui:GetChildren()) do
+   if item:IsA("GuiObject") and item~=sub and item~=fade and not table.find(bars,item) then
+    hiddenHUD[item]=item.Visible; item.Visible=false
+   end
+  end
+ else
+  for item, visible in pairs(hiddenHUD) do item.Visible=visible end
+  table.clear(hiddenHUD)
+ end
+end
+Remotes.Cutscene.OnClientEvent:Connect(function(action, frame, duration)
+ if action == "shot" then
+  shotFrom=cam.CFrame; shotTarget=frame; shotStart=os.clock(); shotDuration=duration or 2
+  return
+ end
+ if action == "start" then
+		cutsceneActive = true
+  shotTarget=nil
+  cinematicHUD(true)
+  cam.CameraType=Enum.CameraType.Scriptable
+  pcall(function() require(plr.PlayerScripts:WaitForChild("PlayerModule")):GetControls():Disable() end)
+  plr.CameraMode = Enum.CameraMode.Classic
+		if vm and vm.Parent then vm.Parent = nil end
+	elseif action == "end" then
+		cutsceneActive = false
+  shotTarget=nil
+  cinematicHUD(false)
+  cam.CameraType=Enum.CameraType.Custom
+  cam.CameraSubject=plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
+  pcall(function() require(plr.PlayerScripts:WaitForChild("PlayerModule")):GetControls():Enable() end)
+  plr.CameraMode = Enum.CameraMode.LockFirstPerson
+	end
+end)
+Remotes.Music.OnClientEvent:Connect(function(action)
+	if action == "stop" then stopMusic()
+	else
+  playMusic(action)
+  if action == "final" then
+   local track=currentMusic
+   task.spawn(function()
+    local started=os.clock()
+    while currentMusic==track and cutsceneActive do
+     -- TimePosition follows actual playback; wall clock is a fallback for private/unavailable audio.
+     if (track and track.IsPlaying and track.TimePosition>=30) or os.clock()-started>=30 then
+      showCredits(true); break
+     end
+     task.wait(0.05)
+    end
+   end)
+  end
+ end
+end)
+Remotes.Credits.OnClientEvent:Connect(function(on) showCredits(on) end)
+
+------------------------------------------------------------------ VIEWMODEL
+vm = Instance.new("Model"); vm.Name = "ViewModel"
+local function vpart(size, color, mat)
+	local p = Instance.new("Part")
+	p.Size = size; p.Color = color; p.Material = mat or Enum.Material.SmoothPlastic
+	p.Anchored = true; p.CanCollide = false; p.CanQuery = false; p.CanTouch = false; p.CastShadow = false
+	return p
+end
+local function makeArm()
+	local a = {}
+	local function add(size, off, color, mat)
+		local p = vpart(size, color, mat); p.Parent = vm; table.insert(a, {p, off})
+	end
+	add(Vector3.new(0.85,0.85,2.8), CFrame.new(0,0,1.7), Color3.fromRGB(38,42,50), Enum.Material.Fabric)
+	add(Vector3.new(0.9,0.9,0.15), CFrame.new(0,0,0.35), Color3.fromRGB(25,28,35), Enum.Material.Metal)
+	add(Vector3.new(0.95,0.95,0.9), CFrame.new(0,0,0), Color3.fromRGB(55,52,48), Enum.Material.Fabric)
+	add(Vector3.new(0.98,0.25,0.5), CFrame.new(0,0.42,-0.25), Color3.fromRGB(75,72,68), Enum.Material.Leather)
+	add(Vector3.new(0.3,0.15,0.35), CFrame.new(0,0.55,0.3), Color3.fromRGB(30,32,38), Enum.Material.Metal)
+	return a
+end
+local function setParts(list, cf) for _, e in ipairs(list) do e[1].CFrame = cf * e[2] end end
+local armR, armL = makeArm(), makeArm()
+
+local dark, metal, poly = Color3.fromRGB(22,22,26), Color3.fromRGB(50,52,60), Color3.fromRGB(28,28,32)
+local GunDefs = {
+	Pistol = {muzzle=-2.2, parts={
+		{Vector3.new(0.38,0.42,1.7),  CFrame.new(0,0.18,-1.1),  dark,  Enum.Material.Metal},
+		{Vector3.new(0.4,0.15,1.6),   CFrame.new(0,0.42,-1.1),  metal, Enum.Material.Metal},
+		{Vector3.new(0.35,0.55,1.4),  CFrame.new(0,-0.05,-0.95), poly, Enum.Material.SmoothPlastic},
+		{Vector3.new(0.38,0.95,0.55), CFrame.new(0,-0.55,-0.3), poly,  Enum.Material.SmoothPlastic},
+		{Vector3.new(0.32,0.12,0.7),  CFrame.new(0,-0.15,-0.4), metal, Enum.Material.Metal},
+		{Vector3.new(0.25,0.15,0.5),  CFrame.new(0,-0.55,0.05), dark,  Enum.Material.SmoothPlastic},
+		{Vector3.new(0.35,0.35,0.3),  CFrame.new(0,0.2,-1.95),  metal, Enum.Material.Metal},
+		{Vector3.new(0.08,0.08,0.15), CFrame.new(0,0.4,-2.05),  dark,  Enum.Material.Metal},
+		{Vector3.new(0.2,0.08,0.1),   CFrame.new(0,0.42,-0.35), dark,  Enum.Material.Metal},
+		{Vector3.new(0.42,0.05,0.4),  CFrame.new(0,0.15,-1.5),  Color3.fromRGB(200,30,30), Enum.Material.Neon},
+	}},
+	SMG = {muzzle=-3.8, parts={
+		{Vector3.new(0.48,0.55,2.5),  CFrame.new(0,0.15,-1.5),  dark,  Enum.Material.Metal},
+		{Vector3.new(0.45,0.35,1.8),  CFrame.new(0,-0.15,-1.3), poly,  Enum.Material.SmoothPlastic},
+		{Vector3.new(0.3,0.3,1.0),    CFrame.new(0,0.15,-3.2),  metal, Enum.Material.Metal},
+		{Vector3.new(0.35,0.35,0.6),  CFrame.new(0,0.15,-3.65), dark,  Enum.Material.Metal},
+		{Vector3.new(0.28,1.2,0.45),  CFrame.new(0,-0.9,-1.0),  metal, Enum.Material.Metal},
+		{Vector3.new(0.4,0.7,0.5),    CFrame.new(0,-0.55,-0.1), poly,  Enum.Material.SmoothPlastic},
+		{Vector3.new(0.4,0.4,0.7),    CFrame.new(0,0.1,0.15),   poly,  Enum.Material.SmoothPlastic},
+		{Vector3.new(0.2,0.18,0.25),  CFrame.new(0,0.45,-1.3),  metal, Enum.Material.Metal},
+		{Vector3.new(0.15,0.2,0.25),  CFrame.new(0,0.6,-1.3),   Color3.fromRGB(30,80,30), Enum.Material.SmoothPlastic},
+		{Vector3.new(0.5,0.05,0.4),   CFrame.new(0,0.13,-2.5),  Color3.fromRGB(200,30,30), Enum.Material.Neon},
+	}},
+	Shotgun = {muzzle=-4.8, parts={
+		{Vector3.new(0.55,0.55,1.4),  CFrame.new(0,0.1,-0.3),   dark,  Enum.Material.Metal},
+		{Vector3.new(0.35,0.35,3.4),  CFrame.new(0,0.25,-2.4),  metal, Enum.Material.Metal},
+		{Vector3.new(0.3,0.3,2.4),    CFrame.new(0,-0.1,-1.9),  dark,  Enum.Material.Metal},
+		{Vector3.new(0.55,0.5,1.1),   CFrame.new(0,-0.05,-1.9), Color3.fromRGB(90,55,30), Enum.Material.Wood},
+		{Vector3.new(0.5,0.55,1.4),   CFrame.new(0,-0.15,0.7),  Color3.fromRGB(90,55,30), Enum.Material.Wood},
+		{Vector3.new(0.45,0.6,0.5),   CFrame.new(0,-0.5,-0.2),  Color3.fromRGB(90,55,30), Enum.Material.Wood},
+		{Vector3.new(0.4,0.4,0.35),   CFrame.new(0,0.3,-4.1),   dark,  Enum.Material.Metal},
+		{Vector3.new(0.08,0.08,0.1),  CFrame.new(0,0.42,-4.3),  metal, Enum.Material.Metal},
+		{Vector3.new(0.25,0.1,0.1),   CFrame.new(0,0.45,-0.9),  dark,  Enum.Material.Metal},
+	}},
+	Rifle = {muzzle=-4.6, parts={
+		{Vector3.new(0.6,0.7,2.8),    CFrame.new(0,0.15,-1.5),  dark,  Enum.Material.Metal},
+		{Vector3.new(0.35,0.35,3.5),  CFrame.new(0,0.15,-3.8),  metal, Enum.Material.Metal},
+		{Vector3.new(0.15,0.15,4.0),  CFrame.new(0.28,0.25,-3.5), Color3.fromRGB(255,80,200), Enum.Material.Neon},
+		{Vector3.new(0.15,0.15,4.0),  CFrame.new(-0.28,0.25,-3.5), Color3.fromRGB(255,80,200), Enum.Material.Neon},
+		{Vector3.new(0.55,0.55,0.4),  CFrame.new(0,0.15,-5.5),  Color3.fromRGB(255,80,200), Enum.Material.Neon},
+		{Vector3.new(0.45,0.9,0.5),   CFrame.new(0,-0.65,-0.2), dark,  Enum.Material.SmoothPlastic},
+		{Vector3.new(0.4,1.0,0.7),    CFrame.new(0,-0.7,-1.3),  metal, Enum.Material.Metal},
+		{Vector3.new(0.45,0.55,1.5),  CFrame.new(0,0.05,0.9),   poly,  Enum.Material.SmoothPlastic},
+		{Vector3.new(0.35,0.35,0.6),  CFrame.new(0,0.55,-1.3),  dark,  Enum.Material.Metal},
+		{Vector3.new(0.5,0.35,0.8),   CFrame.new(0,0.8,-1.3),   Color3.fromRGB(30,100,120), Enum.Material.SmoothPlastic},
+		{Vector3.new(0.15,0.15,0.3),  CFrame.new(0,0.15,-5.9),  Color3.fromRGB(255,80,200), Enum.Material.Neon},
+	}},
+}
+local gunParts = {}
+for name, def in pairs(GunDefs) do
+	gunParts[name] = {}
+	for _, d in ipairs(def.parts) do
+		local col = (d[3] == "ACC") and WD.Stats[name].Color or d[3]
+		table.insert(gunParts[name], {vpart(d[1], col, d[4]), d[2]})
+	end
+end
+local flash = vpart(Vector3.new(0.7,0.7,0.7), Color3.fromRGB(255,220,140), Enum.Material.Neon)
+flash.Shape = Enum.PartType.Ball; flash.Transparency = 1; flash.Parent = vm
+local flashLight = Instance.new("PointLight"); flashLight.Range = 14; flashLight.Brightness = 4; flashLight.Enabled = false
+flashLight.Color = Color3.fromRGB(255,220,140); flashLight.Parent = flash
+
+local chargeOrb = vpart(Vector3.new(0.5,0.5,0.5), Color3.fromRGB(255,80,200), Enum.Material.Neon)
+chargeOrb.Shape = Enum.PartType.Ball; chargeOrb.Transparency = 1; chargeOrb.Parent = vm
+local chargeLight = Instance.new("PointLight"); chargeLight.Range = 20; chargeLight.Brightness = 0
+chargeLight.Color = Color3.fromRGB(255,80,200); chargeLight.Parent = chargeOrb
+
+local curName = "Fists"
+local switchT, recoil, shakeI, recoilVel = 0, 0, 0, 0
+local punchHand, punchStart, flashT = 1, 0, 0
+local firing, lastFire = false, 0
+local charge, charging = 0, false
+local pickupT = 0
+local focusTarget, focusT = nil, 0
+
+local function refreshSlots()
+	local wl = plr:GetAttribute("WeaponLevel") or 1
+	for i, name in ipairs(WD.Order) do
+		local s = slots[name]
+		local unlocked = i <= wl
+		s.tl.TextTransparency = unlocked and 0 or 0.65
+		s.st.Thickness = (name == curName) and 3 or 1
+		s.f.BackgroundTransparency = (name == curName) and 0 or 0.4
+	end
+end
+local function playPickupSound(wl)
+	local key = (wl == 2) and "pickup_pistol" or "pickup_other"
+	local name = SOUND_NAMES[key]
+	local template = findSoundTemplate(name)
+	if not template then
+		warn("[SFX] Sound '" .. tostring(name) .. "' не найден в Workspace/SoundService")
+		return
+	end
+	local s = template:Clone()
+	s.Name = "_PlayingSFX"
+	s.Looped = false
+	s.Volume = 0.8
+	s.Parent = workspace
+	s:Play()
+	Debris:AddItem(s, 6)
+end
+local function selectWeapon(name)
+	local idx = table.find(WD.Order, name)
+	if not idx or idx > (plr:GetAttribute("WeaponLevel") or 1) then return end
+	curName = name; switchT = 1
+	for n, list in pairs(gunParts) do
+		for _, e in ipairs(list) do e[1].Parent = (n == name) and vm or nil end
+	end
+	refreshSlots()
+end
+plr:GetAttributeChangedSignal("WeaponLevel"):Connect(function()
+	local wl = plr:GetAttribute("WeaponLevel") or 1
+	if wl > 1 then
+		pickupT = 1.4
+		playPickupSound(wl)
+		task.delay(0.55, function()
+			curName = "x"; selectWeapon(WD.Order[wl])
+		end)
+	end
+end)
+selectWeapon("Fists")
+
+------------------------------------------------------------------ СТРЕЛЬБА
+local function doFire(chargeLevel)
+	if cutsceneActive then return end
+	local w = WD.Stats[curName]
+	local now = os.clock()
+	if now - lastFire < w.Cooldown then return end
+	local char = plr.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if not hum or hum.Health <= 0 then return end
+	lastFire = now
+	Remotes.Attack:FireServer(curName, cam.CFrame.Position, cam.CFrame.LookVector, chargeLevel)
+	if curName == "Fists" then
+		punchHand = 1 - punchHand; punchStart = now
+	else
+		playPickupSound(curName == "Pistol" and 2 or 3)
+		local kick = w.Recoil or 1
+		recoil = math.min(recoil + kick, 6); recoilVel = kick * 0.8
+		shakeI = math.max(shakeI, kick * 2)
+		flashT = now + 0.05
+	end
+end
+
+UIS.InputBegan:Connect(function(i, gpe)
+	if gpe then return end
+	if cutsceneActive then return end
+	if i.UserInputType == Enum.UserInputType.MouseButton1 then
+		firing = true
+		if curName == "Rifle" then
+			charging = true; charge = 0
+		elseif not WD.Stats[curName].Auto then
+			doFire(0)
+		end
+	elseif i.KeyCode == Enum.KeyCode.E then
+		if doorPrompt.Visible then Remotes.Kick:FireServer() end
+	elseif i.KeyCode.Value >= Enum.KeyCode.One.Value and i.KeyCode.Value <= Enum.KeyCode.Five.Value then
+		selectWeapon(WD.Order[i.KeyCode.Value - Enum.KeyCode.One.Value + 1])
+	end
+end)
+UIS.InputEnded:Connect(function(i)
+	if i.UserInputType == Enum.UserInputType.MouseButton1 then
+		firing = false
+		if curName == "Rifle" and charging then
+			charging = false
+			doFire(math.clamp(charge / WD.Stats.Rifle.MaxCharge, 0, 1))
+			charge = 0
+		end
+	end
+end)
+
+Remotes.Focus.OnClientEvent:Connect(function(point, dur)
+	focusTarget = point; focusT = dur
+ if cutsceneActive then
+  shotFrom=cam.CFrame
+  shotTarget=CFrame.lookAt(point+Vector3.new(9,4,12),point)
+  shotStart=os.clock(); shotDuration=math.min(dur or 2,2)
+ end
+end)
+
+local doorPos = nil
+Remotes.DoorState.OnClientEvent:Connect(function(pos, unlocked)
+	doorPos = unlocked and pos or nil
+	if not unlocked then doorPrompt.Visible = false end
+end)
+
+------------------------------------------------------------------ РЕНДЕР
+local swayX, swayY, bobA = 0, 0, 0
+RunService:BindToRenderStep("ViewModel", Enum.RenderPriority.Camera.Value + 1, function(dt)
+	local now = os.clock()
+	local char = plr.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+	if cutsceneActive then
+  if vm then vm.Parent=nil end
+  cam.CameraType=Enum.CameraType.Scriptable
+  if char then
+			for _, d in ipairs(char:GetDescendants()) do
+				if d:IsA("BasePart") and d.Name ~= "HumanoidRootPart" then d.LocalTransparencyModifier = 0 end
+			end
+		end
+		if shotTarget then
+   local t=math.clamp((os.clock()-shotStart)/shotDuration,0,1)
+   cam.CFrame=shotFrom:Lerp(shotTarget,t*t*(3-2*t))
+  elseif char and char.PrimaryPart then
+   local hr = char.PrimaryPart
+			local side = hr.CFrame.RightVector * 8
+			local back = hr.CFrame.LookVector * -8
+			local camPos = hr.Position + side + back + Vector3.new(0, 6, 0)
+			cam.CFrame = CFrame.lookAt(camPos, hr.Position + Vector3.new(0, 2, 0))
+		end
+		return
+	end
+
+	if char then
+		for _, d in ipairs(char:GetDescendants()) do
+			if d:IsA("BasePart") then d.LocalTransparencyModifier = 1 end
+		end
+	end
+	local alive = hum and hum.Health > 0
+	local target = alive and cam or nil
+	if vm.Parent ~= target then vm.Parent = target end
+	if not alive then return end
+
+	if firing and WD.Stats[curName].Auto then doFire(0) end
+
+	if charging and curName == "Rifle" then
+		charge = math.min(charge + dt, WD.Stats.Rifle.MaxCharge)
+		chargeBg.Visible = true
+		chargeFill.Size = UDim2.fromScale(math.clamp(charge / WD.Stats.Rifle.MaxCharge, 0, 1), 1)
+		chargeOrb.Transparency = 1 - math.clamp(charge / WD.Stats.Rifle.MaxCharge, 0, 1) * 0.9
+		chargeOrb.Size = Vector3.new(0.5,0.5,0.5) * (1 + charge * 1.5)
+		chargeLight.Brightness = charge * 4
+	else
+		chargeBg.Visible = false
+		chargeOrb.Transparency = 1
+		chargeLight.Brightness = 0
+	end
+
+	recoil = recoil * math.exp(-dt * 10)
+	recoilVel = recoilVel * math.exp(-dt * 4)
+	shakeI = shakeI * math.exp(-dt * 6)
+	local pitchKick = math.rad(recoil * 0.6)
+	local shakeAng = CFrame.Angles(
+		(math.random()-0.5) * shakeI * 0.008 + pitchKick,
+		(math.random()-0.5) * shakeI * 0.008,
+		(math.random()-0.5) * shakeI * 0.006)
+	cam.CFrame = cam.CFrame * shakeAng
+
+	if focusT > 0 and focusTarget then
+		focusT -= dt
+		local pos = cam.CFrame.Position
+		local dir = (focusTarget - pos).Unit
+		local look = CFrame.lookAt(pos, pos + dir)
+		cam.CFrame = cam.CFrame:Lerp(look, math.min(1, dt * 6))
+	end
+
+	local pickDip, pickArm = 0, CFrame.new()
+	if pickupT > 0 then
+		pickupT -= dt
+		local p = 1 - math.clamp(pickupT / 1.4, 0, 1)
+		local s = math.sin(p * math.pi)
+		pickDip = s * math.rad(22)
+		pickArm = CFrame.new(0, -s * 1.5, s * 0.4) * CFrame.Angles(math.rad(s * 45), 0, 0)
+		cam.CFrame = cam.CFrame * CFrame.Angles(pickDip, 0, 0)
+	end
+
+	local md = UIS:GetMouseDelta()
+	swayX += ((-md.X * 0.0022) - swayX) * math.min(1, dt * 10)
+	swayY += ((-md.Y * 0.0022) - swayY) * math.min(1, dt * 10)
+	local v = hrp and hrp.AssemblyLinearVelocity or Vector3.zero
+	bobA += (math.clamp(Vector3.new(v.X,0,v.Z).Magnitude / 16, 0, 1) - bobA) * math.min(1, dt * 8)
+	local bob = CFrame.new(math.sin(now*9)*0.05*bobA, -math.abs(math.cos(now*9))*0.06*bobA, 0)
+	local idle = CFrame.new(0, math.sin(now*1.6)*0.012, 0)
+	switchT = math.max(0, switchT - dt * 4)
+	local sw = CFrame.new(0, -switchT*switchT*1.6, 0) * CFrame.Angles(math.rad(-switchT*40), 0, 0)
+	local base = cam.CFrame * sw * bob * idle * CFrame.Angles(swayY, swayX, 0)
+
+	local rightRoot, leftRoot
+	if curName == "Fists" then
+		local function punch(side)
+			if punchHand ~= side then return CFrame.new() end
+			local p = math.clamp((now - punchStart) / 0.3, 0, 1)
+			local c = math.sin(p * math.pi)
+			local dirS = side == 0 and 1 or -1
+			return CFrame.new(-dirS * 0.5 * c, 0.15 * c, -2.7 * c) * CFrame.Angles(0, math.rad(dirS * 10 * c), 0)
+		end
+		rightRoot = base * CFrame.new(1.1,-1.0,-1.7) * CFrame.Angles(math.rad(8), math.rad(6), 0) * punch(0) * pickArm
+		leftRoot  = base * CFrame.new(-1.1,-1.0,-1.7) * CFrame.Angles(math.rad(8), math.rad(-6), 0) * punch(1) * pickArm
+	else
+		rightRoot = base * CFrame.new(0.75,-0.8,-1.4 + recoil*0.15) * CFrame.Angles(math.rad(recoil*2), 0, 0) * pickArm
+		leftRoot  = rightRoot * CFrame.new(-0.55,-0.25,-1.1) * CFrame.Angles(0, math.rad(-20), 0)
+		setParts(gunParts[curName], rightRoot)
+		local on = now < flashT
+		flash.CFrame = rightRoot * CFrame.new(0, 0.1, GunDefs[curName].muzzle)
+		flash.Transparency = on and 0.2 or 1
+		flashLight.Enabled = on
+		if curName == "Rifle" and charging then
+			chargeOrb.CFrame = rightRoot * CFrame.new(0, 0.15, GunDefs.Rifle.muzzle)
+		end
+	end
+	if curName == "Fists" then flash.Transparency = 1; flashLight.Enabled = false end
+	setParts(armR, rightRoot); setParts(armL, leftRoot)
+
+	if doorPos then
+		local near = (hrp.Position - doorPos).Magnitude < 10
+		doorPrompt.Visible = near
+		if near then
+			local screen = cam:WorldToViewportPoint(doorPos)
+			if screen.Z > 0 then doorPrompt.Position = UDim2.fromOffset(screen.X, screen.Y + 60) end
+		end
+	else
+		doorPrompt.Visible = false
+	end
+end)
+
+------------------------------------------------------------------ HUD
+local function onChar(char)
+	local hum = char:WaitForChild("Humanoid")
+	local last = hum.Health
+	local function upd()
+		local f = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+		hpFill.Size = UDim2.fromScale(f, 1)
+		hpFill.BackgroundColor3 = Color3.fromRGB(255,40,70):Lerp(Color3.fromRGB(0,220,120), f)
+		hpText.Text = tostring(math.ceil(hum.Health))
+	end
+	hum.HealthChanged:Connect(function(h)
+		if h < last then
+			vignette.BackgroundTransparency = 0.55
+			TweenService:Create(vignette, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
+		end
+		last = h; upd()
+	end)
+	upd()
+end
+if plr.Character then task.spawn(onChar, plr.Character) end
+plr.CharacterAdded:Connect(onChar)
+
+------------------------------------------------------------------ СОБЫТИЯ
+local subToken = 0
+Remotes.Notify.OnClientEvent:Connect(function(text, dur)
+	subToken += 1; local my = subToken
+	sub.Text = text; sub.Visible = true
+	task.delay(dur or 4, function() if my == subToken then sub.Visible = false end end)
+end)
+Remotes.Fade.OnClientEvent:Connect(function(on, text) showFade(on, text, 0.6) end)
+Remotes.State.OnClientEvent:Connect(function(level, name, left, wave, total)
+	if level >= 1 and level <= 5 then lvlLabel.Text = ("ЛОКАЦИЯ %d / 5 — %s"):format(level, name)
+	else lvlLabel.Text = name end
+	local wtxt = (wave and total and total > 0) and (" • Волна %d/%d"):format(wave, total) or ""
+	enLabel.Text = left >= 0 and ("Осталось: " .. left .. wtxt) or ""
+end)
+Remotes.Hit.OnClientEvent:Connect(function(killed)
+	hitmark.TextColor3 = killed and Color3.fromRGB(255,60,60) or Color3.new(1,1,1)
+	hitmark.TextTransparency = 0
+	TweenService:Create(hitmark, TweenInfo.new(0.25), {TextTransparency = 1}):Play()
+end)
+Remotes.Shake.OnClientEvent:Connect(function(i) shakeI = math.max(shakeI, i) end)
+Remotes.End.OnClientEvent:Connect(function()
+	showFade(true, "КОНЕЦ?\n\nНейро-тянка забрала все данные.\n\n(игра скоро перезапустится)", 2)
+end)
