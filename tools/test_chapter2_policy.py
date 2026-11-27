@@ -200,6 +200,22 @@ chapterHandler(artem,"debugJump","finale")
 assert(C2.stage==previousStage and #queued==queueBefore)
 print("PASS: removed debug functions absent; legacy skip packet has no effect")
 
+-- Ending branch is based on configured party, even when one hero has fallen.
+local savedLiteral=C2.Literal
+local dialogue={}
+C2.Literal=function(name,text) table.insert(dialogue,{name=name,text=text}) end
+C2.party={artem,demid}; dh.Health=0
+C2.EvacuationDialogue(artem,"Демид")
+assert(#dialogue==2 and dialogue[1].name=="Демид" and dialogue[1].text=="Круто, мы победили!")
+assert(dialogue[2].name=="Артём" and dialogue[2].text=="Дааа, мы их вынесли! Хотя... это же была всего лишь мини-база, да? Ладно, всё будет отлично, я тебя уверяю!")
+for _,hero in ipairs({artem,demid}) do
+ dialogue={}; C2.party={hero}; C2.EvacuationDialogue(hero,"Напарник")
+ assert(#dialogue==2 and dialogue[1].name=="Напарник")
+ assert(dialogue[1].text:find("На самом деле",1,true) and dialogue[2].text=="Это было легко, но если бы мне кто-то помогал...")
+end
+C2.Literal=savedLiteral; dh.Health=180; C2.party={artem,demid}
+print("PASS: exact cooperative victory dialogue including fallen partner; both solo hero endings unchanged")
+
 -- Door gates are a conjunction, not merely a completed terminal timer.
 for clear=0,1 do for card=0,1 do for hack=0,1 do
  local z={cleared=clear==1,keyCollected=card==1,hacked=hack==1}

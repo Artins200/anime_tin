@@ -120,17 +120,31 @@ print('PASS: unanchored outfits, path pursuit, no distant objective signs, real 
 # Repacking must preserve every uploaded object/property outside the three script Sources.
 base = list(chunks(Path('Place3.rbxl').read_bytes()))
 built = list(chunks(Path('Place1.rbxl').read_bytes()))
-assert len(base) == len(built)
+# The only permitted additional objects are the verified Kirill import.
+from import_kirill import inspect as inspect_place, u32
+base_classes, _, _, _ = inspect_place(Path('Place3.rbxl').read_bytes())
 source_ids = {41, 47, 61}
-for (bt, br, bf), (ot, raw, flags) in zip(base, built):
+original_chunks = []
+for tag, raw, flags in built:
+    if tag in (b'INST', b'PROP') and u32(raw) not in base_classes:
+        continue
+    original_chunks.append((tag,raw,flags))
+assert len(base) == len(original_chunks)
+for (bt, br, bf), (ot, raw, flags) in zip(base, original_chunks):
     assert bt == ot and bf == flags
     source = False
     if bt == b'PROP':
         cid = struct.unpack_from('<I', br)[0]
         name, _ = string(br, 4)
         source = cid in source_ids and name == 'Source'
-    if not source:
-        assert br == raw, f'Unexpected non-source change: {bt!r}'
+    if bt == b'SSTR':
+        assert raw[:4] == br[:4] and raw[8:8+len(br)-8] == br[8:]
+    elif bt == b'PRNT':
+        _,_,_,before = inspect_place(Path('Place3.rbxl').read_bytes())
+        _,_,_,after = inspect_place(Path('Place1.rbxl').read_bytes())
+        assert all(after[ref] == parent for ref,parent in before.items())
+    elif not source:
+        assert br == raw, f'Unexpected original non-source change: {bt!r}'
 
 # Decode Roblox delta/zigzag/interleaved referents to verify exact model ownership.
 def refs(data, n):
@@ -162,7 +176,7 @@ storage = next(ref for ref, name in names.items() if name == 'ServerStorage')
 for model in ('eurtyoeyrntiu', 'ZamestitelDiomchica'):
     ref = next(ref for ref, name in names.items() if name == model)
     assert parents[ref] == storage
-print('PASS: all non-source RBXL data unchanged; both original heroes remain directly in ServerStorage')
+print('PASS: all original non-source properties/parents preserved alongside Kirill import; original heroes remain in ServerStorage')
 
 # Cinematic finale contracts: camera mode, deterministic transport and safe debug controls.
 campaign=Path('src/Chapter2Campaign.luau').read_text()

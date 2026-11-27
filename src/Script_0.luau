@@ -2854,6 +2854,17 @@ function C2.BuildEscapeCity()
  end
  return city
 end
+function C2.EvacuationDialogue(lead,other)
+ -- Use the original party, not the survivor count: a fallen teammate still
+ -- watches the shared cooperative ending rather than hearing the solo script.
+ if #C2.party>1 then
+  C2.Literal("Демид","Круто, мы победили!",2.5)
+  C2.Literal("Артём","Дааа, мы их вынесли! Хотя... это же была всего лишь мини-база, да? Ладно, всё будет отлично, я тебя уверяю!",7)
+ else
+  C2.Literal(other,"На самом деле это было неплохо, отличная работа. Но скажу тебе так — всё довольно плачевно. В плане, это же их мини-центр, мы даже и половину не уничтожили",10)
+  C2.Literal(lead:GetAttribute("Hero")=="Artem" and "Артем" or "Демид","Это было легко, но если бы мне кто-то помогал...",4)
+ end
+end
 function C2.CarScene()
  local survivors={}; for _,p in ipairs(C2.party) do if c2Root(p) then table.insert(survivors,p) end end
  local lead=survivors[1] or C2.party[1]
@@ -2922,8 +2933,8 @@ function C2.CarScene()
  for _,p in ipairs(C2.party) do p.ReplicationFocus=car:FindFirstChild("Chassis") end
  MusicRE:FireAllClients("finalSlow")
  task.spawn(function() for i=2,10 do C2.Collapse(C2.zones[i],true); task.wait(0.15) end end)
- C2.Literal(other,"На самом деле это было неплохо, отличная работа. Но скажу тебе так — всё довольно плачевно. В плане, это же их мини-центр, мы даже и половину не уничтожили",10)
- C2.Literal(lead:GetAttribute("Hero")=="Artem" and "Артем" or "Демид","Это было легко, но если бы мне кто-то помогал...",4)
+ task.wait(1.5) -- Let the destruction behind the car finish before celebrating.
+ C2.EvacuationDialogue(lead,other)
  task.wait(2); FadeRE:FireAllClients(true,""); task.wait(1)
  connection:Disconnect()
  for _,pose in pairs(poses) do for m,cf in pairs(pose) do if m.Parent then m.C0=cf end end end
