@@ -28,15 +28,16 @@ local SceneReadyRE=newRemote("SceneReady")
 local readyClients, preparedClients = {}, {}
 local prepareId=0
 local finaleId=0
-local scanAcknowledged,blackAcknowledged={},{}
+local scanAcknowledged,blackAcknowledged,armyAcknowledged={},{},{}
 SceneReadyRE.OnServerEvent:Connect(function(player,command,id)
  if command=="ready" then readyClients[player]=true; if pushLobbyState then pushLobbyState() end
  elseif command=="prepared" and id==prepareId then preparedClients[player]=id
  elseif command=="scanDone" and id==finaleId then scanAcknowledged[player]=id
- elseif command=="black" and id==finaleId then blackAcknowledged[player]=id end
+ elseif command=="black" and id==finaleId then blackAcknowledged[player]=id
+ elseif command=="armyDone" and id==finaleId then armyAcknowledged[player]=id end
 end)
 Players.PlayerRemoving:Connect(function(player)
- readyClients[player]=nil; preparedClients[player]=nil; scanAcknowledged[player]=nil; blackAcknowledged[player]=nil
+ readyClients[player]=nil; preparedClients[player]=nil; scanAcknowledged[player]=nil; blackAcknowledged[player]=nil; armyAcknowledged[player]=nil
 end)
 local function prepareView(position)
  prepareId+=1
@@ -966,6 +967,7 @@ end
 local function sceneLock(on)
  for _, player in ipairs(Players:GetPlayers()) do
   player:SetAttribute("InCinematic", on)
+  if not on then player.ReplicationFocus=nil end
   local char = player.Character
   local hum = char and char:FindFirstChildOfClass("Humanoid")
   local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -1357,6 +1359,11 @@ local function playIntro()
 end
 
 ------------------------------------------------------------------ МАФИОЗИ-КАТСЦЕНА
+local function sceneLine(text,minimum)
+ local duration=math.max(minimum or 3,(utf8.len(text) or #text)*0.045+2)
+ NotifyRE:FireAllClients(text,duration)
+ task.wait(duration+0.35)
+end
 local function playMafioziScene()
 	introActive = true
 	canFight = false
@@ -1415,43 +1422,46 @@ local function playMafioziScene()
 	if h then h.WalkSpeed = 0; h.JumpPower = 0; h.AutoRotate = false end
 
 	applyPreset("Office", 0.5)
-	FadeRE:FireAllClients(false, "")
 	CutsceneRE:FireAllClients("start")
- CutsceneRE:FireAllClients("pov",Vector3.new(0,5,-8))
+ CutsceneRE:FireAllClients("pov",Vector3.new(0,5,15))
+ prepareView(currentSpawn.Position)
+ CutsceneRE:FireAllClients("reveal")
 	task.wait(1)
 
 	-- Врываемся через дверь
 	NotifyRE:FireAllClients("Дверь открыта, заходим.", 2)
-	backDoor.Anchored = false
-	backDoor.AssemblyLinearVelocity = Vector3.new(0, 5, 25)
-	backDoor.AssemblyAngularVelocity = Vector3.new(math.random(-6,6), math.random(-6,6), math.random(-6,6))
+ backDoor.CanCollide=false
+ TweenService:Create(backDoor,TweenInfo.new(0.6),{CFrame=CFrame.new(0,0.65,10)*CFrame.Angles(math.rad(-90),0,0)}):Play()
 	ShakeRE:FireAllClients(12)
-	task.wait(0.3)
+	task.wait(0.8)
 
 	-- Забегаем внутрь
 	tweenCharTo(char, CFrame.lookAt(Vector3.new(0, 3, 5), Vector3.new(0, 3, -8)), 1.5)
  CutsceneRE:FireAllClients("pov",maf:FindFirstChild("Head"))
- NotifyRE:FireAllClients(story().office,5)
-	task.wait(1.2)
+ sceneLine(story().office,6)
 
 	-- Мафиози видит нас, поднимает руки
-	NotifyRE:FireAllClients("Стой, не стреляй. Я сдаюсь, я все расскажу.", 3)
+ sceneLine("Стой, не стреляй. Я сдаюсь, я все расскажу.",5)
 	mafJ.RS.C0 = mafJ.RS.C0 * CFrame.Angles(math.rad(100), 0, math.rad(-30))
 	mafJ.LS.C0 = mafJ.LS.C0 * CFrame.Angles(math.rad(100), 0, math.rad(30))
 	task.wait(1.5)
 
-	-- Мы целимся (небольшая пауза)
-	task.wait(0.8)
+ -- Keep the actor and weapon on screen before firing.
+ CutsceneRE:FireAllClients("blaster",true)
+ task.wait(1.5)
+ CutsceneRE:FireAllClients("pulse")
 
 	-- Стреляем
 	local headPos = char:FindFirstChild("Head") and char.Head.Position or char.HumanoidRootPart.Position
-	tracer(headPos, mafHrp.Position, Color3.fromRGB(255, 200, 100))
+ local bullet=part(fxFolder,Vector3.new(0.6,0.6,0.6),headPos,C(100,200,210),Enum.Material.Neon)
+ bullet.Shape=Enum.PartType.Ball; bullet.CanCollide=false; bullet.CanQuery=false
+ TweenService:Create(bullet,TweenInfo.new(0.4,Enum.EasingStyle.Linear),{Position=maf.Head.Position}):Play()
+ Debris:AddItem(bullet,0.5)
 	ShakeRE:FireAllClients(10)
-	NotifyRE:FireAllClients("", 0.8)
-	task.wait(0.3)
+	task.wait(0.45)
 
  -- A scripted rig does not have the enemies' Died connection: animate the reaction explicitly.
- CutsceneRE:FireAllClients("blood",0.45)
+ CutsceneRE:FireAllClients("blood",0.18)
  local wound=Instance.new("ParticleEmitter")
  wound.Texture="rbxasset://textures/particles/sparkles_main.dds"
  wound.Color=ColorSequence.new(C(130,12,20)); wound.LightEmission=0
@@ -1461,11 +1471,13 @@ local function playMafioziScene()
  local hitCF=maf:GetPivot()
  moveModel(maf,hitCF*CFrame.Angles(math.rad(-18),0,math.rad(10)),0.18)
  mafHum.BreakJointsOnDeath=false; mafHum.Health=0
- moveModel(maf,hitCF*CFrame.new(1,-2,2)*CFrame.Angles(math.rad(-80),0,math.rad(12)),0.7)
- local stain=part(office,Vector3.new(2.5,0.03,1.8),Vector3.new(1,0.03,-7),C(95,12,18),Enum.Material.SmoothPlastic)
+ moveModel(maf,hitCF*CFrame.new(7,-1.8,1)*CFrame.Angles(math.rad(-80),0,math.rad(12)),0.7)
+ local stain=part(office,Vector3.new(2.5,0.03,1.8),Vector3.new(7,0.15,-8),C(95,12,18),Enum.Material.SmoothPlastic)
  stain.CanCollide=false
- task.wait(1.5)
-
+ task.wait(4)
+ CutsceneRE:FireAllClients("blaster",false)
+ FadeRE:FireAllClients(true,"")
+ task.wait(0.8)
 	CutsceneRE:FireAllClients("end")
  -- Keep actors frozen across the office -> plane -> base transition.
 	FadeRE:FireAllClients(true, "")
@@ -1518,7 +1530,7 @@ local function playPlaneScene()
 end
 
 ------------------------------------------------------------------ ФИНАЛ НА БАЗЕ , смерть агента и раскрытие нейро-армии
-local function say(text, dur) NotifyRE:FireAllClients(text, dur); task.wait(dur + 0.4) end
+local function say(text, dur) sceneLine(text,dur) end
 
 local function buildConversionFactory()
  local f=Instance.new("Model"); f.Name="ConversionFactory"; f.Parent=levelFolder
@@ -1577,6 +1589,57 @@ local function buildConversionFactory()
   Spawn=CFrame.lookAt(origin+Vector3.new(0,3.2,-18),origin+Vector3.new(0,4.5,9))}
 end
 
+local function buildProductionEpilogue()
+ local origin=Vector3.new(6000,0,0)
+ local f=Instance.new("Model"); f.Name="TyanProductionPlant"; f.Parent=levelFolder
+ local function prop(name,size,offset,color)
+  local p=part(f,size,origin+offset,color,Enum.Material.Metal); p.Name=name; return p
+ end
+ prop("Floor",Vector3.new(64,1,64),Vector3.new(0,-0.5,0),C(40,47,52))
+ prop("Roof",Vector3.new(64,1,64),Vector3.new(0,18.5,0),C(45,52,60))
+ for _,x in ipairs({-32,32}) do prop("Wall",Vector3.new(1,18,64),Vector3.new(x,9,0),C(50,60,68)) end
+ for _,z in ipairs({-32,32}) do prop("Wall",Vector3.new(64,18,1),Vector3.new(0,9,z),C(50,60,68)) end
+ for _,z in ipairs({-23,-7,10,25}) do
+  local fixture=prop("Lamp",Vector3.new(22,0.3,2),Vector3.new(0,16,z),C(170,185,190))
+  light(fixture,C(205,215,225),35,1)
+ end
+ for _,x in ipairs({-22,22}) do
+  prop("Conveyor",Vector3.new(8,1.2,52),Vector3.new(x,0.6,0),C(62,72,80))
+  for z=-24,24,4 do prop("Roller",Vector3.new(7.8,0.4,0.8),Vector3.new(x,1.5,z),C(105,115,120)) end
+ end
+ for _,x in ipairs({-29,29}) do
+  for _,z in ipairs({-22,-11,0,11,22}) do prop("ServerRack",Vector3.new(3,11,5),Vector3.new(x,5.5,z),C(24,35,43)) end
+ end
+ local before=table.clone(Types.Commander); before.Name="Пленник"; before.Shirt=C(95,95,100)
+ local captive=buildRig(before,CFrame.new(origin+Vector3.new(-10,3,1))); anchorAll(captive); captive.Parent=f
+ prop("Platform",Vector3.new(8,0.3,8),Vector3.new(-10,0.2,1),C(70,80,85))
+ local shutter=prop("ConversionShutter",Vector3.new(8,10,0.4),Vector3.new(-10,15,-2),C(75,88,95))
+ for _,x in ipairs({-15,-5}) do prop("ChamberFrame",Vector3.new(0.7,12,0.7),Vector3.new(x,6,1),C(105,115,125)) end
+ local arm=prop("Manipulator",Vector3.new(0.7,5,0.7),Vector3.new(-13,8,1),C(100,115,130))
+ local output=table.clone(Types.Melee); output.Name="Боец картеля"; output.Hair=C(130,80,105)
+ local soldier=buildRig(output,CFrame.new(origin+Vector3.new(10,3,1))); anchorAll(soldier); soldier.Parent=f
+ for _,z in ipairs({8,15,22}) do
+  local unit=buildRig(output,CFrame.new(origin+Vector3.new(10,3,z))); anchorAll(unit); unit.Parent=f
+ end
+ return origin,captive,shutter,arm
+end
+local function focusStreaming(position)
+ local focus=levelFolder:FindFirstChild("CinematicStreamingFocus")
+ if not focus then
+  focus=part(levelFolder,Vector3.new(1,1,1),position,C(0,0,0))
+  focus.Name="CinematicStreamingFocus"; focus.Transparency=1; focus.CanCollide=false; focus.CanQuery=false
+ end
+ focus.Position=position
+ for _,player in ipairs(Players:GetPlayers()) do player.ReplicationFocus=focus end
+end
+local function buildHordeStage()
+ local origin=Vector3.new(8000,0,0)
+ local f=Instance.new("Folder"); f.Name="HordeStage"; f.Parent=levelFolder
+ part(f,Vector3.new(520,2,400),origin+Vector3.new(0,-1,145),C(35,42,48),Enum.Material.Concrete)
+ for _,x in ipairs({-250,250}) do part(f,Vector3.new(2,40,400),origin+Vector3.new(x,20,145),C(45,55,64),Enum.Material.Concrete) end
+ part(f,Vector3.new(500,40,2),origin+Vector3.new(0,20,340),C(45,55,64),Enum.Material.Concrete)
+ return origin
+end
 -- Rename this constant to change the new character's name in dialogue and UI.
 local ANDROID_NAME="Нейро"
 local function awaitFinalAck(states,id,timeout)
@@ -1631,7 +1694,7 @@ function startBase()
  moveModel(boss,bossCF*CFrame.new(1,-2,1)*CFrame.Angles(math.rad(-80),0,math.rad(12)),0.8)
  for _,piece in ipairs(boss:GetDescendants()) do if piece:IsA("BasePart") then piece.CanCollide=false end end
  CutsceneRE:FireAllClients("blaster",false)
- task.wait(0.5)
+ task.wait(3.5)
  CutsceneRE:FireAllClients("pov",ally.Head)
  say("Пока ты был на миссии, нашу базу на Дальнем Востоке полностью разрушили. Появилась очень опасная женщина, в народе ее уже прозвали "..ANDROID_NAME..".",10)
  for _,lamp in ipairs(factory.Lamps) do lamp.Enabled=false end
@@ -1646,27 +1709,94 @@ function startBase()
  local door=factory.Door
  TweenService:Create(door,TweenInfo.new(1.5),{CFrame=door.CFrame*CFrame.new(0,11,0)}):Play()
  task.wait(1.6)
- CutsceneRE:FireAllClients("pov",android.Head)
+ CutsceneRE:FireAllClients("pov",android.Head,44)
  moveModel(android,CFrame.lookAt(origin+Vector3.new(0,3,18),origin+Vector3.new(0,3,-18)),1.5,true)
  say("Не трогай его. Слышишь меня.",2.5)
  local bolt=part(fxFolder,Vector3.new(0.7,0.7,0.7),android.Head.Position,C(65,190,195),Enum.Material.Neon)
  bolt.Shape=Enum.PartType.Ball; bolt.CanCollide=false; bolt.CanQuery=false
  TweenService:Create(bolt,TweenInfo.new(0.3),{Position=ally.Head.Position}):Play()
  task.wait(0.3); bolt:Destroy(); ShakeRE:FireAllClients(4)
- moveModel(ally,ally:GetPivot()*CFrame.new(0,-2,0)*CFrame.Angles(math.rad(80),0,0),0.7)
- moveModel(android,CFrame.lookAt(origin+Vector3.new(0,3,-12),origin+Vector3.new(0,3,-18)),3,true)
+ CutsceneRE:FireAllClients("pov",ally.Head)
+ moveModel(ally,ally:GetPivot()*CFrame.new(0,-2,0)*CFrame.Angles(math.rad(80),0,0),0.9)
+ task.wait(2)
+ CutsceneRE:FireAllClients("pov",android.Head,44)
+ moveModel(android,CFrame.lookAt(origin+Vector3.new(0,3,8),origin+Vector3.new(0,3,-18)),1,true)
+ say("Не двигайся. Сначала я заберу все, что ты знаешь.",4)
  finaleId+=1
  local id=finaleId
  CutsceneRE:FireAllClients("scan",{id=id,seconds=7})
  if not awaitFinalAck(scanAcknowledged,id,12) then warn("Scan acknowledgement timed out") end
- -- No movement, camera or scan animation is scheduled after this blackout.
+ say("Все, что мне нужно, я получила.",3)
+ -- Show the charge, launch and victim's fall without hiding the attacker behind UI.
+ CutsceneRE:FireAllClients("pov",android.Head,44)
+ local charge=part(fxFolder,Vector3.new(0.4,0.4,0.4),android.Head.Position+Vector3.new(0,-1,-1),C(65,190,190),Enum.Material.Neon)
+ charge.Shape=Enum.PartType.Ball; charge.CanCollide=false; charge.CanQuery=false
+ TweenService:Create(charge,TweenInfo.new(1.4),{Size=Vector3.new(1.8,1.8,1.8)}):Play()
+ task.wait(2)
+ for _,player in ipairs(Players:GetPlayers()) do
+  local head=player.Character and player.Character:FindFirstChild("Head")
+  if head then
+   local shot=part(fxFolder,Vector3.new(1,1,1),charge.Position,C(70,200,200),Enum.Material.Neon)
+   shot.Shape=Enum.PartType.Ball; shot.CanCollide=false; shot.CanQuery=false
+   TweenService:Create(shot,TweenInfo.new(0.7,Enum.EasingStyle.Linear),{Position=head.Position}):Play()
+   Debris:AddItem(shot,0.8)
+  end
+ end
+ charge:Destroy()
+ task.wait(0.75)
+ CutsceneRE:FireAllClients("blood",0.25); ShakeRE:FireAllClients(8)
+ local oldRespawn=Players.RespawnTime; Players.RespawnTime=180
+ for _,player in ipairs(Players:GetPlayers()) do
+  local character=player.Character
+  local hum=character and character:FindFirstChildOfClass("Humanoid")
+  if hum then hum.BreakJointsOnDeath=false; hum.Health=0 end
+ end
+ cameraPlan(origin+Vector3.new(0,5,-18),origin+Vector3.new(0,1.5,-19),android.Head.Position,1.2,58,60)
+ for _,player in ipairs(Players:GetPlayers()) do
+  if player.Character then moveModel(player.Character,player.Character:GetPivot()*CFrame.new(0,-2,0)*CFrame.Angles(math.rad(-80),0,0),0.7) end
+ end
+ task.wait(3)
+ FadeRE:FireAllClients(true,"")
+ task.wait(0.8)
+ local horde=buildHordeStage()
+ focusStreaming(horde+Vector3.new(0,4,50))
+ applyPreset("Base",0.1)
+ CutsceneRE:FireAllClients("army",horde,id)
+ cameraPlan(horde+Vector3.new(0,7,-18),horde+Vector3.new(0,6,-11),horde+Vector3.new(0,4,55),8,38,30)
+ prepareView(horde)
+ if not awaitFinalAck(armyAcknowledged,id,10) then warn("Horde loading timed out") end
+ CutsceneRE:FireAllClients("reveal")
+ say("Это не один отряд. Здесь целая армия. Теперь понятно, зачем им завод.",8)
+ task.wait(3)
+ FadeRE:FireAllClients(true,"")
+ task.wait(0.8)
+ local production,captive,shutter,arm=buildProductionEpilogue()
+ focusStreaming(production)
+ cameraPlan(production+Vector3.new(-19,6,-18),production+Vector3.new(-17,5,-13),production+Vector3.new(-10,4,1),8,52,44)
+ prepareView(production)
+ CutsceneRE:FireAllClients("reveal")
+ say("Сюда привозят взрослых пленников. Назад их уже не выпускают.",6)
+ TweenService:Create(shutter,TweenInfo.new(1.5),{Position=production+Vector3.new(-10,5,-2)}):Play()
+ task.wait(1.6)
+ TweenService:Create(arm,TweenInfo.new(1.5,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,1,true),{Position=arm.Position+Vector3.new(2,-2,0)}):Play()
+ say("За створками людей переделывают в бойцов картеля. Конвейер работает без остановки.",7)
+ captive:Destroy()
+ FadeRE:FireAllClients(true,"")
+ task.wait(0.8)
+ cameraPlan(production+Vector3.new(19,5,-13),production+Vector3.new(16,5,-9),production+Vector3.new(10,4,4),8,48,40)
+ CutsceneRE:FireAllClients("reveal")
+ say("Они уже готовят следующих. И таких линий здесь десятки.",7)
+ task.wait(3)
+ -- Blackout is reserved for the end, after BOTH restored epilogue inserts.
  CutsceneRE:FireAllClients("blackout",id)
  if not awaitFinalAck(blackAcknowledged,id,8) then warn("Blackout acknowledgement timed out") end
  -- Credits are server-commanded here only, never from the music playback clock.
  CreditsRE:FireAllClients(true)
  task.wait(35)
  CreditsRE:FireAllClients(false); MusicRE:FireAllClients("stop")
+ CutsceneRE:FireAllClients("armyClear")
  CutsceneRE:FireAllClients("end")
+ Players.RespawnTime=oldRespawn
  startLevel(1)
 end
 

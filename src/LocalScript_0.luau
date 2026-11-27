@@ -289,7 +289,7 @@ local function clearArmy()
  armyGeneration+=1
  if armyFolder then armyFolder:Destroy(); armyFolder=nil end
 end
-local function buildArmy(origin)
+local function buildArmy(origin,token)
  clearArmy()
  local generation=armyGeneration
  local folder=Instance.new("Folder"); folder.Name="CinematicNeuroArmy"; folder.Parent=workspace
@@ -320,6 +320,7 @@ local function buildArmy(origin)
    end
    RunService.Heartbeat:Wait() -- batch creation; no thousands-of-Humanoids replication spike
   end
+  if generation==armyGeneration and token then Remotes.SceneReady:FireServer("armyDone",token) end
  end)
 end
 local function bloodOverlay(strength)
@@ -379,6 +380,11 @@ local function startScan(data)
  end)
 end
 Remotes.Cutscene.OnClientEvent:Connect(function(action, frame, duration, aim)
+ if action=="reveal" then
+  endingBlack=false
+  showFade(false,"",0.45)
+  return
+ end
  if action=="blaster" then showSceneBlaster(frame); return end
  if action=="pulse" then
   pulseTime=os.clock()
@@ -412,7 +418,7 @@ Remotes.Cutscene.OnClientEvent:Connect(function(action, frame, duration, aim)
   local camera=Instance.new("Camera"); camera.CFrame=CFrame.lookAt(Vector3.new(25,19,30),Vector3.new(0,4,0)); camera.FieldOfView=55; camera.Parent=view; view.CurrentCamera=camera
   return
  end
- if action=="army" then buildArmy(frame); return end
+ if action=="army" then buildArmy(frame,duration); return end
  if action=="armyClear" then clearArmy(); return end
  if action=="blood" then bloodOverlay(frame); return end
  if action=="povRide" then firstPersonForward=false; firstPersonSnap=true; firstPersonRide=frame; firstPersonTarget=Vector3.zero; followSubject=nil; shotTarget=nil; return end
@@ -421,7 +427,7 @@ Remotes.Cutscene.OnClientEvent:Connect(function(action, frame, duration, aim)
   firstPersonSnap=not cutsceneActive
   firstPersonRide=nil
   firstPersonTarget=frame; followSubject=nil; shotTarget=nil
-  setSceneFov(58,0.4)
+  setSceneFov(typeof(duration)=="number" and duration or 58,0.6)
   return
  end
  if action=="cam" or action=="shot" or action=="follow" or action=="followRig" or action=="end" or action=="recover" then firstPersonTarget=nil; firstPersonRide=nil; firstPersonForward=false end
@@ -967,11 +973,12 @@ Remotes.Notify.OnClientEvent:Connect(function(text, dur)
    for i=1,utf8.len(text) or #text do
     if my~=subToken then return end
     sub.MaxVisibleGraphemes=i
-    task.wait(0.025)
+    task.wait(0.015)
    end
   end)
  end
-	task.delay(dur or 4, function() if my == subToken then sub.Visible = false end end)
+ local displayTime=cutsceneActive and math.max(dur or 4,(utf8.len(text) or #text)*0.045+2) or (dur or 4)
+ task.delay(displayTime,function() if my==subToken then sub.Visible=false end end)
 end)
 Remotes.Fade.OnClientEvent:Connect(function(on, text) showFade(on, text, 0.6) end)
 Remotes.State.OnClientEvent:Connect(function(level, name, left, wave, total)

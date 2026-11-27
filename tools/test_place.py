@@ -98,7 +98,7 @@ finale=server.split('function startBase()',1)[1].split('-- KICK',1)[0]
 assert 'buildConversionFactory()' in finale
 assert 'CutsceneRE:FireAllClients("pov",boss.Head)' in finale
 assert 'CutsceneRE:FireAllClients("pov",ally.Head)' in finale
-assert 'CutsceneRE:FireAllClients("pov",android.Head)' in finale
+assert 'CutsceneRE:FireAllClients("pov",android.Head,44)' in finale
 assert 'bossHum.Health=0' in finale
 assert 'moveModel(ally,CFrame.lookAt(allyCF.Position' in finale
 assert 'visorWeld.Part0=android.Head' in finale
@@ -130,7 +130,7 @@ assert 'Vector3.new(72,1,80)' in factory
 assert 'Vector3.new(0,3.2,-18)' in factory
 assert 'ANDROID_NAME="Нейро"' in server
 assert 'нашу базу на Дальнем Востоке полностью разрушили' in finale
-assert 'hum.Health=0' not in finale  # data copying replaces the old fatal ending
+assert 'hum.Health=0' in finale  # the restored attack really kills the player
 assert 'mafHum.BreakJointsOnDeath=false; mafHum.Health=0' in mafia
 assert 'moveModel(maf,hitCF*CFrame.new' in mafia
 print('PASS: active-NPC POV, pulse/deactivation, ally turn, visor, scan/black acknowledgements, credits only at end')
@@ -154,3 +154,25 @@ assert 'MissionMenu' in client and 'lobbyRemote:FireServer("join",lobby.owner)' 
 assert 'conversationalSubtitle(text)' in client
 assert chr(0x2014) not in server and chr(0x2014) not in client
 print('PASS: coop/menu retained, original combat lighting retained, enclosed factory, separated floor elevations and subtitle policy')
+
+assert 'local function sceneLine(text,minimum)' in server
+assert '(utf8.len(text) or #text)*0.045+2' in server
+assert 'sceneLine(story().office,6)' in mafia
+assert 'sceneLine("Стой, не стреляй. Я сдаюсь, я все расскажу.",5)' in mafia
+assert 'task.wait(4)' in mafia
+assert 'hitCF*CFrame.new(7,-1.8,1)' in mafia
+assert 'Vector3.new(0,3,-12)' not in finale  # no close-up approach to the victim
+assert 'Vector3.new(0,3,8)' in finale
+assert 'TweenInfo.new(0.7,Enum.EasingStyle.Linear),{Position=head.Position}' in finale
+assert finale.index('hum.Health=0') < finale.index('local horde=buildHordeStage()')
+assert finale.index('local horde=buildHordeStage()') < finale.index('local production,captive,shutter,arm=buildProductionEpilogue()')
+assert finale.index('local production,captive,shutter,arm=buildProductionEpilogue()') < finale.index('"blackout",id')
+assert 'awaitFinalAck(armyAcknowledged,id,10)' in finale
+assert 'Remotes.SceneReady:FireServer("armyDone",token)' in client
+assert 'player.ReplicationFocus=focus' in server
+assert 'player.ReplicationFocus=nil' in server
+assert 'TyanProductionPlant' in server
+assert 'ConversionShutter' in server
+assert 'if action=="reveal" then' in client
+assert 'setSceneFov(typeof(duration)=="number" and duration or 58,0.6)' in client
+print('PASS: readable mafia pacing, visible fatal attack at distance, horde then production insert before final blackout, streaming focus/reveal')
