@@ -9,9 +9,10 @@ luau = Path(sys.argv[1] if len(sys.argv) > 1 else '.tools/luau/build/release/lua
 if not luau.is_file():
     raise SystemExit('Luau CLI not found; pass its path as the first argument.')
 prelude = r'''
+local RunService={IsStudio=function() return false end}
 local C=function(...) return {...} end
 local clock=100
-local game={GetService=function() return {} end}
+local game={PrivateServerOwnerId=0,GetService=function() return {} end}
 local Enum={HumanoidStateType={Running="Running"}}
 local WD={Order={"Fists","Pistol","SMG","Shotgun","Rifle"}}
 local os={clock=function() return clock end}
@@ -190,6 +191,22 @@ local token=C2.challenges[artem].token
 for i=1,8 do clock+=0.2; chapterHandler(artem,"turn",token,i%2==1 and -1 or 1) end
 assert(completed==2 and not C2.challenges[artem])
 print("PASS: executed engineering protocol: actual solution, replay/token/role/range/timeout rejects, E alone cannot win")
+
+-- Production server cannot be skipped with a forged remote packet.
+artem.UserId=123
+assert(not C2.DebugAllowed(artem))
+C2.debugBusy=false; introActive=false
+local queueBefore=#queued
+C2.DebugJump(artem,"finale"); assert(#queued==queueBefore)
+game.PrivateServerOwnerId=456; assert(not C2.DebugAllowed(artem))
+game.PrivateServerOwnerId=123; assert(C2.DebugAllowed(artem))
+C2.DebugJump(artem,"forged"); assert(#queued==queueBefore)
+C2.debugBusy=true; C2.DebugJump(artem,"finale"); assert(#queued==queueBefore)
+C2.debugBusy=false; introActive=true; C2.DebugJump(artem,"finale"); assert(#queued==queueBefore)
+introActive=false; game.PrivateServerOwnerId=0
+RunService.IsStudio=function() return true end; assert(C2.DebugAllowed(artem))
+RunService.IsStudio=function() return false end
+print("PASS: executed debug authorization, forged command, busy and cinematic rejection")
 
 -- Door gates are a conjunction, not merely a completed terminal timer.
 for clear=0,1 do for card=0,1 do for hack=0,1 do

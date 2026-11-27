@@ -1143,6 +1143,15 @@ end)
 -- BEGIN CHAPTER TWO CLIENT
 -- Embedded into GameClient after its menu and weapon controller.
 do
+ local debugPanel=new("Frame",{Size=UDim2.fromOffset(310,295),Position=UDim2.new(1,-325,0,100),BackgroundColor3=Color3.fromRGB(15,22,32),Visible=false,ZIndex=90},gui)
+ new("TextLabel",{Size=UDim2.new(1,0,0,45),Text="ТЕСТ ГЛАВЫ II • F6",TextColor3=Color3.fromRGB(230,235,245),BackgroundTransparency=1,TextSize=18,ZIndex=91},debugPanel)
+ for i,item in ipairs({{"wave9","Последняя волна зоны 9"},{"boss","Вступление босса + волны"},{"shield","Босс: стрельба по щиту"},{"escape","Атака / кнопка / побег"},{"finale","Машина / титры / новости"}}) do
+  local b=new("TextButton",{Size=UDim2.new(1,-20,0,40),Position=UDim2.fromOffset(10,45+(i-1)*48),Text=item[2],BackgroundColor3=Color3.fromRGB(35,48,65),TextColor3=Color3.fromRGB(225,235,245),TextSize=16,ZIndex=91},debugPanel)
+  b.Activated:Connect(function() debugPanel.Visible=false; Remotes:WaitForChild("Chapter2"):FireServer("debugJump",item[1]) end)
+ end
+ UIS.InputBegan:Connect(function(input,processed)
+  if not processed and input.KeyCode==Enum.KeyCode.F6 and plr:GetAttribute("Chapter2Debug") and plr:GetAttribute("Chapter")==2 then debugPanel.Visible=not debugPanel.Visible end
+ end)
  local chooser=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(8,13,19),BackgroundTransparency=0.03,Visible=false,ZIndex=60},menu)
  new("TextLabel",{Size=UDim2.fromScale(0.9,0.09),Position=UDim2.fromScale(0.05,0.06),Text="ГЛАВА II • ВЫБЕРИ ГЕРОЯ",TextScaled=true,Font=Enum.Font.GothamBlack,TextColor3=Color3.fromRGB(220,228,230),BackgroundTransparency=1,ZIndex=61},chooser)
  local hint=new("TextLabel",{Size=UDim2.fromScale(0.9,0.08),Position=UDim2.fromScale(0.05,0.16),Text="Роль закрепится только после подтверждения. Вдвоем нужны разные герои.",TextWrapped=true,TextSize=17,TextColor3=Color3.fromRGB(155,175,186),BackgroundTransparency=1,ZIndex=61},chooser)

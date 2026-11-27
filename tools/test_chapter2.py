@@ -76,7 +76,7 @@ print('PASS: validated attacks/holds, rear stealth kills, welding blind with mec
 assert 'if C2.shieldHP==0 then' in chapter
 assert 'C2.RunProtected(c2Escape)' in chapter
 assert 'C2.deadline=workspace:GetServerTimeNow()+300' in chapter
-assert chapter.index('C2.Literal("Мафия","Это не конец.') < chapter.index('C2.deadline=workspace:GetServerTimeNow()+300')
+assert chapter.index('C2.Literal("Мафия","Хех, скоро здесь всё взорвётся.') < chapter.index('C2.deadline=workspace:GetServerTimeNow()+300')
 assert 'workspace:GetServerTimeNow()>=C2.deadline then c2Finish(false)' in chapter
 assert 'if allSafe and survivors>0 then c2Finish(true)' in chapter
 assert 'if not c2Alive() then c2Finish(false)' in chapter
@@ -90,7 +90,7 @@ assert 'conn:Disconnect()' in chapter
 intro = chapter.split('local function startChapter2(', 1)[1].split('c2Attack=function', 1)[0]
 assert intro.index('cameraPlan(') < intro.index('CutsceneRE:FireClient(p,"pov"')
 assert 'CutsceneRE:FireAllClients("pov",C2.boss.Head,54)' in chapter
-assert 'CutsceneRE:FireAllClients("pov",C2.cyberHand,48)' in chapter
+assert 'CFrame.lookAt(button.Position+Vector3.new(-5,5,-6)' in chapter
 print('PASS: shield-break boss escape, exact five-minute server deadline, sparse pursuit, both endings, POV policy and menu cleanup')
 
 # User-reported regressions: do not reintroduce billboard instructions or a hold-to-win panel.
@@ -163,3 +163,20 @@ for model in ('eurtyoeyrntiu', 'ZamestitelDiomchica'):
     ref = next(ref for ref, name in names.items() if name == model)
     assert parents[ref] == storage
 print('PASS: all non-source RBXL data unchanged; both original heroes remain directly in ServerStorage')
+
+# Cinematic finale contracts: camera mode, deterministic transport and safe debug controls.
+campaign=Path('src/Chapter2Campaign.luau').read_text()
+car=campaign[campaign.index('function C2.CarScene()'):campaign.index('function C2.NewsTwist()')]
+assert '"pov",buddy.Head' in car and 'Какого хрена ты там натворил?!' in car
+assert 'Ладно, валим скорее на тачке!' in car
+assert '"follow",car' in car and 'local distance=18*t+0.65*t*t' in car
+assert 'SeatWeld' not in car.replace('-- No physical seats or SeatWelds: deterministic anchored riders cannot stop the car.','')
+assert 'Instance.new("Seat")' not in car and 'EscapeRouteWall' in car
+assert 'offsets[rig]=pivot:ToObjectSpace(rig:GetPivot())' in car
+assert 'C2.bossButton' in campaign and 'C(255,20,25),Enum.Material.Neon' in campaign
+assert campaign.index('Ладно, мне с этим как всегда разобраться.') < campaign.index('Хех, скоро здесь всё взорвётся.')
+assert 'RunService:IsStudio() or (game.PrivateServerOwnerId~=0 and player.UserId==game.PrivateServerOwnerId)' in campaign
+assert 'not C2.DebugAllowed(player) or C2.debugBusy or introActive' in campaign
+assert 'epoch~=C2.deployEpoch' in campaign
+assert chapter.index('MusicRE:FireAllClients("final")',chapter.index('c2Finish=function')) < chapter.index('C2RE:FireAllClients("chapterCredits",true)')
+print('PASS: first-person rendezvous, moving exterior car with anchored riders, red button insert, credits music and authorized debug jumps')
