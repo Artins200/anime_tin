@@ -192,21 +192,13 @@ for i=1,8 do clock+=0.2; chapterHandler(artem,"turn",token,i%2==1 and -1 or 1) e
 assert(completed==2 and not C2.challenges[artem])
 print("PASS: executed engineering protocol: actual solution, replay/token/role/range/timeout rejects, E alone cannot win")
 
--- Production server cannot be skipped with a forged remote packet.
-artem.UserId=123
-assert(not C2.DebugAllowed(artem))
-C2.debugBusy=false; introActive=false
+-- Removed preview commands must not change authoritative game state.
+assert(C2.DebugJump==nil and C2.DebugAllowed==nil)
+local previousStage=C2.stage
 local queueBefore=#queued
-C2.DebugJump(artem,"finale"); assert(#queued==queueBefore)
-game.PrivateServerOwnerId=456; assert(not C2.DebugAllowed(artem))
-game.PrivateServerOwnerId=123; assert(C2.DebugAllowed(artem))
-C2.DebugJump(artem,"forged"); assert(#queued==queueBefore)
-C2.debugBusy=true; C2.DebugJump(artem,"finale"); assert(#queued==queueBefore)
-C2.debugBusy=false; introActive=true; C2.DebugJump(artem,"finale"); assert(#queued==queueBefore)
-introActive=false; game.PrivateServerOwnerId=0
-RunService.IsStudio=function() return true end; assert(C2.DebugAllowed(artem))
-RunService.IsStudio=function() return false end
-print("PASS: executed debug authorization, forged command, busy and cinematic rejection")
+chapterHandler(artem,"debugJump","finale")
+assert(C2.stage==previousStage and #queued==queueBefore)
+print("PASS: removed debug functions absent; legacy skip packet has no effect")
 
 -- Door gates are a conjunction, not merely a completed terminal timer.
 for clear=0,1 do for card=0,1 do for hack=0,1 do

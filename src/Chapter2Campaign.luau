@@ -34,8 +34,7 @@ function C2.Literal(name,text,minimum)
  task.wait(duration+0.2)
 end
 function C2.InitCampaign()
- C2.deployEpoch=0; C2.debugBusy=false
- for _,p in ipairs(C2.party) do p:SetAttribute("Chapter2Debug",C2.DebugAllowed(p)) end
+ C2.deployEpoch=0
  C2.sprint={}; C2.bossPhase="waiting"; C2.shieldMax=#C2.party>1 and 1400 or 900; C2.shieldHP=C2.shieldMax; C2.spawnSequence=0; C2.home=nil
  local physics=game:GetService("PhysicsService")
  for _,name in ipairs({"C2Enemy","C2Field"}) do pcall(function() physics:RegisterCollisionGroup(name) end) end
@@ -543,40 +542,4 @@ function C2.NewsTwist()
  ShakeRE:FireAllClients(1.3); task.wait(1)
  C2.Literal("Демид","Эмм... нас объявили в розыск, когда мы сделали доброе дело? Я чёт разочарован...",6)
  task.wait(1); FadeRE:FireAllClients(true,""); task.wait(1)
-end
-
--- Never trust a client-visible flag for authorization.
-function C2.DebugAllowed(player)
- return RunService:IsStudio() or (game.PrivateServerOwnerId~=0 and player.UserId==game.PrivateServerOwnerId)
-end
-function C2.DebugJump(player,command)
- if not C2.DebugAllowed(player) or C2.debugBusy or introActive then return end
- local actions={wave9=true,boss=true,shield=true,escape=true,finale=true}
- if not actions[command] then return end
- C2.debugBusy=true
- task.spawn(function()
-  C2.RunProtected(function()
-   for p in pairs(C2.challenges) do c2EndEngineering(p) end
-   C2.deployEpoch=(C2.deployEpoch or 0)+1
-   -- Invalidate delayed wave callbacks without invalidating the mission heartbeat.
-   for _,z in ipairs(C2.zones) do z.waveActive=false; z.wave+=100; z.done=true; z.field.CanCollide=false; z.field.Transparency=1; z.gate.CanCollide=false; C2.Door(z,true) end
-   for model in pairs(C2.mobs) do if model.Parent then model:Destroy() end end
-   table.clear(C2.mobs); C2.boss=nil; C2.escaping=false; C2.escapeStarting=false
-   local index=command=="wave9" and 9 or 10
-   local z=C2.zones[index]; C2.stage=index
-   for i,p in ipairs(C2.party) do local root,h=c2Root(p); if root then h.Health=h.MaxHealth; p.Character:PivotTo(CFrame.lookAt(c2Origin+Vector3.new(z.x-40,4,i*3),c2Origin+Vector3.new(z.x+43,4,0))); c2Grant(p,5) end end
-   if command=="finale" then c2Finish(true); return end
-   z.done=false; z.wave=0; z.cleared=false; z.keyCollected=false; z.hacked=false; z.deploying=false
-   z.field.CanCollide=true; z.field.Transparency=0.82
-   if command=="wave9" then z.wave=z.rounds-1; C2.BeginWave(9)
-   elseif command=="boss" then C2.BossIntro()
-   else
-    C2.CreateBoss(); z.cleared=true; C2.bossPhase="exposed"; C2.shield.Transparency=0.45
-    C2.shieldHP=C2.shieldMax
-    if command=="escape" then C2.bossPhase="broken"; C2.shield.Transparency=1; C2.shield.CanQuery=false; C2.mobs[C2.boss].defeated=true; C2.DefeatSequence() end
-   end
-   c2Send()
-  end)
-  C2.debugBusy=false
- end)
 end

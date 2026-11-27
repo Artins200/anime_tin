@@ -175,11 +175,9 @@ assert 'Instance.new("Seat")' not in car and 'EscapeRouteWall' in campaign
 assert 'offsets[rig]=pivot:ToObjectSpace(rig:GetPivot())' in car
 assert 'C2.bossButton' in campaign and 'C(255,20,25),Enum.Material.Neon' in campaign
 assert campaign.index('Ладно, мне с этим как всегда разобраться.') < campaign.index('Хех, скоро здесь всё взорвётся.')
-assert 'RunService:IsStudio() or (game.PrivateServerOwnerId~=0 and player.UserId==game.PrivateServerOwnerId)' in campaign
-assert 'not C2.DebugAllowed(player) or C2.debugBusy or introActive' in campaign
 assert 'epoch~=C2.deployEpoch' in campaign
 assert chapter.index('MusicRE:FireAllClients("final")',chapter.index('c2Finish=function')) < chapter.index('C2RE:FireAllClients("chapterCredits",true)')
-print('PASS: first-person rendezvous, moving exterior car with anchored riders, red button insert, credits music and authorized debug jumps')
+print('PASS: first-person rendezvous, moving exterior car with anchored riders, red button insert, credits music and no cheat menu')
 
 assert 'Vector3.new(2500' not in campaign
 assert 'city.ModelStreamingMode=Enum.ModelStreamingMode.Persistent' in campaign
@@ -191,3 +189,8 @@ for feature in ('MafiaAnimeFace','EyeWhite','Iris','Catchlight','SweptBangs','La
 assert 'MechanicalFaceplate' not in campaign and 'BallisticChest' not in campaign
 assert car.index('task.wait(1.2)') < car.index('local start=os.clock()')
 print('PASS: segmented road, prebuilt enclosed pickup/courtyard, persistent city skyline, unobscured anime face and settled departure camera')
+
+for forbidden in ('DebugJump','DebugAllowed','debugJump','debugPanel','Chapter2Debug','Enum.KeyCode.F6','debugBusy'):
+    for path in Path('src').glob('*.luau'):
+        assert forbidden not in path.read_text(), (path, forbidden)
+print('PASS: no cheat UI, F6 binding, permission flag or server skip handler in any shipped source')
