@@ -80,7 +80,8 @@ print('PASS: soft non-neon briefing-only lighting; original combat-room lighting
 # Black-screen regressions: readiness ordering, bounded preparation and error cleanup.
 assert client.rfind('FireServer("ready")') > client.index('Remotes.Fade.OnClientEvent')
 assert 'if not member.Parent or not readyClients[member]' in server
-assert 'runScene(playIntro)' in server
+assert 'xpcall(function() startChapter2(party) end,debug.traceback)' in server
+assert 'else runScene(playIntro) end' in server
 assert 'local ok,err=xpcall(callback,debug.traceback)' in server
 assert 'CutsceneRE:FireAllClients("recover")' in server
 assert 'until os.clock()>=deadline' in server

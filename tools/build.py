@@ -2,6 +2,12 @@
 from pathlib import Path
 import struct
 from rbxl import chunks, string, enc
+# Keep the standalone chapter source and embedded server in sync.
+server_path=Path('src/Script_0.luau')
+server=server_path.read_text()
+start=server.index('-- BEGIN CHAPTER TWO')
+end=server.index('-- END CHAPTER TWO',start)
+server_path.write_text(server[:start]+'-- BEGIN CHAPTER TWO\n'+Path('src/Chapter2.luau').read_text()+'\n'+server[end:])
 path=Path('Place1.rbxl')
 data=path.read_bytes(); out=bytearray(data[:32]); count=0
 sources={41:'src/LocalScript_0.luau',47:'src/ModuleScript_0.luau',61:'src/Script_0.luau'}

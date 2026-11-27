@@ -608,6 +608,8 @@ for name, def in pairs(GunDefs) do
 		table.insert(gunParts[name], {vpart(d[1], col, d[4]), d[2]})
 	end
 end
+local chapterTool=vpart(Vector3.new(0.22,0.22,1.8),Color3.fromRGB(170,185,195),Enum.Material.Metal)
+chapterTool.Name="Chapter2RoleTool"; chapterTool.Parent=nil
 local flash = vpart(Vector3.new(0.7,0.7,0.7), Color3.fromRGB(255,220,140), Enum.Material.Neon)
 flash.Shape = Enum.PartType.Ball; flash.Transparency = 1; flash.Parent = vm
 local flashLight = Instance.new("PointLight"); flashLight.Range = 14; flashLight.Brightness = 4; flashLight.Enabled = false
@@ -631,6 +633,7 @@ local function refreshSlots()
 	for i, name in ipairs(WD.Order) do
 		local s = slots[name]
 		local unlocked = i <= wl
+  if name=="Fists" then s.tl.Text=plr:GetAttribute("Chapter")==2 and (plr:GetAttribute("Hero")=="Artem" and "1. Сварка" or "1. Нож") or "1. Кулаки" end
 		s.tl.TextTransparency = unlocked and 0 or 0.65
 		s.st.Thickness = (name == curName) and 3 or 1
 		s.f.BackgroundTransparency = (name == curName) and 0 or 0.4
@@ -656,6 +659,7 @@ local function selectWeapon(name)
 	local idx = table.find(WD.Order, name)
 	if not idx or idx > (plr:GetAttribute("WeaponLevel") or 1) then return end
 	curName = name; switchT = 1
+ chapterTool.Parent=(name=="Fists" and plr:GetAttribute("Chapter")==2) and vm or nil
 	for n, list in pairs(gunParts) do
 		for _, e in ipairs(list) do e[1].Parent = (n == name) and vm or nil end
 	end
@@ -671,6 +675,8 @@ plr:GetAttributeChangedSignal("WeaponLevel"):Connect(function()
 		end)
 	end
 end)
+plr:GetAttributeChangedSignal("Chapter"):Connect(function() selectWeapon("Fists"); refreshSlots() end)
+plr:GetAttributeChangedSignal("Hero"):Connect(refreshSlots)
 selectWeapon("Fists")
 
 ------------------------------------------------------------------ СТРЕЛЬБА
@@ -678,7 +684,8 @@ local function doFire(chargeLevel)
 	if cutsceneActive then return end
 	local w = WD.Stats[curName]
 	local now = os.clock()
-	if now - lastFire < w.Cooldown then return end
+	local cooldown=(plr:GetAttribute("Chapter")==2 and curName=="Fists") and (plr:GetAttribute("Hero")=="Artem" and 0.2 or 0.5) or w.Cooldown
+ if now - lastFire < cooldown then return end
 	local char = plr.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	if not hum or hum.Health <= 0 then return end
@@ -932,7 +939,16 @@ RunService:BindToRenderStep("ViewModel", Enum.RenderPriority.Camera.Value + 1, f
 			chargeOrb.CFrame = rightRoot * CFrame.new(0, 0.15, GunDefs.Rifle.muzzle)
 		end
 	end
-	if curName == "Fists" then flash.Transparency = 1; flashLight.Enabled = false end
+	if curName == "Fists" then
+  flash.Transparency = 1; flashLight.Enabled = false
+  if plr:GetAttribute("Chapter")==2 then
+   chapterTool.Parent=vm
+   local engineer=plr:GetAttribute("Hero")=="Artem"
+   chapterTool.Size=engineer and Vector3.new(0.4,0.45,1.2) or Vector3.new(0.12,0.32,2)
+   chapterTool.Color=engineer and Color3.fromRGB(70,130,145) or Color3.fromRGB(185,195,205)
+   chapterTool.CFrame=rightRoot*CFrame.new(0,0.2,-0.85)
+  else chapterTool.Parent=nil end
+ end
 	setParts(armR, rightRoot); setParts(armL, leftRoot)
 
 	if doorPos then
@@ -1016,19 +1032,35 @@ end)
 -- Menu is a separate GUI: no mission input until the server starts this party.
 local menu=new("ScreenGui",{Name="MissionMenu",IgnoreGuiInset=true,ResetOnSpawn=false,DisplayOrder=150},plr.PlayerGui)
 local background=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(12,17,24),BorderSizePixel=0},menu)
-new("TextLabel",{Size=UDim2.fromScale(0.9,0.1),Position=UDim2.fromScale(0.05,0.06),Text=GAME_TITLE,Font=Enum.Font.GothamBlack,TextScaled=true,TextColor3=Color3.fromRGB(210,225,235),BackgroundTransparency=1},background)
-local status=new("TextLabel",{Size=UDim2.fromScale(0.9,0.12),Position=UDim2.fromScale(0.05,0.17),Text="Выберите одиночную операцию или соберите отряд до 4 игроков.\nВ кооперативе: общий сюжет и здоровье врагов ×2.",TextWrapped=true,Font=Enum.Font.Gotham,TextSize=18,TextColor3=Color3.fromRGB(145,170,185),BackgroundTransparency=1},background)
+new("TextLabel",{Size=UDim2.fromScale(0.9,0.085),Position=UDim2.fromScale(0.05,0.04),Text=GAME_TITLE,Font=Enum.Font.GothamBlack,TextScaled=true,TextColor3=Color3.fromRGB(210,225,235),BackgroundTransparency=1},background)
+local status=new("TextLabel",{Size=UDim2.fromScale(0.9,0.10),Position=UDim2.fromScale(0.05,0.14),Text="Выберите одиночную операцию или соберите отряд до 4 игроков.\nВ кооперативе: общий сюжет и здоровье врагов ×2.",TextWrapped=true,Font=Enum.Font.Gotham,TextSize=18,TextColor3=Color3.fromRGB(145,170,185),BackgroundTransparency=1},background)
 local function button(label,x,y,callback,parent)
- local b=new("TextButton",{Size=UDim2.fromScale(0.27,0.075),Position=UDim2.fromScale(x,y),Text=label,Font=Enum.Font.GothamBold,TextSize=17,TextColor3=Color3.fromRGB(225,235,240),BackgroundColor3=Color3.fromRGB(35,60,73),BorderSizePixel=0},parent or background)
+ local b=new("TextButton",{Size=UDim2.fromScale(0.27,0.075),Position=UDim2.fromScale(x,y),Text=label,Font=Enum.Font.GothamBold,TextSize=17,TextScaled=true,TextColor3=Color3.fromRGB(225,235,240),BackgroundColor3=Color3.fromRGB(35,60,73),BorderSizePixel=0},parent or background)
+ new("UITextSizeConstraint",{MinTextSize=10,MaxTextSize=17},b)
  new("UICorner",{CornerRadius=UDim.new(0,8)},b)
  b.Activated:Connect(callback)
  return b
 end
 local lobbyRemote=Remotes:WaitForChild("Lobby")
-button("ОДИНОЧНАЯ ИГРА",0.06,0.31,function() lobbyRemote:FireServer("solo") end)
-button("СОЗДАТЬ ЛОББИ",0.365,0.31,function() lobbyRemote:FireServer("create") end)
-button("ОБНОВИТЬ",0.67,0.31,function() lobbyRemote:FireServer("list") end)
-local list=new("ScrollingFrame",{Size=UDim2.fromScale(0.88,0.36),Position=UDim2.fromScale(0.06,0.42),BackgroundColor3=Color3.fromRGB(18,26,35),BorderSizePixel=0,CanvasSize=UDim2.new(),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollBarThickness=5},background)
+local chapterButton=button("ГЛАВА I / сменить",0.06,0.26,function()
+ lobbyRemote:FireServer("chapter",plr:GetAttribute("SelectedChapter")==2 and 1 or 2)
+end)
+local artemButton=button("АРТЕМ • ИНЖЕНЕР",0.365,0.26,function() lobbyRemote:FireServer("hero","Artem") end)
+local demidButton=button("ДЕМИД • ШТУРМ",0.67,0.26,function() lobbyRemote:FireServer("hero","Demid") end)
+local function refreshChapterChoice()
+ local second=plr:GetAttribute("SelectedChapter")==2
+ chapterButton.Text=second and "ГЛАВА II / сменить" or "ГЛАВА I / сменить"
+ artemButton.BackgroundColor3=plr:GetAttribute("Hero")=="Artem" and Color3.fromRGB(45,110,115) or Color3.fromRGB(35,60,73)
+ demidButton.BackgroundColor3=plr:GetAttribute("Hero")=="Demid" and Color3.fromRGB(110,70,65) or Color3.fromRGB(35,60,73)
+ status.Text=second and "Глава II: 1–2 игрока. Выберите разных героев до запуска.\nАртем: сварка и панели. Демид: нож, скрытность и новое оружие." or "Глава I: одиночная операция или отряд до 4 игроков."
+end
+plr:GetAttributeChangedSignal("SelectedChapter"):Connect(refreshChapterChoice)
+plr:GetAttributeChangedSignal("Hero"):Connect(refreshChapterChoice)
+refreshChapterChoice()
+button("ОДИНОЧНАЯ ИГРА",0.06,0.36,function() lobbyRemote:FireServer("solo") end)
+button("СОЗДАТЬ ЛОББИ",0.365,0.36,function() lobbyRemote:FireServer("create") end)
+button("ОБНОВИТЬ",0.67,0.36,function() lobbyRemote:FireServer("list") end)
+local list=new("ScrollingFrame",{Size=UDim2.fromScale(0.88,0.30),Position=UDim2.fromScale(0.06,0.46),BackgroundColor3=Color3.fromRGB(18,26,35),BorderSizePixel=0,CanvasSize=UDim2.new(),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollBarThickness=5},background)
 new("UIListLayout",{Padding=UDim.new(0,8)},list)
 button("НАЧАТЬ ОПЕРАЦИЮ",0.06,0.83,function() lobbyRemote:FireServer("start") end)
 button("ВЫЙТИ ИЗ ЛОББИ",0.365,0.83,function() lobbyRemote:FireServer("leave") end)
@@ -1069,7 +1101,7 @@ lobbyRemote.OnClientEvent:Connect(function(command,data)
  for _,lobby in ipairs(data.lobbies) do
   local names={}
   for _,member in ipairs(lobby.members) do
-   table.insert(names,member.name)
+   table.insert(names,member.name.." ["..(member.hero=="Demid" and "Демид" or "Артем").."]")
    if member.id==plr.UserId then mine=lobby end
   end
   local row=new("TextButton",{Size=UDim2.new(1,-10,0,66),Text=lobby.name.."  ["..#lobby.members.."/4]  "..(lobby.launching and "Переход…" or "Присоединиться").."\n"..table.concat(names," • "),TextWrapped=true,TextSize=16,Font=Enum.Font.Gotham,TextColor3=Color3.fromRGB(205,220,230),BackgroundColor3=Color3.fromRGB(27,40,52),BorderSizePixel=0},list)
@@ -1078,5 +1110,36 @@ lobbyRemote.OnClientEvent:Connect(function(command,data)
  waiting.Text=mine and (mine.owner==plr.UserId and "Вы , лидер лобби" or "Ждём запуска лидером") or "Выберите лобби или создайте своё"
 end)
 
--- Last: GUI, camera, fade and gameplay listeners must all exist before startup.
+
+
+-- Chapter II objective and server-clock escape HUD.
+do
+ local state
+ local panel=new("TextLabel",{Size=UDim2.new(0.42,0,0,112),Position=UDim2.fromScale(0.025,0.15),BackgroundColor3=Color3.fromRGB(12,23,31),BackgroundTransparency=0.15,TextColor3=Color3.fromRGB(205,225,230),Font=Enum.Font.GothamMedium,TextSize=16,TextWrapped=true,TextScaled=true,TextXAlignment=Enum.TextXAlignment.Left,Visible=false},gui)
+ new("UITextSizeConstraint",{MinTextSize=10,MaxTextSize=16},panel)
+ new("UIPadding",{PaddingLeft=UDim.new(0,12),PaddingRight=UDim.new(0,12)},panel)
+ local timer=new("TextLabel",{Size=UDim2.fromOffset(350,56),Position=UDim2.new(0.5,-175,0,68),BackgroundColor3=Color3.fromRGB(75,28,25),TextColor3=Color3.fromRGB(255,210,175),Font=Enum.Font.GothamBlack,TextSize=28,Visible=false},gui)
+ Remotes:WaitForChild("Chapter2").OnClientEvent:Connect(function(action,data)
+  if action=="clear" then state=nil; panel.Visible=false; timer.Visible=false; return end
+  if action=="ending" then
+   state=nil; panel.Visible=false; timer.Visible=false
+   enLabel.Text=data.good and "ХОРОШАЯ КОНЦОВКА" or "ПЛОХАЯ КОНЦОВКА"
+   return
+  end
+  if action~="state" then return end
+  state=data
+  local role=data.role=="Artem" and "АРТЕМ / ИНЖЕНЕР" or "ДЕМИД / ШТУРМ"
+  panel.Text=role.."  •  "..data.name.."\n"..data.objective.."\n"..(data.alarm and "ТРЕВОГА" or "ТИХИЙ РЕЖИМ").."  •  Охрана: "..data.enemies
+  panel.Visible=not cutsceneActive; timer.Visible=data.escaping and not cutsceneActive
+  lvlLabel.Text="ГЛАВА II • "..data.name; enLabel.Text=""
+ end)
+ RunService.RenderStepped:Connect(function()
+  if state and state.escaping and state.deadline then
+   local seconds=math.max(0,math.ceil(state.deadline-workspace:GetServerTimeNow()))
+   timer.Text=("ЭВАКУАЦИЯ  %02d:%02d"):format(math.floor(seconds/60),seconds%60)
+  end
+ end)
+end
+
+-- Startup is acknowledged only after listeners for BOTH chapters are installed.
 Remotes:WaitForChild("SceneReady"):FireServer("ready")
