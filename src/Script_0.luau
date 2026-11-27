@@ -15,6 +15,31 @@ local AttackRE, NotifyRE, FadeRE = newRemote("Attack"), newRemote("Notify"), new
 local StateRE, HitRE, EndRE, ShakeRE = newRemote("State"), newRemote("Hit"), newRemote("End"), newRemote("Shake")
 local KickRE, FocusRE, DoorStateRE = newRemote("Kick"), newRemote("Focus"), newRemote("DoorState")
 local CutsceneRE, MusicRE, CreditsRE = newRemote("Cutscene"), newRemote("Music"), newRemote("Credits")
+local SceneReadyRE=newRemote("SceneReady")
+local readyClients, preparedClients = {}, {}
+local prepareId=0
+SceneReadyRE.OnServerEvent:Connect(function(player,command,id)
+ if command=="ready" then readyClients[player]=true
+ elseif command=="prepared" and id==prepareId then preparedClients[player]=id end
+end)
+Players.PlayerRemoving:Connect(function(player)
+ readyClients[player]=nil; preparedClients[player]=nil
+end)
+local function prepareView(position)
+ prepareId+=1
+ local id=prepareId
+ CutsceneRE:FireAllClients("prepare",position,id)
+ local deadline=os.clock()+8
+ repeat
+  local complete=true
+  for _,player in ipairs(Players:GetPlayers()) do
+   if readyClients[player] and preparedClients[player]~=id then complete=false end
+  end
+  if complete then return end
+  task.wait(0.1)
+ until os.clock()>=deadline
+ warn("Cinematic preparation timed out; revealing scene instead of leaving a black screen")
+end
 
 ------------------------------------------------------------------ ЗВУКИ
 local SOUNDS = {PowerOff = "", DoorBreak = "", Shot = "", Punch = ""}
@@ -878,6 +903,21 @@ local function follow(subject, offset, aim)
  CutsceneRE:FireAllClients("follow",subject,offset,aim or Vector3.new(0,1,0))
 end
 
+local function cameraPlan(fromPosition,toPosition,focus,duration,fov0,fov)
+ CutsceneRE:FireAllClients("cam",{
+  from=CFrame.lookAt(fromPosition,focus), cf=CFrame.lookAt(toPosition,focus),
+  time=duration or 4, fov0=fov0 or 58, fov=fov or 52,
+ })
+end
+local recoverScene
+local function runScene(callback)
+ local ok,err=xpcall(callback,debug.traceback)
+ if not ok then
+  warn("[Cinematic] "..tostring(err))
+  recoverScene()
+ end
+end
+
 ------------------------------------------------------------------ УРОВНИ
 Levels = {
 	{Name="Лес и домик", Preset="Forest", Build=buildForest,
@@ -957,6 +997,37 @@ function startLevel(n)
  if n == 1 then prepareEntrance() end
 end
 
+local recovering=false
+recoverScene=function()
+ if recovering then return end
+ recovering=true
+ introActive=false; canFight=false; levelToken+=1
+ for _,object in ipairs(workspace:GetChildren()) do
+  if object.Name=="Helicopter" or object.Name=="Plane" then object:Destroy() end
+ end
+ for _,player in ipairs(Players:GetPlayers()) do
+  if player.Character then
+   for _,name in ipairs({"CinematicWalk","CinematicSeated","CinematicKick"}) do player.Character:SetAttribute(name,nil) end
+  end
+ end
+ sceneLock(false)
+ CreditsRE:FireAllClients(false)
+ MusicRE:FireAllClients("stop")
+ CutsceneRE:FireAllClients("recover")
+ FadeRE:FireAllClients(false)
+ local ok,err=pcall(function() startLevel(1) end)
+ if not ok then
+  warn("[Cinematic recovery] "..tostring(err))
+  -- Last-resort supported spawn, even if rebuilding the mission failed.
+  local floor=part(workspace,Vector3.new(80,2,80),Vector3.new(0,-1,0),C(65,70,75),Enum.Material.Concrete)
+  floor.Name="RecoveryFloor"
+  currentSpawn=CFrame.new(0,4,0); placeAll(); sceneLock(false)
+  FadeRE:FireAllClients(false)
+ end
+ NotifyRE:FireAllClients("Сцена прервана из-за ошибки. Управление восстановлено.",6)
+ recovering=false
+end
+
 function onCleared(n, token)
 	if token ~= levelToken then return end
 	if currentWave < totalWaves then
@@ -984,7 +1055,8 @@ end
 
 ------------------------------------------------------------------ ИНТРО-КАТСЦЕНА (без падения)
 local function playIntro()
- local player=Players:GetPlayers()[1]
+ local player
+ for _,candidate in ipairs(Players:GetPlayers()) do if readyClients[candidate] then player=candidate; break end end
  if not player then return end
  local char=player.Character or player.CharacterAdded:Wait()
  char:WaitForChild("HumanoidRootPart")
@@ -1034,8 +1106,23 @@ local function playIntro()
  local text=Instance.new("TextLabel"); text.Size=UDim2.fromScale(1,1); text.BackgroundTransparency=1
  text.Text="РАЗВЕДКА // ОБЪЕКТ 07\nКРИМИНАЛЬНАЯ БАЗА ОБНАРУЖЕНА\nЛЕСНОЙ СЕКТОР • ВЫСАДКА В 07:00"
  text.TextColor3=C(100,255,220); text.TextScaled=true; text.Font=Enum.Font.GothamBold; text.Parent=surface
+ local tableTop=part(base,Vector3.new(9,0.4,5),Vector3.new(70,2.8,37.5),C(35,43,48),Enum.Material.Metal)
+ for _,x in ipairs({67,73}) do part(base,Vector3.new(0.6,2.5,3),Vector3.new(x,1.3,37.5),C(35,43,48),Enum.Material.Metal) end
+ local hologram=part(base,Vector3.new(3,1.8,2.2),Vector3.new(70,4,37.5),C(75,145,155),Enum.Material.Glass)
+ hologram.Transparency=0.55; hologram.CanCollide=false
+ for _,x in ipairs({67.5,70,72.5}) do
+  part(base,Vector3.new(0.4,0.1,0.4),Vector3.new(x,3.1,37.5),C(170,115,80),Enum.Material.SmoothPlastic)
+ end
+ local entrance=Instance.new("Model"); entrance.Name="BriefingDoor"; entrance.Parent=base
+ local slab=part(entrance,Vector3.new(5.8,9,0.35),Vector3.new(82,4.5,50),C(55,65,70),Enum.Material.Metal)
+ entrance.PrimaryPart=slab
+ part(entrance,Vector3.new(0.25,1,0.3),Vector3.new(84,4.3,50.3),C(150,155,160),Enum.Material.Metal)
  local commander=buildRig(Types.Commander,CFrame.lookAt(Vector3.new(70,3,34),Vector3.new(70,3,45)))
- anchorAll(commander); commander.Parent=base
+ -- Only the root is anchored so Motor6D briefing gestures can move the limbs.
+ for _,limb in ipairs(commander:GetDescendants()) do
+  if limb:IsA("BasePart") then limb.Anchored=limb.Name=="HumanoidRootPart"; limb.CanCollide=false end
+ end
+ commander.Parent=base
  base:PivotTo(CFrame.new(baseOffset)*base:GetPivot())
  -- Walk to briefing, pause, then walk to the helicopter. No hidden teleport mid-shot.
  for i,p in ipairs(Players:GetPlayers()) do
@@ -1043,18 +1130,28 @@ local function playIntro()
  end
  sceneLock(true)
  CutsceneRE:FireAllClients("start")
- follow(char,Vector3.new(11,7,13))
+ cameraPlan(basePoint(Vector3.new(88,6,60)),basePoint(Vector3.new(87,6,57)),basePoint(Vector3.new(82,4,50)),3,60,54)
+ prepareView(basePoint(Vector3.new(82,4,48)))
  FadeRE:FireAllClients(false)
+ task.wait(1)
+ local closedDoor=entrance:GetPivot()
+ moveModel(entrance,closedDoor*CFrame.new(0,9.5,0),1.8)
+ follow(char,Vector3.new(4,3,8))
  currentSpawn=baseCF(CFrame.new(82,3.2,46))
  tweenCharTo(char,baseCF(CFrame.new(82,3.2,46)),3)
  tweenCharTo(char,baseCF(CFrame.new(70,3.2,43)),3)
- shot(basePoint(Vector3.new(82,7,48)),basePoint(Vector3.new(70,4,37)),0)
+ cameraPlan(basePoint(Vector3.new(81,6,46)),basePoint(Vector3.new(79,6,45)),basePoint(Vector3.new(70,4,35)),6,54,46)
  NotifyRE:FireAllClients("КОМАНДИР: Проходи, спец. Разведка обнаружила ещё одну криминальную базу картеля.",6)
+ local shoulder=commander:FindFirstChild("Right Shoulder",true)
+ if shoulder then
+  local original=shoulder.C0
+  TweenService:Create(shoulder,TweenInfo.new(1,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,2,true),{C0=original*CFrame.Angles(math.rad(25),0,math.rad(-15))}):Play()
+ end
  task.wait(6)
- shot(basePoint(Vector3.new(61,6,44)),basePoint(Vector3.new(71,5,29)),0)
+ cameraPlan(basePoint(Vector3.new(63,6,44)),basePoint(Vector3.new(65,6,43)),basePoint(Vector3.new(70,5,29)),7,52,44)
  NotifyRE:FireAllClients("КОМАНДИР: Вот снимок объекта. Это перевалочный пункт в лесу. Нужно проникнуть внутрь и зачистить его.",7)
  task.wait(7)
- shot(basePoint(Vector3.new(82,7,46)),basePoint(Vector3.new(70,4,38)),0)
+ cameraPlan(basePoint(Vector3.new(77,5.5,43)),basePoint(Vector3.new(76,5.5,42)),basePoint(Vector3.new(70,4.5,34)),7,48,40)
  NotifyRE:FireAllClients("КОМАНДИР: Спешки нет. Подготовься. Вертолёт доставит тебя к южной тропе — дальше пешком.",7)
  task.wait(7)
  local departure=baseCF(CFrame.new(70,4,65))
@@ -1114,7 +1211,7 @@ local function playIntro()
  task.wait(1)
  heli:PivotTo(landing*CFrame.new(0,38,0))
  currentSpawn=info.Spawn
- task.wait(0.5)
+ prepareView(landing.Position)
  shot(Vector3.new(43,12,81),landing.Position+Vector3.new(0,5,0),0)
  FadeRE:FireAllClients(false)
  moveModel(heli,landing,7)
@@ -1476,9 +1573,11 @@ KickRE.OnServerEvent:Connect(function(plr)
 	else
 		-- Цепочка: мафиози → самолёт → база
 		task.spawn(function()
-			playMafioziScene()
-			playPlaneScene()
-			startBase()
+   runScene(function()
+    playMafioziScene()
+    playPlaneScene()
+    startBase()
+   end)
 		end)
 	end
 end)
@@ -1606,7 +1705,13 @@ end)
 
 ------------------------------------------------------------------ СТАРТ
 task.spawn(function()
-	if #Players:GetPlayers() == 0 then Players.PlayerAdded:Wait() end
-	task.wait(2)
-	playIntro()
+ -- Do not send the initial fade/camera events before client listeners exist.
+ local selected
+ repeat
+  for _,player in ipairs(Players:GetPlayers()) do
+   if readyClients[player] then selected=player; break end
+  end
+  if not selected then task.wait(0.1) end
+ until selected
+ runScene(playIntro)
 end)

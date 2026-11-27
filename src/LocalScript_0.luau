@@ -93,9 +93,24 @@ end
 local fade = new("Frame", {Size=UDim2.fromScale(1,1), BackgroundColor3=Color3.new(0,0,0), BackgroundTransparency=1, BorderSizePixel=0, ZIndex=50}, gui)
 local fadeText = new("TextLabel", {Size=UDim2.fromScale(1,1), BackgroundTransparency=1, Text="", TextColor3=NEON, Font=Enum.Font.GothamBlack,
 	TextSize=42, TextWrapped=true, ZIndex=51}, fade)
+local fadeTween, fadeGeneration = nil, 0
 local function showFade(on, text, t)
+ fadeGeneration+=1
+ local generation=fadeGeneration
+ if fadeTween then fadeTween:Cancel() end
+ fade.Visible=true
 	fadeText.Text = on and (text or "") or ""
-	TweenService:Create(fade, TweenInfo.new(t or 0.5), {BackgroundTransparency = on and 0 or 1}):Play()
+ fadeTween=TweenService:Create(fade,TweenInfo.new(t or 0.5),{BackgroundTransparency=on and 0 or 1})
+ fadeTween:Play()
+ if on then
+  -- A lost reveal event or server exception must not leave an opaque overlay forever.
+  task.delay(20,function()
+   if fadeGeneration~=generation then return end
+   warn("Cinematic fade watchdog: removing stale black overlay")
+   fadeTween:Cancel()
+   fade.BackgroundTransparency=1; fadeText.Text=""
+  end)
+ end
 end
 
 ------------------------------------------------------------------ МУЗЫКА (из Workspace по имени)
@@ -213,6 +228,26 @@ local vm
 local cutsceneActive = false
 local shotFrom, shotTarget, shotStart, shotDuration
 local followSubject, followOffset, followAim
+local followFirst, followRelative, followSmooth=true,false,7
+local fovTween, savedFov
+local function setSceneFov(value,duration)
+ if fovTween then fovTween:Cancel() end
+ fovTween=TweenService:Create(cam,TweenInfo.new(duration or 0.5,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut),{FieldOfView=value or 58})
+ fovTween:Play()
+end
+local controlGeneration=0
+local function setSceneControls(enabled)
+ controlGeneration+=1
+ local generation=controlGeneration
+ task.spawn(function()
+  local scripts=plr:WaitForChild("PlayerScripts",5)
+  local module=scripts and scripts:WaitForChild("PlayerModule",5)
+  if module and generation==controlGeneration then pcall(function()
+   local controls=require(module):GetControls()
+   if enabled then controls:Enable() else controls:Disable() end
+  end) end
+ end)
+end
 local poseJoints = {}
 local hiddenHUD = {}
 local bars = {}
@@ -234,7 +269,33 @@ local function cinematicHUD(on)
  end
 end
 Remotes.Cutscene.OnClientEvent:Connect(function(action, frame, duration, aim)
- if action == "follow" then
+ if action=="prepare" then
+  task.spawn(function()
+   -- Streaming is optional and bounded; acknowledgements are sent even on failure.
+   local ok,err=pcall(function()
+    if workspace.StreamingEnabled then plr:RequestStreamAroundAsync(frame,5) end
+    RunService.RenderStepped:Wait(); RunService.RenderStepped:Wait()
+   end)
+   if not ok then warn("Scene preparation: "..tostring(err)) end
+   Remotes.SceneReady:FireServer("prepared",duration)
+  end)
+  return
+ end
+ if action=="cam" then
+  followSubject=nil
+  shotFrom=frame.from or cam.CFrame; shotTarget=frame.cf
+  shotStart=os.clock(); shotDuration=frame.time or 0
+  cam.CFrame=shotFrom
+  if frame.fov0 then cam.FieldOfView=frame.fov0 end
+  setSceneFov(frame.fov or 58,shotDuration)
+  return
+ end
+ if action=="recover" then
+  showFade(false,"",0.2)
+  action="end"
+ end
+ if action == "follow" or action=="followRig" then
+  followFirst=true; followRelative=action=="followRig"; followSmooth=7
   followSubject=frame; followOffset=duration; followAim=aim or Vector3.new(0,1,0)
   shotTarget=nil
   return
@@ -248,23 +309,25 @@ Remotes.Cutscene.OnClientEvent:Connect(function(action, frame, duration, aim)
  if action == "start" then
   if cutsceneActive then return end
   followSubject=nil
+  savedFov=cam.FieldOfView
   cam.FieldOfView=58
 		cutsceneActive = true
   shotTarget=nil
   cinematicHUD(true)
   cam.CameraType=Enum.CameraType.Scriptable
-  pcall(function() require(plr.PlayerScripts:WaitForChild("PlayerModule")):GetControls():Disable() end)
+  setSceneControls(false)
   plr.CameraMode = Enum.CameraMode.Classic
 		if vm and vm.Parent then vm.Parent = nil end
 	elseif action == "end" then
 		cutsceneActive = false
   followSubject=nil
-  cam.FieldOfView=70
+  if fovTween then fovTween:Cancel() end
+  cam.FieldOfView=savedFov or 70
   shotTarget=nil
   cinematicHUD(false)
   cam.CameraType=Enum.CameraType.Custom
   cam.CameraSubject=plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
-  pcall(function() require(plr.PlayerScripts:WaitForChild("PlayerModule")):GetControls():Enable() end)
+  setSceneControls(true)
   plr.CameraMode = Enum.CameraMode.LockFirstPerson
 	end
 end)
@@ -575,10 +638,12 @@ RunService:BindToRenderStep("ViewModel", Enum.RenderPriority.Camera.Value + 1, f
 		end
   if followSubject and followSubject.Parent then
    local pivot=followSubject:GetPivot()
-   local focus=pivot.Position+followAim
-   -- World-space offsets stay on the chosen side when the actor turns.
-   local position=unobstructedCamera(focus,pivot.Position+followOffset,followSubject)
-   cam.CFrame=CFrame.lookAt(position,focus)
+   local focus=followRelative and pivot:PointToWorldSpace(followAim) or pivot.Position+followAim
+   local desired=followRelative and pivot:PointToWorldSpace(followOffset) or pivot.Position+followOffset
+   local position=unobstructedCamera(focus,desired,followSubject)
+   local goal=CFrame.lookAt(position,focus)
+   cam.CFrame=followFirst and goal or cam.CFrame:Lerp(goal,1-math.exp(-dt*followSmooth))
+   followFirst=false
   elseif shotTarget then
    local t=shotDuration<=0 and 1 or math.clamp((os.clock()-shotStart)/shotDuration,0,1)
    cam.CFrame=shotFrom:Lerp(shotTarget,t*t*(3-2*t))
@@ -721,6 +786,17 @@ local subToken = 0
 Remotes.Notify.OnClientEvent:Connect(function(text, dur)
 	subToken += 1; local my = subToken
 	sub.Text = text; sub.Visible = true
+ sub.MaxVisibleGraphemes=-1
+ if cutsceneActive then
+  sub.MaxVisibleGraphemes=0
+  task.spawn(function()
+   for i=1,utf8.len(text) or #text do
+    if my~=subToken then return end
+    sub.MaxVisibleGraphemes=i
+    task.wait(0.025)
+   end
+  end)
+ end
 	task.delay(dur or 4, function() if my == subToken then sub.Visible = false end end)
 end)
 Remotes.Fade.OnClientEvent:Connect(function(on, text) showFade(on, text, 0.6) end)
@@ -739,3 +815,6 @@ Remotes.Shake.OnClientEvent:Connect(function(i) shakeI = math.max(shakeI, i) end
 Remotes.End.OnClientEvent:Connect(function()
 	showFade(true, "КОНЕЦ?\n\nНейро-тянка забрала все данные.\n\n(игра скоро перезапустится)", 2)
 end)
+
+-- Last: GUI, camera, fade and gameplay listeners must all exist before startup.
+Remotes:WaitForChild("SceneReady"):FireServer("ready")

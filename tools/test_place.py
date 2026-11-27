@@ -76,3 +76,19 @@ assert 'ceilingLight(' not in combat_lab and 'briefingLight(' not in combat_lab
 assert 'Enum.Material.Neon' not in combat_lab
 assert 'ExposureCompensation=0' not in server
 print('PASS: soft non-neon briefing-only lighting; original combat-room lighting restored')
+# Black-screen regressions: readiness ordering, bounded preparation and error cleanup.
+assert client.rfind('FireServer("ready")') > client.index('Remotes.Fade.OnClientEvent')
+assert 'if readyClients[player] then selected=player; break end' in server
+assert 'runScene(playIntro)' in server
+assert 'local ok,err=xpcall(callback,debug.traceback)' in server
+assert 'CutsceneRE:FireAllClients("recover")' in server
+assert 'until os.clock()>=deadline' in server
+assert 'plr:RequestStreamAroundAsync(frame,5)' in client
+assert 'Remotes.SceneReady:FireServer("prepared",duration)' in client
+assert 'if fadeTween then fadeTween:Cancel() end' in client
+assert 'task.delay(20,function()' in client
+assert 'generation==controlGeneration' in client
+assert 'action=="cam"' in client
+assert '1-math.exp(-dt*followSmooth)' in client
+assert 'moveModel(entrance,closedDoor*CFrame.new(0,9.5,0),1.8)' in intro
+print('PASS: client-ready startup, bounded streaming, fade watchdog/cancellation, recovery and camera plans')
