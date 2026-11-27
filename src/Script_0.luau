@@ -2595,21 +2595,62 @@ function C2.CreateBoss()
  local model=c2Spawn(10,c2Origin+Vector3.new(x+43,3.5,0),false,true)
  model.Name="Кибер-мафия"; C2.boss=model
  model:PivotTo(CFrame.lookAt(c2Origin+Vector3.new(x+43,3.5,0),c2Origin+Vector3.new(x-40,3.5,0)))
- for _,p in ipairs(model:GetChildren()) do if p:IsA("BasePart") and (p.Name=="Hair" or p.Name=="Eye") then p:Destroy() end end
+ -- Remove the old block hair, oversized mask and duplicate face before dressing.
+ for _,p in ipairs(model:GetChildren()) do
+  if p:IsA("BasePart") and table.find({"Hair","Eye","Tail","Bow","Skirt"},p.Name) then p:Destroy() end
+ end
  local root=model.HumanoidRootPart
  local function armor(name,size,offset,color,material)
   local p=c2Part(model,name,size,root.CFrame:PointToWorldSpace(offset),color,material or Enum.Material.Metal); p.CFrame=root.CFrame*CFrame.new(offset); p.CanCollide=false; return p
  end
- armor("SilverFringe",Vector3.new(2.1,0.55,0.65),Vector3.new(0,2.05,-0.45),C(180,186,205),Enum.Material.SmoothPlastic)
- for _,side in ipairs({-1,1}) do
-  armor("LongSilverHair",Vector3.new(0.48,2.7,0.75),Vector3.new(side*0.95,1.05,0.25),C(152,160,185),Enum.Material.SmoothPlastic)
-  armor("CrimsonRibbon",Vector3.new(0.6,0.3,0.35),Vector3.new(side*1.12,1.65,0.1),C(135,25,55),Enum.Material.Fabric)
+ local head=model.Head; head.Color=C(247,219,209)
+ local mesh=Instance.new("SpecialMesh"); mesh.MeshType=Enum.MeshType.Head; mesh.Scale=Vector3.new(1,1.08,1); mesh.Parent=head
+ local function hair(name,size,offset,color,angle)
+  local p=armor(name,size,offset,color,Enum.Material.SmoothPlastic)
+  p.Shape=Enum.PartType.Ball; p.CFrame*=CFrame.Angles(0,0,angle or 0); return p
  end
- armor("CrimsonTie",Vector3.new(0.3,1.3,0.12),Vector3.new(0,0.25,-0.78),C(155,30,57),Enum.Material.Fabric)
- armor("BallisticChest",Vector3.new(2.6,2.1,1.4),Vector3.new(0,0,0),C(24,28,35))
- armor("DarkCloak",Vector3.new(2.9,4.5,0.35),Vector3.new(0,-0.7,0.8),C(13,16,23),Enum.Material.Fabric)
- armor("MechanicalFaceplate",Vector3.new(1.1,1.05,0.24),Vector3.new(0.48,1.5,-0.55),C(71,80,90))
- local visor=armor("CyborgVisor",Vector3.new(1.9,0.2,0.18),Vector3.new(0,1.65,-0.7),C(225,60,55),Enum.Material.Neon); light(visor,C(220,55,50),9,0.7)
+ local silver=C(181,190,216); local shade=C(128,140,172)
+ hair("HairCrown",Vector3.new(2.16,0.68,1.38),Vector3.new(0,2.04,0.1),silver)
+ hair("HairBack",Vector3.new(2.05,2.35,0.7),Vector3.new(0,1.1,0.62),shade)
+ for k=-2,2 do hair("SweptBangs",Vector3.new(0.49,0.78,0.3),Vector3.new(k*0.36,1.96-math.abs(k)*0.08,-0.51),silver,-0.22-k*0.12) end
+ for _,side in ipairs({-1,1}) do
+  hair("FaceFramingLock",Vector3.new(0.32,1.65,0.48),Vector3.new(side*0.98,1.28,-0.12),silver,side*0.08)
+  for k=0,2 do hair("LayeredLongHair",Vector3.new(0.48,2.5-k*0.2,0.55),Vector3.new(side*(1.04+k*0.16),0.75,0.45+k*0.1),k==1 and silver or shade,side*(-0.06+k*0.05)) end
+  for wing=-1,1,2 do
+   local ribbon=armor("VelvetRibbon",Vector3.new(0.45,0.27,0.18),Vector3.new(side*1.12+wing*0.17,1.78,0),C(112,28,58),Enum.Material.Fabric); ribbon.CFrame*=CFrame.Angles(0,0,wing*0.4)
+  end
+ end
+ -- A readable drawn anime face, not glowing rectangular eyes behind a full mask.
+ local face=Instance.new("SurfaceGui"); face.Name="MafiaAnimeFace"; face.Face=Enum.NormalId.Front; face.CanvasSize=Vector2.new(512,256); face.LightInfluence=0.65; face.Parent=head
+ local function ink(name,x,y,w,h,color,round)
+  local f=Instance.new("Frame"); f.Name=name; f.Position=UDim2.fromScale(x,y); f.Size=UDim2.fromScale(w,h); f.BackgroundColor3=color; f.BorderSizePixel=0; f.Parent=face
+  if round then local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0.5,0); c.Parent=f end
+  return f
+ end
+ for _,x in ipairs({0.21,0.62}) do
+  ink("Lash",x-0.015,0.32,0.19,0.045,C(40,28,48),true)
+  ink("EyeWhite",x,0.36,0.16,0.23,C(255,248,245),true)
+  ink("Iris",x+0.042,0.36,0.085,0.22,C(143,66,116),true)
+  ink("Pupil",x+0.068,0.38,0.032,0.16,C(38,25,51),true)
+  ink("Catchlight",x+0.05,0.38,0.03,0.055,C(255,255,255),true)
+  ink("Brow",x,0.24,0.15,0.025,C(101,91,121),true)
+  local blush=ink("Blush",x-0.02,0.64,0.17,0.06,C(224,146,151),true); blush.BackgroundTransparency=0.55
+ end
+ ink("Nose",0.49,0.58,0.018,0.055,C(205,157,152),true)
+ ink("ConfidentSmile",0.435,0.75,0.13,0.024,C(147,71,89),true)
+ armor("TailoredJacket",Vector3.new(2.05,1.75,1.12),Vector3.new(0,0.05,0),C(29,30,46),Enum.Material.Fabric)
+ for _,side in ipairs({-1,1}) do
+  local lapel=armor("SilverLapel",Vector3.new(0.32,1.1,0.08),Vector3.new(side*0.4,0.42,-0.6),C(148,153,174)); lapel.CFrame*=CFrame.Angles(0,0,side*0.32)
+  armor("CoatTail",Vector3.new(0.7,1.5,0.2),Vector3.new(side*0.64,-1.15,0.61),C(26,27,41),Enum.Material.Fabric)
+ end
+ armor("CrimsonTie",Vector3.new(0.2,0.75,0.1),Vector3.new(0,0.35,-0.64),C(141,34,65),Enum.Material.Fabric)
+ for k=-3,3 do
+  local pleat=armor("PleatedSkirt",Vector3.new(0.34,0.72,1.35),Vector3.new(k*0.32,-1.02,0),k%2==0 and C(39,35,54) or C(49,43,64),Enum.Material.Fabric)
+  pleat.CFrame*=CFrame.Angles(0,0,-k*0.025)
+ end
+ -- Only the temple is cybernetic; the face and both eyes stay visible.
+ armor("TempleImplant",Vector3.new(0.18,0.52,0.35),Vector3.new(1.02,1.5,-0.27),C(70,80,99))
+ local visor=armor("CyborgVisor",Vector3.new(0.11,0.12,0.28),Vector3.new(1.12,1.55,-0.36),C(220,75,110),Enum.Material.Neon); light(visor,C(220,75,110),3,0.2)
  armor("CyberForearm",Vector3.new(0.9,1.3,1.1),Vector3.new(1.5,-0.2,-0.25),C(62,73,87))
  C2.cyberHand=armor("CyberHand",Vector3.new(0.8,0.65,0.9),Vector3.new(1.5,-0.7,-0.55),C(80,92,105))
  for k=1,3 do armor("ImplantContact",Vector3.new(0.08,0.6,0.1),Vector3.new(1.99,-0.2,-0.55+k*0.24),C(190,65,55),Enum.Material.Neon) end
@@ -2749,13 +2790,79 @@ function C2.DefeatSequence()
  CutsceneRE:FireAllClients("end"); sceneLock(false); introActive=false; canFight=true
  MusicRE:FireAllClients("finalSlow"); C2RE:FireAllClients("run"); c2Send()
 end
+function C2.DriveDistance(t)
+ t=math.max(0,t)
+ -- Smooth acceleration from rest, then cruise. The complete route covers 60s.
+ local ramp=math.min(t,4)
+ return 4*ramp*ramp+32*math.max(0,t-4)
+end
+-- Shared geometry is built BEFORE gameplay, not only after the final fade.
+function C2.BuildEscapeCity()
+ if C2.escapeCity and C2.escapeCity.Parent then return C2.escapeCity end
+ local city=Instance.new("Model"); city.Name="EscapeCity"; city.ModelStreamingMode=Enum.ModelStreamingMode.Persistent; city.Parent=C2.map
+ C2.escapeCity=city
+ local function block(name,size,pos,color,mat)
+  assert(math.max(size.X,size.Y,size.Z)<=512,"City parts must be segmented")
+  return c2Part(city,name,size,pos,color,mat or Enum.Material.Concrete)
+ end
+ -- Original pickup bay: floor, three walls and a canopy surround the parked van.
+ block("PickupBayFloor",Vector3.new(34,0.6,30),Vector3.new(-58,0,24),C(60,64,70))
+ block("PickupBayBack",Vector3.new(1,12,30),Vector3.new(-74,6,24),C(54,61,70))
+ for _,z in ipairs({9,39}) do block("PickupBayWall",Vector3.new(33,12,1),Vector3.new(-58,6,z),C(61,68,76)) end
+ block("PickupCanopy",Vector3.new(35,0.6,32),Vector3.new(-58,12,24),C(43,50,61),Enum.Material.Metal)
+ local bayLamp=block("PickupLamp",Vector3.new(6,0.2,2),Vector3.new(-57,11.5,24),C(240,213,165),Enum.Material.Neon); light(bayLamp,C(245,215,175),28,1)
+ -- A complete rendezvous courtyard, including the road under the stationary car.
+ block("RendezvousApron",Vector3.new(180,1,90),Vector3.new(-80,-0.2,110),C(48,51,58),Enum.Material.Asphalt)
+ block("CourtyardRearWall",Vector3.new(180,14,2),Vector3.new(-80,7,154),C(64,69,78))
+ block("CourtyardEastWall",Vector3.new(2,14,86),Vector3.new(9,7,110),C(64,69,78))
+ for _,z in ipairs({78,142}) do block("ExitGatePost",Vector3.new(4,16,4),Vector3.new(-164,8,z),C(85,90,100)) end
+ -- Roblox clamps oversized BaseParts. Overlapping 128-stud slabs cannot leave
+ -- the previous 76-stud hole beneath the beginning of the drive.
+ for segment=0,20 do
+  local x=58-segment*128
+  block("EscapeRoad",Vector3.new(129,1,32),Vector3.new(x,-0.2,100),C(32,35,41),Enum.Material.Asphalt)
+  block("CityGround",Vector3.new(129,2,460),Vector3.new(x,-1.7,100),C(49,55,57))
+  for _,side in ipairs({-1,1}) do
+   block("Sidewalk",Vector3.new(129,0.6,9),Vector3.new(x,0.15,100+side*20.5),C(111,113,119))
+   block("Curb",Vector3.new(129,0.35,0.5),Vector3.new(x,0.48,100+side*16.3),C(170,169,163))
+   block("EscapeRouteWall",Vector3.new(129,1.4,0.7),Vector3.new(x,1,100+side*25.2),C(75,82,91))
+  end
+  for line=0,3 do block("RoadMarking",Vector3.new(12,0.025,0.18),Vector3.new(x+line*32-48,0.315,100),C(220,207,159)) end
+ end
+ local rng=Random.new(4217)
+ for k=0,29 do
+  local x=-220-k*76
+  for _,side in ipairs({-1,1}) do
+   local z=100+side*21
+   block("StreetLampPole",Vector3.new(0.35,13,0.35),Vector3.new(x,6.6,z),C(56,64,76),Enum.Material.Metal)
+   local lamp=block("RoadLamp",Vector3.new(2.5,0.25,1.1),Vector3.new(x,13,100+side*18),C(247,214,162),Enum.Material.Neon)
+   if k%2==0 then light(lamp,C(255,222,174),28,0.9) end
+   local height=rng:NextInteger(20,65); local width=rng:NextInteger(35,57)
+   local facade=C(rng:NextInteger(65,105),rng:NextInteger(68,108),rng:NextInteger(78,118))
+   local bz=100+side*54
+   block("CityBuilding",Vector3.new(width,height,36),Vector3.new(x,height/2,bz),facade)
+   block("BuildingCornice",Vector3.new(width+2,0.7,38),Vector3.new(x,height+0.4,bz),C(53,58,70))
+   block("Storefront",Vector3.new(width-5,6,0.2),Vector3.new(x,3.5,bz-side*18.15),C(32,52,65),Enum.Material.Glass)
+   for floor=1,math.floor(height/8)-1 do for column=-2,2 do
+    local lit=(floor+column+k)%4~=0
+    block("CityWindow",Vector3.new(3.8,4.2,0.15),Vector3.new(x+column*(width/6),floor*8+3,bz-side*18.1),lit and C(180,161,121) or C(35,51,68),lit and Enum.Material.Neon or Enum.Material.Glass)
+   end end
+   block("RooftopPlant",Vector3.new(8,3,6),Vector3.new(x+8,height+2,bz),C(68,76,88),Enum.Material.Metal)
+   -- Second skyline row closes distant views between foreground blocks.
+   local towerHeight=rng:NextInteger(50,115)
+   block("SkylineTower",Vector3.new(61,towerHeight,42),Vector3.new(x-30,towerHeight/2,100+side*118),C(57,68,86))
+   for floor=1,math.floor(towerHeight/12) do block("SkylineWindowBand",Vector3.new(49,1.5,0.15),Vector3.new(x-30,floor*11,100+side*96.9),C(126,142,154)) end
+  end
+ end
+ return city
+end
 function C2.CarScene()
  local survivors={}; for _,p in ipairs(C2.party) do if c2Root(p) then table.insert(survivors,p) end end
  local lead=survivors[1] or C2.party[1]
  local other=lead:GetAttribute("Hero")=="Artem" and "Демид" or "Артем"
  FadeRE:FireAllClients(true,""); task.wait(0.7)
  local car=Instance.new("Model"); car.Name="GetawayCar"; car.Parent=C2.map
- local origin=Vector3.new(-70,0,100)
+ local origin=Vector3.new(-70,0.25,100)
  local function body(name,size,offset,color,material)
   local part=c2Part(car,name,size,origin+offset,color,material or Enum.Material.Metal)
   part.CanCollide=false; part.CanTouch=false; return part
@@ -2779,14 +2886,8 @@ function C2.CarScene()
    local rim=body("AlloyRim",Vector3.new(0.85,1.8,1.8),Vector3.new(axle,1.55,side*3.55),C(140,150,165)); rim.Shape=Enum.PartType.Cylinder; rim.CFrame=wheel.CFrame
   end
  end
- for k=0,50 do
-  c2Part(C2.map,"RoadMarking",Vector3.new(14,0.03,0.2),origin+Vector3.new(60-k*42,0.35,0),C(190,180,145))
- end
- c2Part(C2.map,"EscapeRoad",Vector3.new(2500,1,32),origin+Vector3.new(-1100,-0.2,0),C(30,33,38),Enum.Material.Asphalt)
- for _,side in ipairs({-1,1}) do
-  c2Part(C2.map,"EscapeRouteWall",Vector3.new(2500,9,2),origin+Vector3.new(-1100,4,side*19),C(48,53,61),Enum.Material.Concrete)
-  for k=0,30 do local lamp=c2Part(C2.map,"RoadLamp",Vector3.new(1,0.3,3),origin+Vector3.new(40-k*70,8,side*17),C(240,195,125),Enum.Material.Neon); light(lamp,C(245,200,140),28,1.1) end
- end
+ C2.BuildEscapeCity()
+ car.ModelStreamingMode=Enum.ModelStreamingMode.Persistent
  local source=other=="Артем" and "eurtyoeyrntiu" or "ZamestitelDiomchica"
  local buddy=secretActor(C2.map,source,other,CFrame.lookAt(origin+Vector3.new(3,0.5,-8),origin+Vector3.new(10,0.5,-8)))
  for i,p in ipairs(survivors) do p.Character:PivotTo(CFrame.lookAt(origin+Vector3.new(12,4,-8-i*2),buddy.Head.Position)) end
@@ -2809,18 +2910,19 @@ function C2.CarScene()
  if #survivors<2 then buddy:PivotTo(CFrame.lookAt(origin+Vector3.new(0,0.7,1.5),origin+Vector3.new(-20,0.7,1.5))); C2.SitRig(buddy); table.insert(riders,buddy) else buddy:Destroy() end
  local pivot=car:GetPivot(); local offsets={}
  for _,rig in ipairs(riders) do offsets[rig]=pivot:ToObjectSpace(rig:GetPivot()) end
+ CutsceneRE:FireAllClients("follow",car,Vector3.new(20,9,-14),Vector3.new(-6,2,0))
+ CutsceneRE:FireAllClients("reveal"); task.wait(1.2)
  local start=os.clock(); local connection
  connection=RunService.Heartbeat:Connect(function()
   if not car.Parent then connection:Disconnect(); return end
   local t=os.clock()-start
-  local distance=18*t+0.65*t*t
+  local distance=C2.DriveDistance(t)
   local cf=pivot+Vector3.new(-distance,0,0); car:PivotTo(cf)
   for rig,offset in pairs(offsets) do if rig.Parent then rig:PivotTo(cf*offset) end end
  end)
  table.insert(C2.connections,connection)
  for _,p in ipairs(C2.party) do p.ReplicationFocus=car:FindFirstChild("Chassis") end
- CutsceneRE:FireAllClients("follow",car,Vector3.new(20,11,-20),Vector3.new(-6,2,0))
- CutsceneRE:FireAllClients("reveal"); MusicRE:FireAllClients("finalSlow")
+ MusicRE:FireAllClients("finalSlow")
  task.spawn(function() for i=2,10 do C2.Collapse(C2.zones[i],true); task.wait(0.15) end end)
  C2.Literal(other,"На самом деле это было неплохо, отличная работа. Но скажу тебе так — всё довольно плачевно. В плане, это же их мини-центр, мы даже и половину не уничтожили",10)
  C2.Literal(lead:GetAttribute("Hero")=="Artem" and "Артем" or "Демид","Это было легко, но если бы мне кто-то помогал...",4)
@@ -3043,6 +3145,7 @@ local function c2Build()
   local chimney=prop(C2.map,"FactoryChimney",Vector3.new(11,95+k*5,11),Vector3.new(350+k*150,45,-100),C(63,69,75),Enum.Material.Concrete)
   local smoke=Instance.new("Smoke"); smoke.Opacity=0.2; smoke.Size=18; smoke.RiseVelocity=9; smoke.Color=C(90,95,100); smoke.Parent=chimney
  end
+ C2.BuildEscapeCity()
  local car=prop(C2.map,"EscapeVan",Vector3.new(13,4,7),Vector3.new(-58,3,24),C(42,65,83),Enum.Material.Metal)
  prop(C2.map,"VanCabin",Vector3.new(5,2.2,7),Vector3.new(-61,6,24),C(50,73,88),Enum.Material.Metal)
  prop(C2.map,"VanWindshield",Vector3.new(0.15,1.5,5.5),Vector3.new(-63.6,6,24),C(85,125,140),Enum.Material.Glass)

@@ -169,9 +169,9 @@ campaign=Path('src/Chapter2Campaign.luau').read_text()
 car=campaign[campaign.index('function C2.CarScene()'):campaign.index('function C2.NewsTwist()')]
 assert '"pov",buddy.Head' in car and 'Какого хрена ты там натворил?!' in car
 assert 'Ладно, валим скорее на тачке!' in car
-assert '"follow",car' in car and 'local distance=18*t+0.65*t*t' in car
+assert '"follow",car' in car and 'local distance=C2.DriveDistance(t)' in car
 assert 'SeatWeld' not in car.replace('-- No physical seats or SeatWelds: deterministic anchored riders cannot stop the car.','')
-assert 'Instance.new("Seat")' not in car and 'EscapeRouteWall' in car
+assert 'Instance.new("Seat")' not in car and 'EscapeRouteWall' in campaign
 assert 'offsets[rig]=pivot:ToObjectSpace(rig:GetPivot())' in car
 assert 'C2.bossButton' in campaign and 'C(255,20,25),Enum.Material.Neon' in campaign
 assert campaign.index('Ладно, мне с этим как всегда разобраться.') < campaign.index('Хех, скоро здесь всё взорвётся.')
@@ -180,3 +180,14 @@ assert 'not C2.DebugAllowed(player) or C2.debugBusy or introActive' in campaign
 assert 'epoch~=C2.deployEpoch' in campaign
 assert chapter.index('MusicRE:FireAllClients("final")',chapter.index('c2Finish=function')) < chapter.index('C2RE:FireAllClients("chapterCredits",true)')
 print('PASS: first-person rendezvous, moving exterior car with anchored riders, red button insert, credits music and authorized debug jumps')
+
+assert 'Vector3.new(2500' not in campaign
+assert 'city.ModelStreamingMode=Enum.ModelStreamingMode.Persistent' in campaign
+assert chapter.index('C2.BuildEscapeCity()',chapter.index('local function c2Build()')) < chapter.index('local function startChapter2(')
+for feature in ('PickupBayWall','RendezvousApron','CourtyardRearWall','SkylineTower','CityBuilding','CityWindow','Sidewalk','StreetLampPole'):
+    assert feature in campaign, feature
+for feature in ('MafiaAnimeFace','EyeWhite','Iris','Catchlight','SweptBangs','LayeredLongHair','PleatedSkirt'):
+    assert feature in campaign, feature
+assert 'MechanicalFaceplate' not in campaign and 'BallisticChest' not in campaign
+assert car.index('task.wait(1.2)') < car.index('local start=os.clock()')
+print('PASS: segmented road, prebuilt enclosed pickup/courtyard, persistent city skyline, unobscured anime face and settled departure camera')
