@@ -33,6 +33,7 @@ local currentSpawn = CFrame.new(0, 10, 0)
 local fxFolder = Instance.new("Folder"); fxFolder.Name = "FX"; fxFolder.Parent = workspace
 local currentExitDoor, currentDoorCF, doorUnlocked = nil, nil, false
 local Levels
+local activeLevelInfo
 local introActive = false
 local breachDoor, entranceUsed = nil, false
 
@@ -52,7 +53,7 @@ local function C(r, g, b) return Color3.fromRGB(r, g, b) end
 local Presets = {
 	Forest    = {A=C(70,78,90),    B=2,   Clock=16.5, D=0.25, AC=C(180,195,210), CT=0.08, S=-0.12, T=C(250,245,238), BL=0.05},
 	Apartment = {A=C(110,105,100), B=1,   Clock=0,    D=0.00, AC=C(195,195,195), CT=0.06, S=-0.10, T=C(250,248,242), BL=0.05},
-	Lab       = {A=C(140,145,150), B=1,   Clock=0,    D=0.00, AC=C(205,210,215), CT=0.06, S=-0.15, T=C(242,248,255), BL=0.05},
+	Lab       = {A=C(155,165,180), B=2,   Clock=0,    D=0.00, AC=C(205,210,215), CT=0.06, S=-0.15, T=C(242,248,255), BL=0.05},
 	Warehouse = {A=C(95,90,82),    B=1,   Clock=0,    D=0.05, AC=C(180,175,160), CT=0.10, S=-0.15, T=C(250,242,228), BL=0.05},
 	Server    = {A=C(75,70,75),    B=1,   Clock=0,    D=0.05, AC=C(140,130,135), CT=0.10, S=-0.15, T=C(250,240,240), BL=0.05},
 	Base      = {A=C(110,115,125), B=1,   Clock=0,    D=0.05, AC=C(185,195,210), CT=0.06, S=-0.10, T=C(248,250,255), BL=0.05},
@@ -61,7 +62,7 @@ local Presets = {
 }
 local function applyPreset(name, t)
 	local p = Presets[name]; local ti = TweenInfo.new(t)
-	TweenService:Create(Lighting, ti, {Ambient=p.A, OutdoorAmbient=p.A, Brightness=p.B, ClockTime=p.Clock}):Play()
+	TweenService:Create(Lighting, ti, {Ambient=p.A, OutdoorAmbient=p.A, Brightness=p.B, ClockTime=p.Clock, ExposureCompensation=0}):Play()
 	TweenService:Create(atm, ti, {Density=p.D, Color=p.AC, Haze=1}):Play()
 	TweenService:Create(cc, ti, {Contrast=p.CT, Saturation=p.S, TintColor=p.T}):Play()
 	TweenService:Create(bloom, ti, {Intensity=p.BL}):Play()
@@ -89,6 +90,17 @@ local function light(parent, color, range, brightness)
 	local l = Instance.new("PointLight"); l.Color = color; l.Range = range; l.Brightness = brightness; l.Parent = parent
 	return l
 end
+-- Down-facing lights sit below ceilings, not buried in them.
+local function ceilingLight(parent, position, width, depth)
+ local panel=part(parent,Vector3.new(width or 7,0.2,depth or 3),position,C(225,240,255))
+ panel.Name="CeilingLight"; panel.Material=Enum.Material.Neon
+ local area=Instance.new("SurfaceLight")
+ area.Face=Enum.NormalId.Bottom; area.Angle=140; area.Range=40
+ area.Brightness=2.5; area.Color=C(225,240,255); area.Shadows=false; area.Parent=panel
+ local fill=light(panel,C(215,235,255),32,1.3); fill.Shadows=false
+ return panel
+end
+
 local function anchorAll(m)
 	for _, d in ipairs(m:GetDescendants()) do if d:IsA("BasePart") then d.Anchored = true end end
 end
@@ -592,8 +604,7 @@ local function buildRoom(f, c)
 	part(f, Vector3.new(0.2,0.3,D), Vector3.new(-W/2+0.2,H-1.5,0), c.Neon)
 	part(f, Vector3.new(0.2,0.3,D), Vector3.new(W/2-0.2,H-1.5,0), c.Neon)
 	for ix = -1, 1 do for iz = -2, 2 do
-			local lp = part(f, Vector3.new(6,0.3,1.5), Vector3.new(ix*W/3, H-0.2, iz*D/5), C(230,225,215))
-			if (ix + iz) % 2 == 0 then light(lp, c.Neon:Lerp(C(240,240,240), 0.6), 35, 1.0) end
+   ceilingLight(f,Vector3.new(ix*W/3,H-0.8,iz*D/5),7,3)
 		end end
 	for _ = 1, c.Crates do
 		local s = rng:NextNumber(4, 7)
@@ -610,6 +621,22 @@ local function buildRoom(f, c)
 		return t
 	end
 	return info
+end
+
+local function buildLaboratory(f)
+ local info=buildRoom(f,RoomCfg[3])
+ -- Dedicated side bays leave the central combat and exit lane unobstructed.
+ for _, sign in ipairs({-1,1}) do
+  part(f,Vector3.new(1,12,38),Vector3.new(sign*23,6,0),C(175,195,210),Enum.Material.Metal)
+  for _, z in ipairs({-24,0,24}) do
+   local desk=part(f,Vector3.new(7,3,5),Vector3.new(sign*29,1.5,z),C(210,220,225),Enum.Material.Metal)
+   part(f,Vector3.new(7.4,0.3,5.4),desk.Position+Vector3.new(0,1.7,0),C(235,245,250))
+   local screen=part(f,Vector3.new(4,2.5,0.3),Vector3.new(sign*29,4.5,z-1.5),C(30,160,190))
+   screen.Material=Enum.Material.Neon
+   ceilingLight(f,Vector3.new(sign*28,16,z),5,4)
+  end
+ end
+ return info
 end
 
 ------------------------------------------------------------------ БАЗА
@@ -858,7 +885,7 @@ Levels = {
 	{Name="Квартира", Preset="Apartment", Build=function(f) return buildRoom(f, RoomCfg[2]) end,
 	Waves={{{"Melee",2}}, {{"Pistol",1},{"Melee",1}}},
 	Intro="Квартира. Одна с пистолетом — держи дистанцию."},
-	{Name="Лаборатория", Preset="Lab", Build=function(f) return buildRoom(f, RoomCfg[3]) end,
+	{Name="Лаборатория", Preset="Lab", Build=buildLaboratory,
 	Waves={{{"Melee",2}}, {{"Pistol",1},{"SMG",1}}, {{"Melee",1},{"SMG",1}}},
 	Intro="Лаборатория. ПП стреляют очередями — укрывайся."},
 	{Name="Склад", Preset="Warehouse", Build=function(f) return buildRoom(f, RoomCfg[4]) end,
@@ -907,10 +934,12 @@ function startLevel(n)
 	currentLevel, currentName = n, Levels[n].Name
 	local L = Levels[n]
 	local info = L.Build(levelFolder)
+ activeLevelInfo=info
 	currentSpawn = info.Spawn
 	applyPreset(L.Preset, 0.1)
 	for _, plr in ipairs(Players:GetPlayers()) do plr:SetAttribute("WeaponLevel", n) end
 	placeAll()
+ sceneLock(false)
 	local door, ind = makeExitDoor(info.ExitDoorCF, RoomCfg[n] and RoomCfg[n].H or 14)
 	currentExitDoor = door
 	currentDoorCF = info.ExitDoorCF
@@ -922,6 +951,7 @@ function startLevel(n)
 	local txt = L.Intro
 	if n >= 2 then txt ..= ("\n[Новое оружие: %s — клавиша %d]"):format(WD.Stats[WD.Order[n]].Display, n) end
 	NotifyRE:FireAllClients(txt, 6)
+ introActive=false
 	canFight = true
  if n == 1 then prepareEntrance() end
 end
@@ -936,9 +966,7 @@ function onCleared(n, token)
 		local remainingW = L.Waves[currentWave + 1]
 		local count = 0
 		for _, pair in ipairs(remainingW) do count += pair[2] end
-		local spots
-		if n == 1 then spots = buildForest(nil).GetSpots(count)
-		else spots = buildRoom(nil, RoomCfg[n]).GetSpots(count) end
+  local spots=activeLevelInfo.GetSpots(count)
 		currentWave += 1
 		enemiesLeft = count
 		local i = 0
@@ -968,13 +996,36 @@ local function playIntro()
  clearLevel(); newFolders()
  currentLevel,currentName=1,Levels[1].Name
  local info=Levels[1].Build(levelFolder)
+ activeLevelInfo=info
  currentSpawn=info.Spawn
  applyPreset("Forest",0.1)
  for _, p in ipairs(Players:GetPlayers()) do p:SetAttribute("WeaponLevel",1) end
  -- An open-front briefing shelter: all walking paths and camera setups stay outside walls.
- local base=Instance.new("Model"); base.Name="OperationsBase"; base.Parent=levelFolder
+ local base=Instance.new("Model"); base.Name="BriefingLaboratory"; base.Parent=levelFolder
+ local baseOffset=Vector3.new(2000,0,0)
+ local function baseCF(cf) return CFrame.new(baseOffset)*cf end
+ local function basePoint(point) return point+baseOffset end
+ part(base,Vector3.new(180,2,180),Vector3.new(70,-1,55),C(60,72,80),Enum.Material.Concrete)
+ -- A closed laboratory with one real 6-stud doorway to the helipad.
+ part(base,Vector3.new(1,12,22),Vector3.new(91,6,39),C(55,65,78),Enum.Material.Metal)
+ part(base,Vector3.new(30,12,1),Vector3.new(64,6,50),C(55,65,78),Enum.Material.Metal)
+ part(base,Vector3.new(6,12,1),Vector3.new(88,6,50),C(55,65,78),Enum.Material.Metal)
+ part(base,Vector3.new(6,3,1),Vector3.new(82,10.5,50),C(55,65,78),Enum.Material.Metal)
+ for _, x in ipairs({57,70,83}) do ceilingLight(base,Vector3.new(x,11.2,39),7,4) end
+ for _, z in ipairs({32,41}) do
+  part(base,Vector3.new(6,3,5),Vector3.new(54,1.5,z),C(170,190,205),Enum.Material.Metal)
+  local monitor=part(base,Vector3.new(4,2,0.3),Vector3.new(54,4,z-1),C(20,160,180)); monitor.Material=Enum.Material.Neon
+ end
+ for _, wall in ipairs({{70,15,-35,180,30,2},{70,15,145,180,30,2},{-20,15,55,2,30,180},{160,15,55,2,30,180}}) do
+  part(base,Vector3.new(wall[4],wall[5],wall[6]),Vector3.new(wall[1],wall[2],wall[3]),C(65,78,90),Enum.Material.Concrete)
+ end
+ local pad=part(base,Vector3.new(24,0.15,24),Vector3.new(70,0.15,65),C(38,48,54),Enum.Material.Metal)
+ for _, x in ipairs({60,80}) do
+  local lamp=part(base,Vector3.new(0.5,6,0.5),Vector3.new(x,3,76),C(70,85,95),Enum.Material.Metal)
+  light(lamp,C(220,240,255),28,2)
+ end
  part(base,Vector3.new(42,0.2,40),Vector3.new(70,0.1,48),C(85,94,96),Enum.Material.Concrete)
- part(base,Vector3.new(30,12,1),Vector3.new(70,6,28),C(45,55,65),Enum.Material.Metal)
+ part(base,Vector3.new(42,12,1),Vector3.new(70,6,28),C(45,55,65),Enum.Material.Metal)
  part(base,Vector3.new(1,12,22),Vector3.new(49,6,39),C(45,55,65),Enum.Material.Metal)
  part(base,Vector3.new(43,0.5,24),Vector3.new(70,12,39),C(40,48,57),Enum.Material.Metal)
  local board=part(base,Vector3.new(14,7,0.2),Vector3.new(70,6,28.7),C(12,28,35),Enum.Material.Neon)
@@ -984,25 +1035,28 @@ local function playIntro()
  text.TextColor3=C(100,255,220); text.TextScaled=true; text.Font=Enum.Font.GothamBold; text.Parent=surface
  local commander=buildRig(Types.Commander,CFrame.lookAt(Vector3.new(70,3,34),Vector3.new(70,3,45)))
  anchorAll(commander); commander.Parent=base
+ base:PivotTo(CFrame.new(baseOffset)*base:GetPivot())
  -- Walk to briefing, pause, then walk to the helicopter. No hidden teleport mid-shot.
  for i,p in ipairs(Players:GetPlayers()) do
-  if p.Character then p.Character:PivotTo(CFrame.lookAt(Vector3.new(68+i*3,3.2,54),Vector3.new(70,3.2,34))) end
+  if p.Character then p.Character:PivotTo(baseCF(CFrame.lookAt(Vector3.new(81+(i-1)*0.7,3.2,54),Vector3.new(82,3.2,43)))) end
  end
  sceneLock(true)
  CutsceneRE:FireAllClients("start")
  follow(char,Vector3.new(11,7,13))
  FadeRE:FireAllClients(false)
- tweenCharTo(char,CFrame.new(70,3.2,43),3)
- shot(Vector3.new(82,7,48),Vector3.new(70,4,37),0)
+ currentSpawn=baseCF(CFrame.new(82,3.2,46))
+ tweenCharTo(char,baseCF(CFrame.new(82,3.2,46)),3)
+ tweenCharTo(char,baseCF(CFrame.new(70,3.2,43)),3)
+ shot(basePoint(Vector3.new(82,7,48)),basePoint(Vector3.new(70,4,37)),0)
  NotifyRE:FireAllClients("КОМАНДИР: Проходи, спец. Разведка обнаружила ещё одну криминальную базу картеля.",6)
  task.wait(6)
- shot(Vector3.new(61,6,44),Vector3.new(71,5,29),0)
+ shot(basePoint(Vector3.new(61,6,44)),basePoint(Vector3.new(71,5,29)),0)
  NotifyRE:FireAllClients("КОМАНДИР: Вот снимок объекта. Это перевалочный пункт в лесу. Нужно проникнуть внутрь и зачистить его.",7)
  task.wait(7)
- shot(Vector3.new(82,7,46),Vector3.new(70,4,38),0)
+ shot(basePoint(Vector3.new(82,7,46)),basePoint(Vector3.new(70,4,38)),0)
  NotifyRE:FireAllClients("КОМАНДИР: Спешки нет. Подготовься. Вертолёт доставит тебя к южной тропе — дальше пешком.",7)
  task.wait(7)
- local departure=CFrame.new(70,4,65)
+ local departure=baseCF(CFrame.new(70,4,65))
  local landing=CFrame.new(24,4,60)
  local heli=buildHelicopter(departure); heli.Parent=workspace
  -- Steps align with the open starboard doorway (local X positive, Z=0).
@@ -1025,12 +1079,12 @@ local function playIntro()
   end
  end)
  follow(char,Vector3.new(12,7,-10))
- tweenCharTo(char,CFrame.new(82,3.2,48),3)
- tweenCharTo(char,CFrame.new(82,3.2,65),3)
- shot(Vector3.new(86,8,77),Vector3.new(72,4,65),0)
- tweenCharTo(char,CFrame.new(77,3.2,65),2)
- tweenCharTo(char,CFrame.new(74.5,4.8,65),2)
- local boarded=tweenCharTo(char,CFrame.new(71.5,4.8,65),2)
+ tweenCharTo(char,baseCF(CFrame.new(82,3.2,48)),3)
+ tweenCharTo(char,baseCF(CFrame.new(82,3.2,65)),3)
+ shot(basePoint(Vector3.new(86,8,77)),basePoint(Vector3.new(72,4,65)),0)
+ tweenCharTo(char,baseCF(CFrame.new(77,3.2,65)),2)
+ tweenCharTo(char,baseCF(CFrame.new(74.5,4.8,65)),2)
+ local boarded=tweenCharTo(char,baseCF(CFrame.new(71.5,4.8,65)),2)
  if not boarded then
   -- Recover only behind a full fade; never show a slide through the fuselage.
   FadeRE:FireAllClients(true,"ПОСАДКА НА БОРТ")
@@ -1040,19 +1094,34 @@ local function playIntro()
  sceneLock(true)
  char:SetAttribute("CinematicSeated",true)
  local ride=RunService.Heartbeat:Connect(function()
-  if char.Parent and heli.Parent then char:PivotTo(heli:GetPivot()*CFrame.new(1.5,0.8,0)) end
+  if not heli.Parent then return end
+  for i,passenger in ipairs(Players:GetPlayers()) do
+   local character=passenger.Character
+   if character then
+    character:SetAttribute("CinematicSeated",true)
+    character:PivotTo(heli:GetPivot()*CFrame.new(1.5,0.8,(i-1)*1.5))
+   end
+  end
  end)
  steps:Destroy()
  NotifyRE:FireAllClients("ПИЛОТ: Все на борту. Взлетаем. До точки пара минут.",5)
  follow(heli,Vector3.new(20,10,22),Vector3.new(0,1,0))
  FadeRE:FireAllClients(false)
  moveModel(heli,departure*CFrame.new(0,38,0),6)
- moveModel(heli,landing*CFrame.new(0,38,0),8)
+ -- Separate maps: travel cut is hidden, never fly across an empty world.
+ FadeRE:FireAllClients(true,"ПЕРЕЛЁТ // ЛЕСНОЙ СЕКТОР")
+ task.wait(1)
+ heli:PivotTo(landing*CFrame.new(0,38,0))
+ currentSpawn=info.Spawn
+ task.wait(0.5)
  shot(Vector3.new(43,12,81),landing.Position+Vector3.new(0,5,0),0)
+ FadeRE:FireAllClients(false)
  moveModel(heli,landing,7)
  steps=stairs(landing)
  ride:Disconnect()
- char:SetAttribute("CinematicSeated",false)
+ for _,passenger in ipairs(Players:GetPlayers()) do
+  if passenger.Character then passenger.Character:SetAttribute("CinematicSeated",false) end
+ end
  follow(char,Vector3.new(13,7,12))
  tweenCharTo(char,CFrame.new(28.5,4.8,60),2)
  tweenCharTo(char,CFrame.new(31,3.2,60),2)
@@ -1064,6 +1133,7 @@ local function playIntro()
  heli:Destroy(); steps:Destroy()
  CutsceneRE:FireAllClients("end")
  sceneLock(false); introActive=false
+ currentSpawn=info.Spawn
  currentExitDoor=makeExitDoor(info.ExitDoorCF,14)
  currentDoorCF=info.ExitDoorCF; doorUnlocked=false
  totalWaves=#Levels[1].Waves
@@ -1077,6 +1147,7 @@ end
 local function playMafioziScene()
 	introActive = true
 	canFight = false
+ sceneLock(true)
 	FadeRE:FireAllClients(true, "ОФИС ГЛАВНОЙ ТЯНКИ")
 	task.wait(2)
 	clearLevel(); newFolders()
@@ -1085,6 +1156,13 @@ local function playMafioziScene()
 	-- Строим офис
 	local office = levelFolder
 	local W, H, D = 30, 12, 30
+ -- Entrance starts at Z=18: the original room floor ended at Z=15.5.
+ part(office,Vector3.new(44,2,60),Vector3.new(0,-1,7),C(65,62,62),Enum.Material.Concrete)
+ for _, sign in ipairs({-1,1}) do
+  part(office,Vector3.new(11,12,1),Vector3.new(sign*9.5,6,15.5),C(60,45,35),Enum.Material.Wood)
+ end
+ part(office,Vector3.new(8,2,1),Vector3.new(0,11,15.5),C(60,45,35),Enum.Material.Wood)
+ ceilingLight(office,Vector3.new(0,11,5),7,3)
 	part(office, Vector3.new(W+2, 1, D+2), Vector3.new(0, -0.5, 0), C(80, 60, 50), Enum.Material.WoodPlanks)
 	part(office, Vector3.new(W+2, 1, D+2), Vector3.new(0, H+0.5, 0), C(40, 30, 25), Enum.Material.Wood)
 	part(office, Vector3.new(W+2, H, 1), Vector3.new(0, H/2, -D/2-0.5), C(60, 45, 35), Enum.Material.Wood)
@@ -1117,7 +1195,9 @@ local function playMafioziScene()
 	-- Игрок за дверью
 	local plr = Players:GetPlayers()[1]
 	local char = plr.Character
-	placeCharAt(char, CFrame.new(0, 3, 18))
+ currentSpawn=CFrame.lookAt(Vector3.new(0,3.2,20),Vector3.new(0,3.2,0))
+ placeAll()
+ sceneLock(true)
 	-- Управление выкл
 	local h = char:FindFirstChildOfClass("Humanoid")
 	if h then h.WalkSpeed = 0; h.JumpPower = 0; h.AutoRotate = false end
@@ -1125,6 +1205,7 @@ local function playMafioziScene()
 	applyPreset("Office", 0.5)
 	FadeRE:FireAllClients(false, "")
 	CutsceneRE:FireAllClients("start")
+ shot(Vector3.new(10,7,26),Vector3.new(0,4,15),0)
 	task.wait(1)
 
 	-- Врываемся через дверь
@@ -1137,6 +1218,7 @@ local function playMafioziScene()
 
 	-- Забегаем внутрь
 	tweenCharTo(char, CFrame.lookAt(Vector3.new(0, 3, 5), Vector3.new(0, 3, -8)), 1.5)
+ shot(Vector3.new(10,7,10),Vector3.new(0,4,-6),0)
 	task.wait(1.2)
 
 	-- Мафиози видит нас, поднимает руки
@@ -1162,7 +1244,7 @@ local function playMafioziScene()
 	task.wait(2.5)
 
 	CutsceneRE:FireAllClients("end")
-	introActive = false
+ -- Keep actors frozen across the office -> plane -> base transition.
 	FadeRE:FireAllClients(true, "")
 	task.wait(1.5)
 end
@@ -1170,15 +1252,31 @@ end
 ------------------------------------------------------------------ САМОЛЁТ-КАТСЦЕНА
 local function playPlaneScene()
 	introActive = true
+ sceneLock(true)
 	clearLevel(); newFolders()
+ -- Actors remain anchored during the aerial insert; there is no walkable sky floor.
+ currentSpawn=CFrame.new(0,301,0)
+ placeAll()
+ sceneLock(true)
 
 	-- Самолёт летит в небе
 	local plane = buildPlane(CFrame.new(0, 300, 0))
 	plane.Parent = workspace
+ local planeRide=RunService.Heartbeat:Connect(function()
+  if not plane.Parent then return end
+  currentSpawn=plane:GetPivot()*CFrame.new(0,-0.5,0)
+  for i,player in ipairs(Players:GetPlayers()) do
+   local character=player.Character
+   if character then
+    character:SetAttribute("CinematicSeated",true)
+    character:PivotTo(currentSpawn*CFrame.new(0,0,(i-1)*2))
+   end
+  end
+ end)
 
 	CutsceneRE:FireAllClients("start")
 	FadeRE:FireAllClients(false, "")
-	FocusRE:FireAllClients(Vector3.new(0, 300, -30), 8)
+ follow(plane,Vector3.new(25,12,32),Vector3.new(0,0,0))
 	NotifyRE:FireAllClients("Вы возвращаетесь на базу...", 4)
 
 	-- Самолёт летит
@@ -1187,15 +1285,20 @@ local function playPlaneScene()
 
 	FadeRE:FireAllClients(true, "")
 	task.wait(1.5)
+ planeRide:Disconnect()
 	plane:Destroy()
+ for _,player in ipairs(Players:GetPlayers()) do
+  if player.Character then player.Character:SetAttribute("CinematicSeated",false) end
+ end
 	CutsceneRE:FireAllClients("end")
-	introActive = false
+ -- startBase builds the destination before releasing the scene lock.
 end
 
 ------------------------------------------------------------------ ФИНАЛ НА БАЗЕ — не смертельное столкновение и цитадель
 local function say(text, dur) NotifyRE:FireAllClients(text, dur); task.wait(dur + 0.4) end
 
 function startBase()
+ sceneLock(true)
 	introActive = true
 	levelToken += 1
 	canFight = false
@@ -1315,11 +1418,10 @@ function startBase()
  CreditsRE:FireAllClients(false)
  MusicRE:FireAllClients("stop")
  CutsceneRE:FireAllClients("end")
- introActive=false
-
+ -- Keep transition protection active until the replay floor is ready.
+ introActive=true
 	EndRE:FireAllClients()
 	task.wait(8)
- sceneLock(false)
 	startLevel(1)
 end
 
@@ -1389,6 +1491,7 @@ Players.PlayerAdded:Connect(function(plr)
 		if not introActive then
    placePlayer(plr)
   else
+   char:PivotTo(currentSpawn)
    sceneLock(true)
    CutsceneRE:FireClient(plr,"start")
   end
@@ -1487,7 +1590,13 @@ task.spawn(function()
 		task.wait(0.5)
 		for i, plr in ipairs(Players:GetPlayers()) do
 			local hrp = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
-			if hrp and hrp.Position.Y < -20 and not introActive then placePlayer(plr, i) end
+			if hrp and hrp.Position.Y < -20 then
+    if introActive then
+     hrp.Anchored=true
+     plr.Character:PivotTo(currentSpawn)
+     hrp.AssemblyLinearVelocity=Vector3.zero
+    else placePlayer(plr,i) end
+   end
 		end
 		for _, e in pairs(enemies) do
 			if e.Hrp.Position.Y < -20 then e.Hum.Health = 0 end

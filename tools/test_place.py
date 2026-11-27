@@ -31,7 +31,7 @@ print('PASS: valid chunk stream, 3 exact embedded scripts, cinematic regressions
 intro = server.split('local function playIntro()', 1)[1].split('-- МАФИОЗИ', 1)[0]
 assert intro.count('spawnWave(1,token,info)') == 1
 assert intro.count('currentExitDoor=makeExitDoor') == 1
-assert 'OperationsBase' in intro and 'BoardingSteps' in intro
+assert 'BriefingLaboratory' in intro and 'BoardingSteps' in intro
 assert 'prepareEntrance()' in intro
 assert 'hum:MoveTo(target.Position)' in server
 assert 'root.Anchored=wasAnchored' in server
@@ -44,3 +44,21 @@ assert 'shotDuration<=0 and 1' in client
 assert 'unobstructedCamera' in client
 assert 'CinematicKick' in client and 'CinematicSeated' in client
 print('PASS: one intro wave/exit, separate one-use breach, physical walking, cabin collision, camera and poses')
+
+assert 'baseOffset=Vector3.new(2000,0,0)' in intro
+assert 'base:PivotTo(CFrame.new(baseOffset)*base:GetPivot())' in intro
+assert 'area.Face=Enum.NormalId.Bottom' in server
+assert 'area.Shadows=false' in server
+assert 'Build=buildLaboratory' in server
+assert 'buildForest(nil)' not in server and 'buildRoom(nil' not in server
+assert 'local spots=activeLevelInfo.GetSpots(count)' in server
+mafia=server.split('local function playMafioziScene()',1)[1].split('local function playPlaneScene()',1)[0]
+assert mafia.index('sceneLock(true)') < mafia.index('clearLevel()')
+assert 'Vector3.new(44,2,60)' in mafia  # support includes the Z=20 entrance spawn
+assert 'currentSpawn=CFrame.lookAt(Vector3.new(0,3.2,20)' in mafia
+plane=server.split('local function playPlaneScene()',1)[1].split('function startBase()',1)[0]
+assert plane.index('sceneLock(true)') < plane.index('clearLevel()')
+assert 'planeRide:Disconnect()' in plane
+assert 'introActive = false' not in plane
+assert 'if introActive then\n     hrp.Anchored=true' in server
+print('PASS: separate briefing map, lit laboratory, retained wave geometry, supported/anchored cinematic transitions')
