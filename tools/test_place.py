@@ -62,3 +62,17 @@ assert 'planeRide:Disconnect()' in plane
 assert 'introActive = false' not in plane
 assert 'if introActive then\n     hrp.Anchored=true' in server
 print('PASS: separate briefing map, lit laboratory, retained wave geometry, supported/anchored cinematic transitions')
+# Lighting additions are intentionally scoped to the starting briefing map.
+assert server.count('briefingLight(') == 2  # helper definition + base-only loop
+briefing_fixture=server.split('local function briefingLight(',1)[1].split('local function anchorAll',1)[0]
+assert 'Enum.Material.Neon' not in briefing_fixture
+assert 'PointLight' not in briefing_fixture and 'fill=light' not in briefing_fixture
+assert 'area.Brightness=0.65' in briefing_fixture
+room=server.split('local function buildRoom(',1)[1].split('local function buildLaboratory(',1)[0]
+assert 'if (ix + iz) % 2 == 0 then light(lp' in room
+assert 'briefingLight' not in room and 'SurfaceLight' not in room
+combat_lab=server.split('local function buildLaboratory(',1)[1].split('-- БАЗА',1)[0]
+assert 'ceilingLight(' not in combat_lab and 'briefingLight(' not in combat_lab
+assert 'Enum.Material.Neon' not in combat_lab
+assert 'ExposureCompensation=0' not in server
+print('PASS: soft non-neon briefing-only lighting; original combat-room lighting restored')

@@ -53,7 +53,7 @@ local function C(r, g, b) return Color3.fromRGB(r, g, b) end
 local Presets = {
 	Forest    = {A=C(70,78,90),    B=2,   Clock=16.5, D=0.25, AC=C(180,195,210), CT=0.08, S=-0.12, T=C(250,245,238), BL=0.05},
 	Apartment = {A=C(110,105,100), B=1,   Clock=0,    D=0.00, AC=C(195,195,195), CT=0.06, S=-0.10, T=C(250,248,242), BL=0.05},
-	Lab       = {A=C(155,165,180), B=2,   Clock=0,    D=0.00, AC=C(205,210,215), CT=0.06, S=-0.15, T=C(242,248,255), BL=0.05},
+	Lab       = {A=C(140,145,150), B=1,   Clock=0,    D=0.00, AC=C(205,210,215), CT=0.06, S=-0.15, T=C(242,248,255), BL=0.05},
 	Warehouse = {A=C(95,90,82),    B=1,   Clock=0,    D=0.05, AC=C(180,175,160), CT=0.10, S=-0.15, T=C(250,242,228), BL=0.05},
 	Server    = {A=C(75,70,75),    B=1,   Clock=0,    D=0.05, AC=C(140,130,135), CT=0.10, S=-0.15, T=C(250,240,240), BL=0.05},
 	Base      = {A=C(110,115,125), B=1,   Clock=0,    D=0.05, AC=C(185,195,210), CT=0.06, S=-0.10, T=C(248,250,255), BL=0.05},
@@ -62,7 +62,7 @@ local Presets = {
 }
 local function applyPreset(name, t)
 	local p = Presets[name]; local ti = TweenInfo.new(t)
-	TweenService:Create(Lighting, ti, {Ambient=p.A, OutdoorAmbient=p.A, Brightness=p.B, ClockTime=p.Clock, ExposureCompensation=0}):Play()
+	TweenService:Create(Lighting, ti, {Ambient=p.A, OutdoorAmbient=p.A, Brightness=p.B, ClockTime=p.Clock}):Play()
 	TweenService:Create(atm, ti, {Density=p.D, Color=p.AC, Haze=1}):Play()
 	TweenService:Create(cc, ti, {Contrast=p.CT, Saturation=p.S, TintColor=p.T}):Play()
 	TweenService:Create(bloom, ti, {Intensity=p.BL}):Play()
@@ -90,14 +90,14 @@ local function light(parent, color, range, brightness)
 	local l = Instance.new("PointLight"); l.Color = color; l.Range = range; l.Brightness = brightness; l.Parent = parent
 	return l
 end
--- Down-facing lights sit below ceilings, not buried in them.
-local function ceilingLight(parent, position, width, depth)
- local panel=part(parent,Vector3.new(width or 7,0.2,depth or 3),position,C(225,240,255))
- panel.Name="CeilingLight"; panel.Material=Enum.Material.Neon
+-- Soft local fixtures ONLY for the starting briefing laboratory.
+local function briefingLight(parent, position, width, depth)
+ local panel=part(parent,Vector3.new(width or 7,0.2,depth or 3),position,C(175,178,180))
+ panel.Name="BriefingLight"; panel.Material=Enum.Material.SmoothPlastic
  local area=Instance.new("SurfaceLight")
- area.Face=Enum.NormalId.Bottom; area.Angle=140; area.Range=40
- area.Brightness=2.5; area.Color=C(225,240,255); area.Shadows=false; area.Parent=panel
- local fill=light(panel,C(215,235,255),32,1.3); fill.Shadows=false
+ area.Face=Enum.NormalId.Bottom; area.Angle=110; area.Range=24
+ area.Brightness=0.65; area.Color=C(245,235,220); area.Shadows=false; area.Parent=panel
+ -- No overlapping point-light fill: keep contrast and avoid washed-out walls.
  return panel
 end
 
@@ -604,7 +604,8 @@ local function buildRoom(f, c)
 	part(f, Vector3.new(0.2,0.3,D), Vector3.new(-W/2+0.2,H-1.5,0), c.Neon)
 	part(f, Vector3.new(0.2,0.3,D), Vector3.new(W/2-0.2,H-1.5,0), c.Neon)
 	for ix = -1, 1 do for iz = -2, 2 do
-   ceilingLight(f,Vector3.new(ix*W/3,H-0.8,iz*D/5),7,3)
+			local lp = part(f, Vector3.new(6,0.3,1.5), Vector3.new(ix*W/3, H-0.2, iz*D/5), C(230,225,215))
+			if (ix + iz) % 2 == 0 then light(lp, c.Neon:Lerp(C(240,240,240), 0.6), 35, 1.0) end
 		end end
 	for _ = 1, c.Crates do
 		local s = rng:NextNumber(4, 7)
@@ -623,6 +624,7 @@ local function buildRoom(f, c)
 	return info
 end
 
+
 local function buildLaboratory(f)
  local info=buildRoom(f,RoomCfg[3])
  -- Dedicated side bays leave the central combat and exit lane unobstructed.
@@ -632,8 +634,7 @@ local function buildLaboratory(f)
    local desk=part(f,Vector3.new(7,3,5),Vector3.new(sign*29,1.5,z),C(210,220,225),Enum.Material.Metal)
    part(f,Vector3.new(7.4,0.3,5.4),desk.Position+Vector3.new(0,1.7,0),C(235,245,250))
    local screen=part(f,Vector3.new(4,2.5,0.3),Vector3.new(sign*29,4.5,z-1.5),C(30,160,190))
-   screen.Material=Enum.Material.Neon
-   ceilingLight(f,Vector3.new(sign*28,16,z),5,4)
+   screen.Material=Enum.Material.SmoothPlastic
   end
  end
  return info
@@ -1011,10 +1012,10 @@ local function playIntro()
  part(base,Vector3.new(30,12,1),Vector3.new(64,6,50),C(55,65,78),Enum.Material.Metal)
  part(base,Vector3.new(6,12,1),Vector3.new(88,6,50),C(55,65,78),Enum.Material.Metal)
  part(base,Vector3.new(6,3,1),Vector3.new(82,10.5,50),C(55,65,78),Enum.Material.Metal)
- for _, x in ipairs({57,70,83}) do ceilingLight(base,Vector3.new(x,11.2,39),7,4) end
+ for _, x in ipairs({57,70,83}) do briefingLight(base,Vector3.new(x,11.2,39),7,4) end
  for _, z in ipairs({32,41}) do
   part(base,Vector3.new(6,3,5),Vector3.new(54,1.5,z),C(170,190,205),Enum.Material.Metal)
-  local monitor=part(base,Vector3.new(4,2,0.3),Vector3.new(54,4,z-1),C(20,160,180)); monitor.Material=Enum.Material.Neon
+  local monitor=part(base,Vector3.new(4,2,0.3),Vector3.new(54,4,z-1),C(20,160,180)); monitor.Material=Enum.Material.SmoothPlastic
  end
  for _, wall in ipairs({{70,15,-35,180,30,2},{70,15,145,180,30,2},{-20,15,55,2,30,180},{160,15,55,2,30,180}}) do
   part(base,Vector3.new(wall[4],wall[5],wall[6]),Vector3.new(wall[1],wall[2],wall[3]),C(65,78,90),Enum.Material.Concrete)
@@ -1022,13 +1023,13 @@ local function playIntro()
  local pad=part(base,Vector3.new(24,0.15,24),Vector3.new(70,0.15,65),C(38,48,54),Enum.Material.Metal)
  for _, x in ipairs({60,80}) do
   local lamp=part(base,Vector3.new(0.5,6,0.5),Vector3.new(x,3,76),C(70,85,95),Enum.Material.Metal)
-  light(lamp,C(220,240,255),28,2)
+  light(lamp,C(245,235,220),20,0.6)
  end
  part(base,Vector3.new(42,0.2,40),Vector3.new(70,0.1,48),C(85,94,96),Enum.Material.Concrete)
  part(base,Vector3.new(42,12,1),Vector3.new(70,6,28),C(45,55,65),Enum.Material.Metal)
  part(base,Vector3.new(1,12,22),Vector3.new(49,6,39),C(45,55,65),Enum.Material.Metal)
  part(base,Vector3.new(43,0.5,24),Vector3.new(70,12,39),C(40,48,57),Enum.Material.Metal)
- local board=part(base,Vector3.new(14,7,0.2),Vector3.new(70,6,28.7),C(12,28,35),Enum.Material.Neon)
+ local board=part(base,Vector3.new(14,7,0.2),Vector3.new(70,6,28.7),C(12,28,35),Enum.Material.SmoothPlastic)
  local surface=Instance.new("SurfaceGui"); surface.Face=Enum.NormalId.Back; surface.Parent=board
  local text=Instance.new("TextLabel"); text.Size=UDim2.fromScale(1,1); text.BackgroundTransparency=1
  text.Text="РАЗВЕДКА // ОБЪЕКТ 07\nКРИМИНАЛЬНАЯ БАЗА ОБНАРУЖЕНА\nЛЕСНОЙ СЕКТОР • ВЫСАДКА В 07:00"
@@ -1162,7 +1163,6 @@ local function playMafioziScene()
   part(office,Vector3.new(11,12,1),Vector3.new(sign*9.5,6,15.5),C(60,45,35),Enum.Material.Wood)
  end
  part(office,Vector3.new(8,2,1),Vector3.new(0,11,15.5),C(60,45,35),Enum.Material.Wood)
- ceilingLight(office,Vector3.new(0,11,5),7,3)
 	part(office, Vector3.new(W+2, 1, D+2), Vector3.new(0, -0.5, 0), C(80, 60, 50), Enum.Material.WoodPlanks)
 	part(office, Vector3.new(W+2, 1, D+2), Vector3.new(0, H+0.5, 0), C(40, 30, 25), Enum.Material.Wood)
 	part(office, Vector3.new(W+2, H, 1), Vector3.new(0, H/2, -D/2-0.5), C(60, 45, 35), Enum.Material.Wood)
