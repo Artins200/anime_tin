@@ -8,6 +8,11 @@ server=server_path.read_text()
 start=server.index('-- BEGIN CHAPTER TWO')
 end=server.index('-- END CHAPTER TWO',start)
 server_path.write_text(server[:start]+'-- BEGIN CHAPTER TWO\n'+Path('src/Chapter2.luau').read_text()+'\n'+server[end:])
+client_path=Path('src/LocalScript_0.luau')
+client=client_path.read_text()
+start=client.index('-- BEGIN CHAPTER TWO CLIENT')
+end=client.index('-- END CHAPTER TWO CLIENT',start)
+client_path.write_text(client[:start]+'-- BEGIN CHAPTER TWO CLIENT\n'+Path('src/Chapter2Client.luau').read_text()+'\n'+client[end:])
 path=Path('Place1.rbxl')
 data=path.read_bytes(); out=bytearray(data[:32]); count=0
 sources={41:'src/LocalScript_0.luau',47:'src/ModuleScript_0.luau',61:'src/Script_0.luau'}

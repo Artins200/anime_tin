@@ -27,7 +27,9 @@ assert 'Vector3.new(10,18,1)' in chapter
 assert 'ApproachRearFence' in chapter
 assert 'if allAcross then c2Activate(C2.stage+1) end' in chapter
 assert 'c2Origin.X+z.x+80' in chapter
-assert 'RoutePartition' in chapter and 'EngineeringPanel' in chapter
+assert 'ArchivePartition' in chapter and 'EngineeringPanel' in chapter
+assert 'EntryWall' in chapter and 'EntryLintel' in chapter and 'PerimeterWall' in chapter
+assert 'c2Contain(p,root)' in chapter
 assert 'MainFactoryFacade' in chapter and 'FactoryChimney' in chapter
 assert 'PressHead' in chapter and 'if z and not z.done then' in chapter
 print('PASS: contiguous retreat geometry, bounded routes, team progression barrier, sabotage stops machinery')
@@ -37,9 +39,12 @@ assert 'heroes[tostring(member.UserId)]' in server
 assert 'data.heroes[tostring(player.UserId)]' in server
 assert 'Выберите разных героев' in server
 assert 'if #party>2 or (#party==2' in server
-assert 'plr:GetAttribute("SelectedChapter")==2 and 1 or 2' in client
-assert 'lobbyRemote:FireServer("hero","Artem")' in client
-assert 'lobbyRemote:FireServer("hero","Demid")' in client
+assert 'selectedChapter=selectedChapter==2 and 1 or 2' in client
+assert 'openHeroChooser(nil,"Artem")' in client
+assert 'openHeroChooser(nil,"Demid")' in client
+assert 'lobbyRemote:FireServer("configure",{chapter=2,hero=candidate})' in client
+assert 'if command=="configured" then' in client
+assert 'HeroChosen' in server
 assert 'if living<=1 then return true end' in chapter
 assert 'if not p.Parent then return nil end' in chapter
 assert 'target:ApplyDescription(description)' in chapter
@@ -77,7 +82,7 @@ assert 'if not c2Alive() then c2Finish(false)' in chapter
 assert 'if c2Count(zone)<2 then c2Spawn' in chapter
 assert 'os.clock()-lastEscape>18' in chapter
 assert 'FactoryDetonation' in chapter and 'FinalReactorFlash' in chapter
-assert 'state.deadline-workspace:GetServerTimeNow()' in client
+assert 'worldState.deadline-workspace:GetServerTimeNow()' in client
 assert 'returnToMenu()' in chapter
 assert 'conn:Disconnect()' in chapter
 # Intro is third person until the explicit eyes-only approach.
@@ -86,6 +91,30 @@ assert intro.index('cameraPlan(') < intro.index('CutsceneRE:FireClient(p,"pov"')
 assert 'CutsceneRE:FireAllClients("pov",C2.boss.Head,55)' in chapter
 assert 'CutsceneRE:FireAllClients("pov",c2Origin+' in chapter
 print('PASS: automatic near-death boss escape, exact five-minute server deadline, sparse pursuit, both endings, POV policy and menu cleanup')
+
+# User-reported regressions: do not reintroduce billboard instructions or a hold-to-win panel.
+assert 'Instance.new("BillboardGui")' not in chapter
+assert 'c2Label(' not in chapter
+assert 'c2Mobilize(m,h,r)' in chapter
+assert chapter.index('if not boss then c2Dress(m,mech) end') < chapter.index('c2Mobilize(m,h,r)')
+assert 'p.Anchored=false; p.CanCollide=false; p.Massless=true' in chapter
+assert 'PathfindingService:CreatePath' in chapter and 'path:ComputeAsync' in chapter
+assert 'e.alertUntil=os.clock()+12' in chapter and 'e.stuckAt' in chapter
+assert 'z.prompt=c2Prompt(panel,"Подключиться",0' in chapter
+assert 'c2Engineering(player,z)' in chapter and 'c2CircuitSolved(ch.board)' in chapter
+assert 'ch.token~=token' in chapter and 'ch.expires<workspace:GetServerTimeNow()' in chapter
+assert '(root.Position-ch.zone.panel.Position).Magnitude>12' in chapter
+assert 'action=="rotate"' in chapter and 'action=="pulse"' in chapter and 'action=="turn"' in chapter
+assert 'c2Grant(p,' in chapter and 'C2RE:FireClient(player,"loadout"' in chapter
+assert 'curName = "x"' not in client
+assert 'slot.f.Activated:Connect' in client and 'MouseWheel' in client
+assert 'c2Home()' in chapter and 'WoodFloor' in chapter and 'KitchenCounter' in chapter
+intro=chapter.split('local function startChapter2(',1)[1]
+assert intro.index('c2Home()') < intro.index('Vector3.new(-193,4,4)') < intro.index('focusStreaming(Vector3.new(-180,5,0))')
+assert 'local c2Origin=Vector3.new(0,0,0)' in chapter
+client_embedded=client.split('-- BEGIN CHAPTER TWO CLIENT\n',1)[1].split('\n-- END CHAPTER TWO CLIENT',1)[0]
+assert client_embedded==Path('src/Chapter2Client.luau').read_text()
+print('PASS: unanchored outfits, path pursuit, no distant objective signs, real puzzles, explicit equipment, home opening and synchronized client source')
 
 # Repacking must preserve every uploaded object/property outside the three script Sources.
 base = list(chunks(Path('Place3.rbxl').read_bytes()))

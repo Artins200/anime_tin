@@ -10,10 +10,15 @@ if not luau.is_file():
     raise SystemExit('Luau CLI not found; pass its path as the first argument.')
 prelude = r'''
 local clock=100
+local game={GetService=function() return {} end}
+local Enum={HumanoidStateType={Running="Running"}}
+local WD={Order={"Fists","Pistol","SMG","Shotgun","Rifle"}}
 local os={clock=function() return clock end}
 local sent={}
+local chapterHandler
+local workspace={GetServerTimeNow=function() return clock end}
 local function newRemote()
- return {FireClient=function(_,player,action,data) table.insert(sent,{player=player,action=action,data=data}) end}
+ return {OnServerEvent={Connect=function(_,fn) chapterHandler=fn; return {Disconnect=function() end} end},FireClient=function(_,player,action,data) table.insert(sent,{player=player,action=action,data=data}) end}
 end
 local vec={}; vec.__index=vec
 function vec.__sub(a,b)
@@ -39,6 +44,30 @@ end}
 local task={defer=function(fn) fn() end}
 '''
 checks = r'''
+-- The same post-outfit finalizer used by spawned enemies must unanchor ALL parts.
+local bodies={{Name="Torso",Anchored=true},{Name="HairRibbon",Anchored=true},{Name="HumanoidRootPart",Anchored=true}}
+for _,body in ipairs(bodies) do function body:IsA(kind) return kind=="BasePart" end end
+local model={GetDescendants=function() return bodies end}
+local mobileHum={PlatformStand=true,AutoRotate=false,ChangeState=function(self,state) self.state=state end}
+local root={SetNetworkOwner=function(self,owner) self.ownedByServer=owner==nil end}
+c2Mobilize(model,mobileHum,root)
+for _,body in ipairs(bodies) do assert(not body.Anchored,"outfit welded the NPC to the world") end
+assert(mobileHum.state=="Running" and mobileHum.AutoRotate and not mobileHum.PlatformStand and root.ownedByServer)
+assert(bodies[1].CanCollide and not bodies[2].CanCollide)
+print("PASS: executed NPC mobility repair including anchored clothing regression")
+
+math.randomseed(73)
+local rng={NextInteger=function(_,a,b) return math.random(a,b) end}
+for _=1,100 do
+ local board=c2CircuitBoard(rng)
+ assert(not c2CircuitSolved(board),"random puzzle starts completed")
+ for i=1,9 do board.rotations[i]=0 end
+ assert(c2CircuitSolved(board),"puzzle has no known solution")
+ board.rotations[4]=1
+ assert(not c2CircuitSolved(board),"disconnected input falsely accepted")
+end
+print("PASS: executed 100 generated circuit puzzles: unsolved start, valid path, severed path rejected")
+
 local function player(hero,health)
  local p={Parent=true,attrs={Hero=hero}}
  local hum={Health=health,MaxHealth=180}
@@ -47,6 +76,7 @@ local function player(hero,health)
  function char:FindFirstChildOfClass(kind) assert(kind=="Humanoid"); return hum end
  function char:FindFirstChild(name) assert(name=="HumanoidRootPart"); return root end
  function p:GetAttribute(key) return self.attrs[key] end
+ function p:SetAttribute(key,value) self.attrs[key]=value end
  p.Character=char
  return p,hum,root
 end
@@ -110,6 +140,55 @@ prompt.Triggered:Fire(demid); assert(calls==1,"finished session cannot interact"
 for _,connection in ipairs(C2.connections) do connection:Disconnect() end
 C2.finished=false; prompt.Triggered:Fire(demid); assert(calls==1,"cleanup disconnects prompts")
 print("PASS: executed hold-duration, proximity, session and connection-cleanup checks")
+
+local savedEquip=c2WorldWeapon
+c2WorldWeapon=function(p,name) p:SetAttribute("EquippedWeapon",name) end
+sent={}
+demid:SetAttribute("WeaponLevel",1)
+for level=2,5 do
+ c2Grant(demid,level)
+ assert(demid:GetAttribute("WeaponLevel")==level)
+ assert(demid:GetAttribute("EquippedWeapon")==WD.Order[level])
+ assert(sent[#sent].action=="loadout" and sent[#sent].data.equipped==WD.Order[level])
+end
+c2WorldWeapon=savedEquip
+print("PASS: executed authoritative pistol/SMG/shotgun/rifle grants and explicit client loadout packets")
+
+
+-- Run the real remote interaction handler, including rejects and completion.
+C2.active=true; C2.finished=false; C2.escaping=false; C2.stage=3; C2.challenges={}; C2.challengeSerial=0
+C2.party={artem,demid}; ah.Health=180; dh.Health=180; artem.Parent=true
+local completed=0
+local zone={index=3,kind="hack",panel={Position=Vector3.new(0,0,0)},complete=function() completed+=1 end}
+local function session(p)
+ local board=c2CircuitBoard(rng); for i=1,9 do board.rotations[i]=0 end; board.rotations[4]=3
+ local ch={token="real-token",zone=zone,board=board,progress=0,expires=clock+90,last=0,start=clock,target=0.5}
+ C2.challenges[p]=ch; zone.owner=p; return ch
+end
+session(artem)
+chapterHandler(artem,"rotate","fake-token",4); assert(completed==0)
+clock+=1; chapterHandler(artem,"success","real-token",true); assert(completed==0,"client success flag must not open gate")
+clock+=1; chapterHandler(artem,"rotate","real-token",4)
+assert(completed==1 and not C2.challenges[artem],"actual solution must complete exactly once")
+clock+=1; chapterHandler(artem,"rotate","real-token",4); assert(completed==1,"replayed completion accepted")
+local ch=session(artem); ch.expires=clock-1
+clock+=1; chapterHandler(artem,"rotate","real-token",4); assert(completed==1 and not C2.challenges[artem])
+session(demid); clock+=1; chapterHandler(demid,"rotate","real-token",4)
+assert(completed==1 and not C2.challenges[demid],"wrong role accepted")
+session(artem)
+local ar=artem.Character:FindFirstChild("HumanoidRootPart"); ar.Position=Vector3.new(40,0,0)
+clock+=1; chapterHandler(artem,"rotate","real-token",4)
+assert(completed==1 and not C2.challenges[artem],"distant terminal accepted")
+ar.Position=Vector3.new(0,0,0)
+-- Opening a valve interface via E alone does not complete it. Eight real turns do.
+zone.kind="valve"; zone.owner=nil
+c2Engineering(artem,zone)
+assert(completed==1 and C2.challenges[artem],"opening terminal completed objective")
+local token=C2.challenges[artem].token
+for i=1,8 do clock+=0.2; chapterHandler(artem,"turn",token,i%2==1 and -1 or 1) end
+assert(completed==2 and not C2.challenges[artem])
+print("PASS: executed engineering protocol: actual solution, replay/token/role/range/timeout rejects, E alone cannot win")
+
 '''
 path = Path('.tools/chapter2-policy-test.luau')
 path.parent.mkdir(exist_ok=True)
