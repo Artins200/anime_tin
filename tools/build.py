@@ -18,6 +18,16 @@ client=client_path.read_text()
 start=client.index('-- BEGIN CHAPTER TWO CLIENT')
 end=client.index('-- END CHAPTER TWO CLIENT',start)
 client_path.write_text(client[:start]+'-- BEGIN CHAPTER TWO CLIENT\n'+Path('src/Chapter2Client.luau').read_text()+'\n'+client[end:])
+# Embed chapter III geometry, server and client without changing RBXL objects.
+c3path=Path('src/Chapter3.luau')
+c3=c3path.read_text()
+a=c3.index('-- BEGIN CHAPTER THREE WORLD'); b=c3.index('-- END CHAPTER THREE WORLD',a)
+c3path.write_text(c3[:a]+'-- BEGIN CHAPTER THREE WORLD\n'+Path('src/Chapter3World.luau').read_text()+'\n'+c3[b:])
+for destination,source,begin,end in [
+ ('src/Script_0.luau','src/Chapter3.luau','-- BEGIN CHAPTER THREE','-- END CHAPTER THREE'),
+ ('src/LocalScript_0.luau','src/Chapter3Client.luau','-- BEGIN CHAPTER THREE CLIENT','-- END CHAPTER THREE CLIENT')]:
+ text=Path(destination).read_text(); a=text.index(begin+'\n'); b=text.index('\n'+end+'\n',a)
+ Path(destination).write_text(text[:a]+begin+'\n'+Path(source).read_text()+text[b:])
 path=Path('Place1.rbxl')
 data=path.read_bytes(); out=bytearray(data[:32]); count=0
 sources={41:'src/LocalScript_0.luau',47:'src/ModuleScript_0.luau',61:'src/Script_0.luau'}

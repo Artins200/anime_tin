@@ -1,7 +1,7 @@
 -- Embedded into GameClient after its menu and weapon controller.
 do
  local chooser=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(8,13,19),BackgroundTransparency=0.03,Visible=false,ZIndex=60},menu)
- new("TextLabel",{Size=UDim2.fromScale(0.9,0.09),Position=UDim2.fromScale(0.05,0.06),Text="ГЛАВА II • ВЫБЕРИ ГЕРОЯ",TextScaled=true,Font=Enum.Font.GothamBlack,TextColor3=Color3.fromRGB(220,228,230),BackgroundTransparency=1,ZIndex=61},chooser)
+ new("TextLabel",{Size=UDim2.fromScale(0.9,0.09),Position=UDim2.fromScale(0.05,0.06),Text="ВЫБЕРИ ГЕРОЯ • ГЛАВЫ II / III",TextScaled=true,Font=Enum.Font.GothamBlack,TextColor3=Color3.fromRGB(220,228,230),BackgroundTransparency=1,ZIndex=61},chooser)
  local hint=new("TextLabel",{Size=UDim2.fromScale(0.9,0.08),Position=UDim2.fromScale(0.05,0.16),Text="Роль закрепится только после подтверждения. Вдвоем нужны разные герои.",TextWrapped=true,TextSize=17,TextColor3=Color3.fromRGB(155,175,186),BackgroundTransparency=1,ZIndex=61},chooser)
  local cards={}; local candidate; local pendingCommand
  for index,hero in ipairs({"Artem","Demid"}) do
@@ -20,7 +20,7 @@ do
   if not candidate then hint.Text="Сначала нажми на карточку Артема или Демида."; return end
   confirmSelectionPending=true
   hint.Text="Подтверждаем роль…"
-  lobbyRemote:FireServer("configure",{chapter=2,hero=candidate})
+  lobbyRemote:FireServer("configure",{chapter=selectedChapter,hero=candidate})
  end,chooser); confirm.ZIndex=62
  local cancel=button("НАЗАД",0.06,0.82,function() chooser.Visible=false; pendingCommand=nil end,chooser); cancel.ZIndex=62
  local function loadPreviews()
@@ -39,14 +39,14 @@ do
   end end
  end
  openHeroChooser=function(command,hero)
-  selectedChapter=2; pendingCommand=command; candidate=hero
+  if selectedChapter<2 then selectedChapter=2 end; pendingCommand=command; candidate=hero
   chooser.Visible=true; confirmSelectionPending=false
   hint.Text="Выбери роль и подтверди ее. В кооперативе герои должны быть разными."
   for key,c in pairs(cards) do c.stroke.Color=key==candidate and Color3.fromRGB(100,205,190) or Color3.fromRGB(65,85,100); c.stroke.Thickness=key==candidate and 4 or 2 end
   loadPreviews(); refreshChapterChoice()
  end
  requestLaunch=function(command)
-  if selectedChapter==2 and not heroConfirmed then openHeroChooser(command); return end
+  if selectedChapter>=2 and not heroConfirmed then openHeroChooser(command); return end
   pendingCommand=command
   lobbyRemote:FireServer("configure",{chapter=selectedChapter,hero=heroConfirmed and selectedHero or nil})
  end

@@ -640,7 +640,7 @@ local function refreshSlots()
 	for i, name in ipairs(WD.Order) do
 		local s = slots[name]
 		local unlocked = i <= wl
-  if name=="Fists" then s.tl.Text=plr:GetAttribute("Chapter")==2 and (plr:GetAttribute("Hero")=="Artem" and "1. Сварка" or "1. Нож") or "1. Кулаки" end
+  if name=="Fists" then s.tl.Text=(plr:GetAttribute("Chapter") or 1)>=2 and (plr:GetAttribute("Hero")=="Artem" and "1. Сварка" or "1. Нож") or "1. Кулаки" end
 		s.tl.TextTransparency = unlocked and 0 or 0.65
 		s.st.Thickness = (name == curName) and 3 or 1
 		s.f.BackgroundTransparency = (name == curName) and 0 or 0.4
@@ -666,8 +666,8 @@ local function selectWeapon(name)
 	local idx = table.find(WD.Order, name)
 	if not idx or idx > (chapterLoadout and chapterLoadout.level or (plr:GetAttribute("WeaponLevel") or 1)) then return end
 	curName = name; switchT = 1
- if chapterLoadout then Remotes.Chapter2:FireServer("equip",name) end
- local roleParent=(name=="Fists" and plr:GetAttribute("Chapter")==2) and vm or nil
+ if chapterLoadout then Remotes:WaitForChild(plr:GetAttribute("Chapter")==3 and "Chapter3" or "Chapter2"):FireServer("equip",name) end
+ local roleParent=(name=="Fists" and (plr:GetAttribute("Chapter") or 1)>=2) and vm or nil
  chapterTool.Parent=roleParent; chapterToolHandle.Parent=roleParent; chapterToolGuard.Parent=roleParent; chapterToolTip.Parent=roleParent
 	for n, list in pairs(gunParts) do
 		for _, e in ipairs(list) do e[1].Parent = (n == name) and vm or nil end
@@ -675,7 +675,7 @@ local function selectWeapon(name)
 	refreshSlots()
 end
 plr:GetAttributeChangedSignal("WeaponLevel"):Connect(function()
- if plr:GetAttribute("Chapter")==2 then refreshSlots(); return end
+ if (plr:GetAttribute("Chapter") or 1)>=2 then refreshSlots(); return end
 	local wl = plr:GetAttribute("WeaponLevel") or 1
 	if wl > 1 then
 		pickupT = 1.4
@@ -695,7 +695,7 @@ local function doFire(chargeLevel)
 	if cutsceneActive or engineeringActive then return end
 	local w = WD.Stats[curName]
 	local now = os.clock()
-	local cooldown=(plr:GetAttribute("Chapter")==2 and curName=="Fists") and (plr:GetAttribute("Hero")=="Artem" and 0.2 or 0.5) or w.Cooldown
+	local cooldown=((plr:GetAttribute("Chapter") or 1)>=2 and curName=="Fists") and (plr:GetAttribute("Hero")=="Artem" and 0.2 or 0.5) or w.Cooldown
  if now - lastFire < cooldown then return end
 	local char = plr.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -938,7 +938,7 @@ RunService:BindToRenderStep("ViewModel", Enum.RenderPriority.Camera.Value + 1, f
 		end
 		rightRoot = base * CFrame.new(1.1,-1.0,-1.7) * CFrame.Angles(math.rad(8), math.rad(6), 0) * punch(0) * pickArm
 		leftRoot  = base * CFrame.new(-1.1,-1.0,-1.7) * CFrame.Angles(math.rad(8), math.rad(-6), 0) * punch(1) * pickArm
-  if plr:GetAttribute("Chapter")==2 and plr:GetAttribute("Hero")=="Artem" then
+  if (plr:GetAttribute("Chapter") or 1)>=2 and plr:GetAttribute("Hero")=="Artem" then
    rightRoot=base*CFrame.new(0.78,-0.85,-1.5)*pickArm
    leftRoot=base*CFrame.new(-0.55,-0.95,-1.9)*CFrame.Angles(0,-0.2,0)*pickArm
   end
@@ -956,7 +956,7 @@ RunService:BindToRenderStep("ViewModel", Enum.RenderPriority.Camera.Value + 1, f
 	end
 	if curName == "Fists" then
   flash.Transparency = 1; flashLight.Enabled = false
-  if plr:GetAttribute("Chapter")==2 then
+  if (plr:GetAttribute("Chapter") or 1)>=2 then
    chapterTool.Parent=vm
    local engineer=plr:GetAttribute("Hero")=="Artem"
    chapterTool.Size=engineer and Vector3.new(0.4,0.45,1.2) or Vector3.new(0.12,0.32,2)
@@ -1070,18 +1070,18 @@ local openHeroChooser,requestLaunch,onConfigured,onConfigureError
 local confirmSelectionPending=false
 local refreshChapterChoice
 local chapterButton=button("ГЛАВА I / сменить",0.06,0.26,function()
- selectedChapter=selectedChapter==2 and 1 or 2
+ selectedChapter=selectedChapter%3+1
  refreshChapterChoice()
- if selectedChapter==2 then openHeroChooser() else lobbyRemote:FireServer("configure",{chapter=1}) end
+ if selectedChapter>=2 then openHeroChooser() else lobbyRemote:FireServer("configure",{chapter=1}) end
 end)
 local artemButton=button("АРТЕМ • ИНЖЕНЕР",0.365,0.26,function() openHeroChooser(nil,"Artem") end)
 local demidButton=button("ДЕМИД • ШТУРМ",0.67,0.26,function() openHeroChooser(nil,"Demid") end)
 refreshChapterChoice=function()
- local second=selectedChapter==2
- chapterButton.Text=second and "ГЛАВА II / сменить" or "ГЛАВА I / сменить"
+ local second=selectedChapter>=2
+ chapterButton.Text="ГЛАВА "..({"I","II","III"})[selectedChapter].." / сменить"
  artemButton.BackgroundColor3=heroConfirmed and selectedHero=="Artem" and Color3.fromRGB(45,110,115) or Color3.fromRGB(35,60,73)
  demidButton.BackgroundColor3=heroConfirmed and selectedHero=="Demid" and Color3.fromRGB(110,70,65) or Color3.fromRGB(35,60,73)
- status.Text=second and (heroConfirmed and ("Выбран "..(selectedHero=="Artem" and "Артем • инженер" or "Демид • штурм")..". Можно запускать главу II.") or "Глава II: сначала выбери и подтверди героя.") or "Глава I: одиночная операция или отряд до 4 игроков."
+ status.Text=second and (heroConfirmed and ("Выбран "..(selectedHero=="Artem" and "Артем • инженер" or "Демид • штурм")..". Можно запускать выбранную главу.") or "Главы II–III: сначала выбери и подтверди героя.") or "Глава I: одиночная операция или отряд до 4 игроков."
 end
 refreshChapterChoice()
 button("ОДИНОЧНАЯ ИГРА",0.06,0.36,function() requestLaunch("solo") end)
@@ -1144,7 +1144,7 @@ end)
 -- Embedded into GameClient after its menu and weapon controller.
 do
  local chooser=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(8,13,19),BackgroundTransparency=0.03,Visible=false,ZIndex=60},menu)
- new("TextLabel",{Size=UDim2.fromScale(0.9,0.09),Position=UDim2.fromScale(0.05,0.06),Text="ГЛАВА II • ВЫБЕРИ ГЕРОЯ",TextScaled=true,Font=Enum.Font.GothamBlack,TextColor3=Color3.fromRGB(220,228,230),BackgroundTransparency=1,ZIndex=61},chooser)
+ new("TextLabel",{Size=UDim2.fromScale(0.9,0.09),Position=UDim2.fromScale(0.05,0.06),Text="ВЫБЕРИ ГЕРОЯ • ГЛАВЫ II / III",TextScaled=true,Font=Enum.Font.GothamBlack,TextColor3=Color3.fromRGB(220,228,230),BackgroundTransparency=1,ZIndex=61},chooser)
  local hint=new("TextLabel",{Size=UDim2.fromScale(0.9,0.08),Position=UDim2.fromScale(0.05,0.16),Text="Роль закрепится только после подтверждения. Вдвоем нужны разные герои.",TextWrapped=true,TextSize=17,TextColor3=Color3.fromRGB(155,175,186),BackgroundTransparency=1,ZIndex=61},chooser)
  local cards={}; local candidate; local pendingCommand
  for index,hero in ipairs({"Artem","Demid"}) do
@@ -1163,7 +1163,7 @@ do
   if not candidate then hint.Text="Сначала нажми на карточку Артема или Демида."; return end
   confirmSelectionPending=true
   hint.Text="Подтверждаем роль…"
-  lobbyRemote:FireServer("configure",{chapter=2,hero=candidate})
+  lobbyRemote:FireServer("configure",{chapter=selectedChapter,hero=candidate})
  end,chooser); confirm.ZIndex=62
  local cancel=button("НАЗАД",0.06,0.82,function() chooser.Visible=false; pendingCommand=nil end,chooser); cancel.ZIndex=62
  local function loadPreviews()
@@ -1182,14 +1182,14 @@ do
   end end
  end
  openHeroChooser=function(command,hero)
-  selectedChapter=2; pendingCommand=command; candidate=hero
+  if selectedChapter<2 then selectedChapter=2 end; pendingCommand=command; candidate=hero
   chooser.Visible=true; confirmSelectionPending=false
   hint.Text="Выбери роль и подтверди ее. В кооперативе герои должны быть разными."
   for key,c in pairs(cards) do c.stroke.Color=key==candidate and Color3.fromRGB(100,205,190) or Color3.fromRGB(65,85,100); c.stroke.Thickness=key==candidate and 4 or 2 end
   loadPreviews(); refreshChapterChoice()
  end
  requestLaunch=function(command)
-  if selectedChapter==2 and not heroConfirmed then openHeroChooser(command); return end
+  if selectedChapter>=2 and not heroConfirmed then openHeroChooser(command); return end
   pendingCommand=command
   lobbyRemote:FireServer("configure",{chapter=selectedChapter,hero=heroConfirmed and selectedHero or nil})
  end
@@ -1381,5 +1381,119 @@ end
 
 -- END CHAPTER TWO CLIENT
 
--- Startup is acknowledged only after listeners for BOTH chapters are installed.
+-- BEGIN CHAPTER THREE CLIENT
+-- Chapter III HUD, binocular overlay and authoritative three-phase terminal UI.
+do
+ local remote=Remotes:WaitForChild("Chapter3")
+ local state; local challenge
+ local hud=new("ScreenGui",{Name="Chapter3HUD",ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=45,Enabled=false},plr.PlayerGui)
+ local objective=new("TextLabel",{Size=UDim2.new(0.7,0,0,55),Position=UDim2.new(0.15,0,0,125),BackgroundColor3=Color3.fromRGB(17,26,42),BackgroundTransparency=0.15,TextColor3=Color3.fromRGB(220,230,240),TextSize=17,TextWrapped=true,Font=Enum.Font.GothamBold},hud)
+ local stamina=new("Frame",{Size=UDim2.fromOffset(180,9),Position=UDim2.new(0,30,1,-108),BackgroundColor3=Color3.fromRGB(30,40,55)},hud)
+ local fill=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(85,185,175),BorderSizePixel=0},stamina)
+ local scope=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.new(),BackgroundTransparency=0.3,Visible=false},hud)
+ new("TextLabel",{Size=UDim2.fromScale(0.6,0.12),Position=UDim2.fromScale(0.2,0.8),Text="ОПТИКА  ×12  •  СИГНАЛ С ВЕРШИНЫ",TextColor3=Color3.fromRGB(175,220,190),TextSize=22,BackgroundTransparency=1},scope)
+ local flash=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(210,220,225),BackgroundTransparency=1,ZIndex=40},hud)
+ local terminal=new("Frame",{Size=UDim2.fromScale(0.76,0.77),Position=UDim2.fromScale(0.12,0.12),BackgroundColor3=Color3.fromRGB(14,24,38),Visible=false,ZIndex=60},hud)
+ local title=new("TextLabel",{Size=UDim2.fromScale(0.86,0.15),Position=UDim2.fromScale(0.04,0.02),TextColor3=Color3.fromRGB(145,215,200),TextSize=23,TextWrapped=true,BackgroundTransparency=1,ZIndex=61},terminal)
+ local body=new("Frame",{Size=UDim2.fromScale(0.9,0.62),Position=UDim2.fromScale(0.05,0.2),BackgroundTransparency=1,ZIndex=61},terminal)
+ local help=new("TextLabel",{Size=UDim2.fromScale(0.9,0.14),Position=UDim2.fromScale(0.05,0.84),TextColor3=Color3.fromRGB(180,200,215),TextSize=17,TextWrapped=true,BackgroundTransparency=1,ZIndex=61},terminal)
+ local function close(send)
+  if send and challenge then remote:FireServer("cancel") end
+  challenge=nil; terminal.Visible=false; engineeringActive=false
+  if not cutsceneActive and not menu.Enabled then setSceneControls(true); UIS.MouseBehavior=Enum.MouseBehavior.LockCenter; UIS.MouseIconEnabled=false end
+ end
+ local exit=new("TextButton",{Size=UDim2.fromScale(0.08,0.12),Position=UDim2.fromScale(0.9,0.02),Text="×",TextSize=28,BackgroundTransparency=1,TextColor3=Color3.fromRGB(225,205,200),ZIndex=62},terminal)
+ exit.Activated:Connect(function() close(true) end)
+ local function submit(value) if challenge then remote:FireServer("hack",challenge.token,value) end end
+ local function draw(data)
+  challenge=data; terminal.Visible=true; engineeringActive=true; setSceneControls(false); UIS.MouseBehavior=Enum.MouseBehavior.Default; UIS.MouseIconEnabled=true
+  for _,c in ipairs(body:GetChildren()) do c:Destroy() end
+  if data.phase==1 then
+   title.Text="I / ПЕРЕХВАТ ЧАСТОТЫ  •  "..data.steps.." / 3"
+   help.Text="Нажимай ПРОБЕЛ или кнопку, когда указатель внутри зелёного сектора."
+   local track=new("Frame",{Size=UDim2.fromScale(0.9,0.16),Position=UDim2.fromScale(0.05,0.25),BackgroundColor3=Color3.fromRGB(37,51,70),Name="Frequency"},body)
+   new("Frame",{Size=UDim2.fromScale(0.32,1),Position=UDim2.fromScale(0.3,0),BackgroundColor3=Color3.fromRGB(45,125,95)},track)
+   new("Frame",{Name="Cursor",Size=UDim2.new(0,5,1,0),BackgroundColor3=Color3.fromRGB(245,225,170)},track)
+   local b=new("TextButton",{Text="ЗАФИКСИРОВАТЬ",Size=UDim2.fromScale(0.7,0.2),Position=UDim2.fromScale(0.15,0.6),TextSize=22,TextColor3=Color3.fromRGB(220,235,235),BackgroundColor3=Color3.fromRGB(44,90,104)},body)
+   b.Activated:Connect(function() submit() end)
+  elseif data.phase==2 then
+   title.Text="II / ПЕРЕНАПРАВЛЕНИЕ СЕТИ"
+   help.Text="Вращай контакты. Соедини вход слева в среднем ряду с выходом справа."
+   for i=1,9 do
+    local x=(i-1)%3; local y=math.floor((i-1)/3)
+    local b=new("TextButton",{Text="",Size=UDim2.fromScale(0.24,0.28),Position=UDim2.fromScale(0.1+x*0.28,y*0.32),BackgroundColor3=Color3.fromRGB(32,53,70)},body)
+    local ports=data.board.base[i]; local rotation=data.board.rotations[i]
+    for _,edge in ipairs(ports) do do
+     local actual=(edge+rotation)%4
+     local lines={{0.46,0,0.08,0.55},{0.46,0.46,0.54,0.08},{0.46,0.46,0.08,0.54},{0,0.46,0.55,0.08}}
+     local l=lines[actual+1]
+     new("Frame",{Position=UDim2.fromScale(l[1],l[2]),Size=UDim2.fromScale(l[3],l[4]),BackgroundColor3=Color3.fromRGB(115,215,180),BorderSizePixel=0},b)
+    end end
+    b.Activated:Connect(function() submit(i) end)
+   end
+  else
+   title.Text="III / ОТКЛЮЧЕНИЕ ВЕЩАНИЯ"
+   help.Text=state and state.coop and "Демид подтверждает размыкатель напротив. Затем Артём отключает передачу. Если напарник выбыл, доступен аварийный одиночный режим." or "Отключи передачу. Реле уже изолированы на нижних ярусах."
+   local b=new("TextButton",{Text="ОТКЛЮЧИТЬ БАШНЮ",Size=UDim2.fromScale(0.9,0.3),Position=UDim2.fromScale(0.05,0.3),TextSize=24,TextColor3=Color3.fromRGB(240,225,210),BackgroundColor3=Color3.fromRGB(125,52,67)},body)
+   b.Activated:Connect(function() submit() end)
+  end
+  for _,d in ipairs(body:GetDescendants()) do if d:IsA("GuiObject") then d.ZIndex=62 end end
+ end
+ remote.OnClientEvent:Connect(function(action,data)
+  if action=="state" then
+   state=data; hud.Enabled=true
+   objective.Text=("III • %s\nВолна %d/%d  |  Угрозы: %d  |  Реле: %d/4"):format(data.name,data.wave,data.rounds,data.enemies,data.relays)
+   if data.cleared then objective.Text="III • "..data.name..(data.stage==10 and "\nВзломайте главный терминал" or data.objective and "\nСоберитесь у следующего шлюза" or "\nОтключите панель у шлюза") end
+   return
+  end
+  if action=="hack" then hud.Enabled=true; draw(data); return end
+  if action=="hackClose" then close(false); return end
+  if action=="binocular" then hud.Enabled=true; scope.Visible=data; return end
+  if action=="signal" then
+   hud.Enabled=true; flash.BackgroundTransparency=0.65; TweenService:Create(flash,TweenInfo.new(0.8),{BackgroundTransparency=1}):Play()
+   local s=new("Sound",{SoundId="rbxasset://sounds/electronicpingshort.wav",Volume=0.18,PlaybackSpeed=1.2},SoundService); s:Play(); Debris:AddItem(s,2); return
+  end
+  if action=="grab" then -- local damage feedback
+   flash.BackgroundColor3=Color3.fromRGB(145,65,70); flash.BackgroundTransparency=0.85; TweenService:Create(flash,TweenInfo.new(0.5),{BackgroundTransparency=1}):Play(); return
+  end
+  if action=="collect" then objective.Text="СИГНАЛ ОТКЛЮЧЕН\nЗаберите контроллер и память из кейса"; return end
+  if action=="signalOff" then close(false); scope.Visible=false; return end
+  if action=="credits" then
+   hud.Enabled=not data
+   showCredits(data)
+   if data and creditsText then creditsText.Text="Уничтожь Тянку 3\n\nГЛАВА III\nБашня Нейро-Сингулярности\n\nСигнал остановлен\nМодули сохранены\n\nНо Кириллу всё ещё нужна помощь\n\nПродолжение следует\n\nСпасибо за игру" end
+   return
+  end
+  if action=="clear" then close(false); hud.Enabled=false; state=nil; scope.Visible=false; return end
+ end)
+ UIS.InputBegan:Connect(function(input,processed)
+  if plr:GetAttribute("Chapter")~=3 then return end
+  if challenge and input.KeyCode==Enum.KeyCode.Escape then close(true); return end
+  if challenge and input.KeyCode==Enum.KeyCode.Space and challenge.phase==1 then submit(); return end
+  if not processed and not cutsceneActive and not engineeringActive and (input.KeyCode==Enum.KeyCode.LeftShift or input.KeyCode==Enum.KeyCode.RightShift) then remote:FireServer("sprint",true) end
+ end)
+ UIS.InputEnded:Connect(function(input) if input.KeyCode==Enum.KeyCode.LeftShift or input.KeyCode==Enum.KeyCode.RightShift then remote:FireServer("sprint",false) end end)
+ UIS.WindowFocusReleased:Connect(function() remote:FireServer("sprint",false) end)
+ RunService.RenderStepped:Connect(function(dt)
+  if plr:GetAttribute("Chapter")~=3 then return end
+  local hum=plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
+  if hum and hum.Health<=0 and not cutsceneActive then
+   for _,other in ipairs(Players:GetPlayers()) do
+    local oh=other.Character and other.Character:FindFirstChildOfClass("Humanoid"); local head=other.Character and other.Character:FindFirstChild("Head")
+    if other~=plr and oh and oh.Health>0 and head then cam.CameraType=Enum.CameraType.Scriptable; cam.CFrame=head.CFrame; break end
+   end
+  elseif hum and hum.Health>0 and not cutsceneActive and not engineeringActive then cam.CameraType=Enum.CameraType.Custom; cam.CameraSubject=hum end
+  objective.Visible=state~=nil and not cutsceneActive
+  stamina.Visible=not cutsceneActive
+  fill.Size=UDim2.fromScale((plr:GetAttribute("SprintStamina") or 100)/100,1)
+  if not cutsceneActive and not engineeringActive then local target=plr:GetAttribute("IsSprinting") and 76 or 70; cam.FieldOfView+=(target-cam.FieldOfView)*(1-math.exp(-dt*5)) end
+  if challenge and challenge.phase==1 then
+   local track=body:FindFirstChild("Frequency"); if track then track.Cursor.Position=UDim2.fromScale((workspace:GetServerTimeNow()-challenge.start)*0.35%1,0) end
+  end
+ end)
+end
+
+-- END CHAPTER THREE CLIENT
+
+-- Startup is acknowledged after all chapter listeners are installed.
 Remotes:WaitForChild("SceneReady"):FireServer("ready")

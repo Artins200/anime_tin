@@ -34,15 +34,15 @@ assert 'MainFactoryFacade' in chapter and 'FactoryChimney' in chapter
 assert 'PressHead' in chapter and 'if z and not z.done then' in chapter
 print('PASS: contiguous retreat geometry, bounded routes, team progression barrier, sabotage stops machinery')
 
-assert 'data.chapter==2 and 2 or 1' in server
+assert '(data.chapter==2 or data.chapter==3) and data.chapter or 1' in server
 assert 'heroes[tostring(member.UserId)]' in server
 assert 'data.heroes[tostring(player.UserId)]' in server
 assert 'Выберите разных героев' in server
 assert 'if #party>2 or (#party==2' in server
-assert 'selectedChapter=selectedChapter==2 and 1 or 2' in client
+assert 'selectedChapter=selectedChapter%3+1' in client
 assert 'openHeroChooser(nil,"Artem")' in client
 assert 'openHeroChooser(nil,"Demid")' in client
-assert 'lobbyRemote:FireServer("configure",{chapter=2,hero=candidate})' in client
+assert 'lobbyRemote:FireServer("configure",{chapter=selectedChapter,hero=candidate})' in client
 assert 'if command=="configured" then' in client
 assert 'HeroChosen' in server
 assert 'if living<=1 then return true end' in chapter
