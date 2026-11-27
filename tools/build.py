@@ -4,7 +4,7 @@ import struct
 from rbxl import chunks, string, enc
 path=Path('Place1.rbxl')
 data=path.read_bytes(); out=bytearray(data[:32]); count=0
-sources={31:'src/LocalScript_0.luau',36:'src/ModuleScript_0.luau',47:'src/Script_0.luau'}
+sources={41:'src/LocalScript_0.luau',47:'src/ModuleScript_0.luau',61:'src/Script_0.luau'}
 for tag,raw,res in chunks(data):
  if tag==b'PROP':
   cid=struct.unpack_from('<I',raw)[0]; name,p=string(raw,4)

@@ -5,7 +5,7 @@ from rbxl import chunks, string
 
 parts = list(chunks(Path('Place1.rbxl').read_bytes()))
 assert parts[-1][0] == b'END\0'
-expected = {31: 'LocalScript', 36: 'ModuleScript', 47: 'Script'}
+expected = {41: 'LocalScript', 47: 'ModuleScript', 61: 'Script'}
 found = set()
 for tag, raw, _ in parts:
     if tag != b'PROP':
