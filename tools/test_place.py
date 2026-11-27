@@ -79,7 +79,7 @@ assert 'ExposureCompensation=0' not in server
 print('PASS: soft non-neon briefing-only lighting; original combat-room lighting restored')
 # Black-screen regressions: readiness ordering, bounded preparation and error cleanup.
 assert client.rfind('FireServer("ready")') > client.index('Remotes.Fade.OnClientEvent')
-assert 'if readyClients[player] then selected=player; break end' in server
+assert 'if not member.Parent or not readyClients[member]' in server
 assert 'runScene(playIntro)' in server
 assert 'local ok,err=xpcall(callback,debug.traceback)' in server
 assert 'CutsceneRE:FireAllClients("recover")' in server
@@ -100,9 +100,9 @@ assert 'CutsceneRE:FireAllClients("pov",neuro:FindFirstChild("Head"))' in finale
 assert 'hum.Health=0' in finale and 'Players.RespawnTime=120' in finale
 assert 'door.CFrame=hinge*CFrame.Angles(math.rad(-90)*t,0,0)*relative' in finale
 assert 'CanCollide=false' in finale
-assert 'object:Destroy()' in finale and 'Vector3.new(0,85,-17)' in finale
+assert 'buildConversionFactory()' in finale and 'Vector3.new(0,6,187)' in finale
 assert 'for row=0,31 do' in client and 'for column=0,63 do' in client
-assert 'unit.Name="NeuroCopy"' in client
+assert 'unit.Name="CartelSoldier"' in client
 assert 'generation~=armyGeneration' in client
 assert 'firstPersonTarget' in client and 'bloodOverlay' in client
 assert 'mafHum.BreakJointsOnDeath=false; mafHum.Health=0' in mafia
@@ -110,3 +110,24 @@ assert 'moveModel(maf,hitCF*CFrame.new' in mafia
 assert 'Enum.HumanoidStateType.Freefall,not on' in server
 assert 'local duration=math.max(distance/12,0.12)' in server
 print('PASS: grounded 12-stud walking, explicit hit/death reaction, POV fatal finale, falling door, 2048-copy crowd')
+
+assert 'local LobbyRE=newRemote("Lobby")' in server
+assert 'options.ShouldReserveServer=true' in server
+assert 'TeleportService:TeleportAsync(game.PlaceId,party,options)' in server
+assert 'if lobby and membership[player]==player.UserId then launch' in server
+assert '#lobby.members<4' in server
+assert 'hum.MaxHealth*=2' in server
+assert 'buildEvidenceTerminal(info,n)' in server
+assert 'evidenceCollected[player.UserId]=true' in server
+assert 'local STORIES={' in server and '[4]={name="ПРОТОКОЛ СВИДЕТЕЛЬ"' in server
+assert 'MusicRE:FireAllClients("finalSlow")' in finale
+assert finale.index('MusicRE:FireAllClients("stop")') < finale.index('local info=buildBase')
+assert finale.index('task.wait(3)') < finale.index('local door=info.Door')
+assert 'TweenInfo.new(8,Enum.EasingStyle.Sine),{Volume=0.5}' in client
+assert 'CutsceneRE:FireAllClients("recon",board,recon)' in intro
+assert 'local view=new("ViewportFrame"' in client
+assert 'cameraPlan(basePoint' not in intro
+assert 'CinematicNeuroArmy' in client  # folder holds the crowd, not duplicate Neuro rigs
+assert 'MissionMenu' in client and 'lobbyRemote:FireServer("join",lobby.owner)' in client
+assert 'ЛИНИЯ ПРИНУДИТЕЛЬНОЙ ПЕРЕДЕЛКИ // ВЗРОСЛЫЕ' in server
+print('PASS: explicit lobby launch, private match isolation, 1–4 story variants, coop evidence/HP, recon and factory montage')

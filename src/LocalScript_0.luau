@@ -16,6 +16,7 @@ local WD = require(RS:WaitForChild("WeaponData"))
 local SOUND_NAMES = {
 	intro         = "Running Faster A",
 	final         = "Evil Morty Rap",
+ finalSlow     = "Evil Morty Rap",
 	pickup_pistol = "Gun Shot",
 	pickup_other  = "Realistic Gun shot",
 }
@@ -126,10 +127,11 @@ local function playMusic(key)
 	if template.IsPlaying then template:Stop() end
 	currentMusic = template:Clone()
 	currentMusic.Name = "_PlayingMusic"
-	currentMusic.Looped = (key == "intro" or key == "final")
-	currentMusic.Volume = 0.5
+	currentMusic.Looped = (key == "intro" or key == "final" or key=="finalSlow")
+	currentMusic.Volume = key=="finalSlow" and 0 or 0.5
 	currentMusic.Parent = workspace
 	currentMusic:Play()
+ if key=="finalSlow" then TweenService:Create(currentMusic,TweenInfo.new(8,Enum.EasingStyle.Sine),{Volume=0.5}):Play() end
 end
 local function stopMusic()
 	if currentMusic then currentMusic:Destroy(); currentMusic = nil end
@@ -199,7 +201,7 @@ local function showCredits(on)
     Командир — Голос
     Нейро-тянка — Она
     Тянки — Они
-    Нейро-армия — 2 048 копий
+    Армия картеля — 2 048 бойцов
 
     ────────────
 
@@ -268,6 +270,7 @@ local function cinematicHUD(on)
   table.clear(hiddenHUD)
  end
 end
+local firstPersonRide
 local firstPersonTarget
 local armyFolder,armyGeneration=nil,0
 local function clearArmy()
@@ -289,18 +292,18 @@ local function buildArmy(origin)
    if generation~=armyGeneration then return end
    for column=0,63 do
     local position=origin+Vector3.new((column-31.5)*6,0,row*8)
-    local unit=Instance.new("Model"); unit.Name="NeuroCopy"; unit.Parent=folder
+    local unit=Instance.new("Model"); unit.Name="CartelSoldier"; unit.Parent=folder
     -- Far ranks are lightweight silhouettes. Only front ranks need separate limbs.
     piece(unit,Vector3.new(1.8,2.2,1),position+Vector3.new(0,3.2,0),Color3.fromRGB(20,28,35))
     piece(unit,Vector3.new(2.1,1.3,1.2),position+Vector3.new(0,1.7,0),Color3.fromRGB(13,20,28))
-    piece(unit,Vector3.new(1.6,1.4,1.3),position+Vector3.new(0,4.9,0),Color3.fromRGB(60,145,145))
+    piece(unit,Vector3.new(1.6,1.4,1.3),position+Vector3.new(0,4.9,0),({Color3.fromRGB(110,65,80),Color3.fromRGB(65,55,40),Color3.fromRGB(150,115,65),Color3.fromRGB(65,70,95)})[(column+row)%4+1])
     piece(unit,Vector3.new(1.2,0.8,0.12),position+Vector3.new(0,4.8,-0.7),Color3.fromRGB(200,190,180))
     if row<4 then
      for _,sign in ipairs({-1,1}) do
       piece(unit,Vector3.new(0.55,2,0.65),position+Vector3.new(sign*1.25,3.1,0),Color3.fromRGB(45,100,110))
       piece(unit,Vector3.new(0.65,1.3,0.7),position+Vector3.new(sign*0.5,0.65,0),Color3.fromRGB(25,35,43))
      end
-     piece(unit,Vector3.new(0.35,1.5,0.12),position+Vector3.new(0,3.2,-0.56),Color3.fromRGB(70,185,180))
+     if column%5==0 then piece(unit,Vector3.new(0.35,1.5,0.12),position+Vector3.new(0,3.2,-0.56),Color3.fromRGB(90,125,130)) end
     end
    end
    RunService.Heartbeat:Wait() -- batch creation; no thousands-of-Humanoids replication spike
@@ -318,15 +321,26 @@ local function bloodOverlay(strength)
  end
 end
 Remotes.Cutscene.OnClientEvent:Connect(function(action, frame, duration, aim)
+ if action=="recon" then
+  local surface=frame:FindFirstChildOfClass("SurfaceGui")
+  if not surface then return end
+  for _,label in ipairs(surface:GetChildren()) do if label:IsA("TextLabel") then label.Size=UDim2.fromScale(1,0.18); label.TextSize=18; label.TextScaled=true end end
+  local view=new("ViewportFrame",{Size=UDim2.fromScale(1,0.8),Position=UDim2.fromScale(0,0.2),BackgroundColor3=Color3.fromRGB(45,60,65),Ambient=Color3.fromRGB(160,165,170),LightColor=Color3.fromRGB(210,210,200)},surface)
+  local copy=duration:Clone(); copy.Parent=view
+  local camera=Instance.new("Camera"); camera.CFrame=CFrame.lookAt(Vector3.new(25,19,30),Vector3.new(0,4,0)); camera.FieldOfView=55; camera.Parent=view; view.CurrentCamera=camera
+  return
+ end
  if action=="army" then buildArmy(frame); return end
  if action=="armyClear" then clearArmy(); return end
  if action=="blood" then bloodOverlay(frame); return end
+ if action=="povRide" then firstPersonRide=frame; firstPersonTarget=Vector3.zero; followSubject=nil; shotTarget=nil; return end
  if action=="pov" then
+  firstPersonRide=nil
   firstPersonTarget=frame; followSubject=nil; shotTarget=nil
   setSceneFov(58,0.4)
   return
  end
- if action=="cam" or action=="shot" or action=="follow" or action=="followRig" or action=="end" or action=="recover" then firstPersonTarget=nil end
+ if action=="cam" or action=="shot" or action=="follow" or action=="followRig" or action=="end" or action=="recover" then firstPersonTarget=nil; firstPersonRide=nil end
  if action=="prepare" then
   task.spawn(function()
    -- Streaming is optional and bounded; acknowledgements are sent even on failure.
@@ -393,7 +407,7 @@ Remotes.Music.OnClientEvent:Connect(function(action)
 	if action == "stop" then stopMusic()
 	else
   playMusic(action)
-  if action == "final" then
+  if action == "final" or action=="finalSlow" then
    local track=currentMusic
    task.spawn(function()
     local started=os.clock()
@@ -697,7 +711,7 @@ RunService:BindToRenderStep("ViewModel", Enum.RenderPriority.Camera.Value + 1, f
   if firstPersonTarget then
    local head=char and char:FindFirstChild("Head")
    local eye=head and head.Position or cam.CFrame.Position
-   local focus=typeof(firstPersonTarget)=="Instance" and firstPersonTarget.Position or firstPersonTarget
+   local focus=firstPersonRide and firstPersonRide:GetPivot():PointToWorldSpace(Vector3.new(35,0,0)) or (typeof(firstPersonTarget)=="Instance" and firstPersonTarget.Position or firstPersonTarget)
    cam.CFrame=CFrame.lookAt(eye,focus)
   elseif followSubject and followSubject.Parent then
    local pivot=followSubject:GetPivot()
@@ -877,6 +891,56 @@ end)
 Remotes.Shake.OnClientEvent:Connect(function(i) shakeI = math.max(shakeI, i) end)
 Remotes.End.OnClientEvent:Connect(function()
 	showFade(true, "КОНЕЦ?\n\nНейро-тянка забрала все данные.\n\n(игра скоро перезапустится)", 2)
+end)
+
+-- Menu is a separate GUI: no mission input until the server starts this party.
+local menu=new("ScreenGui",{Name="MissionMenu",IgnoreGuiInset=true,ResetOnSpawn=false,DisplayOrder=150},plr.PlayerGui)
+local background=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(12,17,24),BorderSizePixel=0},menu)
+new("TextLabel",{Size=UDim2.fromScale(0.9,0.1),Position=UDim2.fromScale(0.05,0.06),Text="SECTOR 7  /  ОПЕРАЦИЯ «ЗАРЯ»",Font=Enum.Font.GothamBlack,TextScaled=true,TextColor3=Color3.fromRGB(210,225,235),BackgroundTransparency=1},background)
+local status=new("TextLabel",{Size=UDim2.fromScale(0.9,0.12),Position=UDim2.fromScale(0.05,0.17),Text="Выберите одиночную операцию или соберите отряд до 4 игроков.\nВ кооперативе: общий сюжет и здоровье врагов ×2.",TextWrapped=true,Font=Enum.Font.Gotham,TextSize=18,TextColor3=Color3.fromRGB(145,170,185),BackgroundTransparency=1},background)
+local function button(label,x,y,callback,parent)
+ local b=new("TextButton",{Size=UDim2.fromScale(0.27,0.075),Position=UDim2.fromScale(x,y),Text=label,Font=Enum.Font.GothamBold,TextSize=17,TextColor3=Color3.fromRGB(225,235,240),BackgroundColor3=Color3.fromRGB(35,60,73),BorderSizePixel=0},parent or background)
+ new("UICorner",{CornerRadius=UDim.new(0,8)},b)
+ b.Activated:Connect(callback)
+ return b
+end
+local lobbyRemote=Remotes:WaitForChild("Lobby")
+button("ОДИНОЧНАЯ ИГРА",0.06,0.31,function() lobbyRemote:FireServer("solo") end)
+button("СОЗДАТЬ ЛОББИ",0.365,0.31,function() lobbyRemote:FireServer("create") end)
+button("ОБНОВИТЬ",0.67,0.31,function() lobbyRemote:FireServer("list") end)
+local list=new("ScrollingFrame",{Size=UDim2.fromScale(0.88,0.36),Position=UDim2.fromScale(0.06,0.42),BackgroundColor3=Color3.fromRGB(18,26,35),BorderSizePixel=0,CanvasSize=UDim2.new(),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollBarThickness=5},background)
+new("UIListLayout",{Padding=UDim.new(0,8)},list)
+button("НАЧАТЬ ОПЕРАЦИЮ",0.06,0.83,function() lobbyRemote:FireServer("start") end)
+button("ВЫЙТИ ИЗ ЛОББИ",0.365,0.83,function() lobbyRemote:FireServer("leave") end)
+local waiting=new("TextLabel",{Size=UDim2.fromScale(0.27,0.075),Position=UDim2.fromScale(0.67,0.83),Text="Лобби текущего сервера",Font=Enum.Font.Gotham,TextSize=15,TextColor3=Color3.fromRGB(145,170,185),BackgroundTransparency=1},background)
+gui.Enabled=false
+plr.CameraMode=Enum.CameraMode.Classic
+RunService:BindToRenderStep("MenuPointer",Enum.RenderPriority.Last.Value,function()
+ if menu.Enabled then UIS.MouseIconEnabled=true; UIS.MouseBehavior=Enum.MouseBehavior.Default; cam.CameraType=Enum.CameraType.Scriptable end
+end)
+lobbyRemote.OnClientEvent:Connect(function(command,data)
+ if command=="error" then status.Text=data; return end
+ if command=="start" or (command=="state" and data.started) then
+  menu.Enabled=false; gui.Enabled=true
+  RunService:UnbindFromRenderStep("MenuPointer")
+  UIS.MouseIconEnabled=false
+  cam.CameraType=Enum.CameraType.Custom
+  return
+ end
+ if command~="state" then return end
+ if data.waitingReserved then status.Text="Собираем отряд в отдельной сессии… Ожидаем остальных участников (до 35 секунд)." end
+ for _,child in ipairs(list:GetChildren()) do if child:IsA("GuiObject") then child:Destroy() end end
+ local mine
+ for _,lobby in ipairs(data.lobbies) do
+  local names={}
+  for _,member in ipairs(lobby.members) do
+   table.insert(names,member.name)
+   if member.id==plr.UserId then mine=lobby end
+  end
+  local row=new("TextButton",{Size=UDim2.new(1,-10,0,66),Text=lobby.name.."  ["..#lobby.members.."/4]  "..(lobby.launching and "Переход…" or "Присоединиться").."\n"..table.concat(names," • "),TextWrapped=true,TextSize=16,Font=Enum.Font.Gotham,TextColor3=Color3.fromRGB(205,220,230),BackgroundColor3=Color3.fromRGB(27,40,52),BorderSizePixel=0},list)
+  row.Activated:Connect(function() lobbyRemote:FireServer("join",lobby.owner) end)
+ end
+ waiting.Text=mine and (mine.owner==plr.UserId and "Вы — лидер лобби" or "Ждём запуска лидером") or "Выберите лобби или создайте своё"
 end)
 
 -- Last: GUI, camera, fade and gameplay listeners must all exist before startup.
