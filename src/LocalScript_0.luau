@@ -8,6 +8,7 @@ local Debris = game:GetService("Debris")
 local SoundService = game:GetService("SoundService")
 
 local plr = Players.LocalPlayer
+local GAME_TITLE=workspace:GetAttribute("GameTitle") or "Уничтожь Тянку 3"
 local cam = workspace.CurrentCamera
 local Remotes = RS:WaitForChild("Remotes")
 local WD = require(RS:WaitForChild("WeaponData"))
@@ -71,6 +72,10 @@ local sub = new("TextLabel", {Size=UDim2.new(0.6,0,0,70), Position=UDim2.new(0.5
 	BackgroundColor3=Color3.new(0,0,0), BackgroundTransparency=0.4, TextColor3=Color3.new(1,1,1), Font=Enum.Font.GothamMedium,
 	TextSize=20, TextWrapped=true, Visible=false, BorderSizePixel=0}, gui)
 
+new("UITextSizeConstraint",{MinTextSize=10,MaxTextSize=20},sub)
+local subToken=0
+local speakerTag=new("TextLabel",{Size=UDim2.new(0.86,0,0,26),Position=UDim2.new(0.5,0,1,-280),AnchorPoint=Vector2.new(0.5,0),
+ BackgroundTransparency=1,Text="",TextColor3=Color3.fromRGB(210,190,145),Font=Enum.Font.GothamBold,TextSize=20,Visible=false,ZIndex=26},gui)
 local doorPrompt = new("TextLabel", {Size=UDim2.fromOffset(340,44), Position=UDim2.new(0.5,0,0.72,0), AnchorPoint=Vector2.new(0.5,0),
 	BackgroundColor3=Color3.fromRGB(15,20,15), BackgroundTransparency=0.2, TextColor3=Color3.fromRGB(100,255,150),
 	Font=Enum.Font.GothamBold, TextSize=18, Text="[E] , ВЫБИТЬ ДВЕРЬ", Visible=false, BorderSizePixel=0}, gui)
@@ -173,7 +178,7 @@ local function showCredits(on)
 		creditsText.Text = [[
 
 
-    КАРТЕЛЬ ТЯНОК: КОНЕЦ?
+    Уничтожь Тянку 3
 
     ────────────
 
@@ -208,7 +213,7 @@ local function showCredits(on)
 
     Агент , Ты
     Командир , Голос
-    Нейро-тянка , Она
+    Нейро , Она
     Тянки , Они
     Следующая глава
     Завод синдиката
@@ -337,6 +342,7 @@ local sceneBlaster,blasterParts,scanPanel=nil,{},nil
 local scanGeneration,pulseTime=0,-100
 local scanRunning=false
 local function removeSceneProps()
+ subToken+=1; sub.Visible=false; speakerTag.Visible=false
  if sceneBlaster then sceneBlaster:Destroy(); sceneBlaster=nil; table.clear(blasterParts) end
  scanGeneration+=1; scanRunning=false
  if scanPanel then scanPanel:Destroy(); scanPanel=nil end
@@ -380,6 +386,15 @@ local function startScan(data)
  end)
 end
 Remotes.Cutscene.OnClientEvent:Connect(function(action, frame, duration, aim)
+ if action=="dialogue" then
+  subToken+=1; local token=subToken
+  -- Preserve the supplied post-credits wording and punctuation literally.
+  sub.Text=frame.text; sub.MaxVisibleGraphemes=-1; sub.Visible=true; sub.TextScaled=true
+  sub.Size=UDim2.new(0.86,0,0,150); sub.Position=UDim2.new(0.5,0,1,-100); sub.TextSize=18
+  speakerTag.Text=frame.name; speakerTag.Visible=true
+  task.delay(frame.duration,function() if token==subToken then sub.Visible=false; speakerTag.Visible=false end end)
+  return
+ end
  if action=="reveal" then
   endingBlack=false
   showFade(false,"",0.45)
@@ -961,8 +976,9 @@ local function conversationalSubtitle(text)
  text=text:gsub("%.%.+","."):gsub("  +"," ")
  return text
 end
-local subToken = 0
 Remotes.Notify.OnClientEvent:Connect(function(text, dur)
+ speakerTag.Visible=false; sub.TextScaled=false
+ sub.Size=UDim2.new(0.6,0,0,70); sub.Position=UDim2.new(0.5,0,1,-140); sub.TextSize=20
  text=conversationalSubtitle(text)
 	subToken += 1; local my = subToken
 	sub.Text = text; sub.Visible = true
@@ -1000,7 +1016,7 @@ end)
 -- Menu is a separate GUI: no mission input until the server starts this party.
 local menu=new("ScreenGui",{Name="MissionMenu",IgnoreGuiInset=true,ResetOnSpawn=false,DisplayOrder=150},plr.PlayerGui)
 local background=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(12,17,24),BorderSizePixel=0},menu)
-new("TextLabel",{Size=UDim2.fromScale(0.9,0.1),Position=UDim2.fromScale(0.05,0.06),Text="SECTOR 7  /  ОПЕРАЦИЯ «ЗАРЯ»",Font=Enum.Font.GothamBlack,TextScaled=true,TextColor3=Color3.fromRGB(210,225,235),BackgroundTransparency=1},background)
+new("TextLabel",{Size=UDim2.fromScale(0.9,0.1),Position=UDim2.fromScale(0.05,0.06),Text=GAME_TITLE,Font=Enum.Font.GothamBlack,TextScaled=true,TextColor3=Color3.fromRGB(210,225,235),BackgroundTransparency=1},background)
 local status=new("TextLabel",{Size=UDim2.fromScale(0.9,0.12),Position=UDim2.fromScale(0.05,0.17),Text="Выберите одиночную операцию или соберите отряд до 4 игроков.\nВ кооперативе: общий сюжет и здоровье врагов ×2.",TextWrapped=true,Font=Enum.Font.Gotham,TextSize=18,TextColor3=Color3.fromRGB(145,170,185),BackgroundTransparency=1},background)
 local function button(label,x,y,callback,parent)
  local b=new("TextButton",{Size=UDim2.fromScale(0.27,0.075),Position=UDim2.fromScale(x,y),Text=label,Font=Enum.Font.GothamBold,TextSize=17,TextColor3=Color3.fromRGB(225,235,240),BackgroundColor3=Color3.fromRGB(35,60,73),BorderSizePixel=0},parent or background)
@@ -1022,7 +1038,22 @@ plr.CameraMode=Enum.CameraMode.Classic
 RunService:BindToRenderStep("MenuPointer",Enum.RenderPriority.Last.Value,function()
  if menu.Enabled then UIS.MouseIconEnabled=true; UIS.MouseBehavior=Enum.MouseBehavior.Default; cam.CameraType=Enum.CameraType.Scriptable end
 end)
+local function showMainMenu()
+ menu.Enabled=true; gui.Enabled=false
+ endingBlack=false
+ showFade(false,"",0)
+ showCredits(false)
+ status.Text="Выберите одиночную операцию или соберите отряд до 4 игроков.\nВ кооперативе общий сюжет и здоровье врагов вдвое выше."
+ plr.CameraMode=Enum.CameraMode.Classic
+ UIS.MouseIconEnabled=true; UIS.MouseBehavior=Enum.MouseBehavior.Default
+ setSceneControls(false)
+ RunService:UnbindFromRenderStep("MenuPointer")
+ RunService:BindToRenderStep("MenuPointer",Enum.RenderPriority.Last.Value,function()
+  if menu.Enabled then UIS.MouseIconEnabled=true; UIS.MouseBehavior=Enum.MouseBehavior.Default; cam.CameraType=Enum.CameraType.Scriptable end
+ end)
+end
 lobbyRemote.OnClientEvent:Connect(function(command,data)
+ if command=="menu" then showMainMenu(); return end
  if command=="error" then status.Text=data; return end
  if command=="start" or (command=="state" and data.started) then
   menu.Enabled=false; gui.Enabled=true

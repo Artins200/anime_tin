@@ -55,8 +55,8 @@ assert 'buildForest(nil)' not in server and 'buildRoom(nil' not in server
 assert 'local spots=activeLevelInfo.GetSpots(count)' in server
 mafia=server.split('local function playMafioziScene()',1)[1].split('local function playPlaneScene()',1)[0]
 assert mafia.index('sceneLock(true)') < mafia.index('clearLevel()')
-assert 'Vector3.new(44,2,60)' in mafia  # support includes the Z=20 entrance spawn
-assert 'currentSpawn=CFrame.lookAt(Vector3.new(0,3.2,20)' in mafia
+assert 'local factory=buildConversionFactory()' in mafia
+assert 'currentSpawn=factory.Spawn' in mafia
 plane=server.split('local function playPlaneScene()',1)[1].split('function startBase()',1)[0]
 assert plane.index('sceneLock(true)') < plane.index('clearLevel()')
 assert 'planeRide:Disconnect()' in plane
@@ -95,14 +95,15 @@ assert 'moveModel(entrance,closedDoor*CFrame.new(0,9.5,0),1.8)' in intro
 print('PASS: client-ready startup, bounded streaming, fade watchdog/cancellation, recovery and camera plans')
 
 finale=server.split('function startBase()',1)[1].split('-- KICK',1)[0]
-assert 'buildConversionFactory()' in finale
-assert 'CutsceneRE:FireAllClients("pov",boss.Head)' in finale
+assert 'local baseInfo=buildBase(levelFolder)' in finale
+assert 'Types.Mafiozi' not in finale
+assert 'CutsceneRE:FireAllClients("pov",maf.Head)' in mafia
 assert 'CutsceneRE:FireAllClients("pov",ally.Head)' in finale
 assert 'CutsceneRE:FireAllClients("pov",android.Head,44)' in finale
-assert 'bossHum.Health=0' in finale
+assert 'mafHum.Health=0' in mafia
 assert 'moveModel(ally,CFrame.lookAt(allyCF.Position' in finale
 assert 'visorWeld.Part0=android.Head' in finale
-assert 'CutsceneRE:FireAllClients("blaster",true)' in finale
+assert 'CutsceneRE:FireAllClients("blaster",true)' in mafia
 assert 'Копирование боевых данных и опыта' in client
 assert 'Remotes.SceneReady:FireServer("scanDone",data.id)' in client
 assert 'Remotes.SceneReady:FireServer("black",frame)' in client
@@ -120,10 +121,10 @@ assert 'firstPersonForward' in client
 assert 'cam.CFrame.Rotation:Lerp(goal.Rotation,1-math.exp(-dt*5))' in client
 assert 'if oldFloor then oldFloor:Destroy() end' in server
 assert 'p.Reflectance=0' in server
-assert 'Vector3.new(0, -0.38, 0)' in server
+assert 'maf:Destroy()' in mafia
 assert 'Vector3.new(70,0.285,65)' in server
 assert 'Enum.HumanoidStateType.Freefall,not on' in server
-factory=server.split('local function buildConversionFactory()',1)[1].split('-- Rename this constant',1)[0]
+factory=server.split('buildConversionFactory=function()',1)[1].split('local function buildProductionEpilogue()',1)[0]
 for fixture in ['FactoryFloor','FrontWall','SideWall','Roof','EntranceWall','CorridorEnd','ServerRack','ConveyorBelt','FactoryLamp','EmergencyLamp','StorageCrate']:
  assert fixture in factory
 assert 'Vector3.new(72,1,80)' in factory
@@ -145,7 +146,7 @@ assert 'buildEvidenceTerminal(info,n)' in server
 assert 'evidenceCollected[player.UserId]=true' in server
 assert 'local STORIES={' in server and '[4]={name="ПРОТОКОЛ СВИДЕТЕЛЬ"' in server
 assert 'MusicRE:FireAllClients("finalSlow")' in finale
-assert finale.index('MusicRE:FireAllClients("stop")') < finale.index('local factory=buildConversionFactory')
+assert finale.index('MusicRE:FireAllClients("stop")') < finale.index('local baseInfo=buildBase')
 assert 'TweenInfo.new(8,Enum.EasingStyle.Sine),{Volume=0.5}' in client
 assert 'CutsceneRE:FireAllClients("recon",board,recon)' in intro
 assert 'local view=new("ViewportFrame"' in client
@@ -176,3 +177,50 @@ assert 'ConversionShutter' in server
 assert 'if action=="reveal" then' in client
 assert 'setSceneFov(typeof(duration)=="number" and duration or 58,0.6)' in client
 print('PASS: readable mafia pacing, visible fatal attack at distance, horde then production insert before final blackout, streaming focus/reveal')
+
+# A factory-owned antagonist must never be recreated at the home base.
+assert 'maf.Parent=factory.Model' in mafia
+assert 'maf:SetAttribute("FactoryAntagonist",true)' in mafia
+assert 'maf:Destroy()' in mafia
+assert 'buildConversionFactory()' not in finale
+assert finale.index('local ally=buildRig') < finale.index('local androidCfg=')
+assert finale.index('for _,lamp in ipairs(factory.Lamps)') < finale.index('local androidCfg=')
+assert 'playSecretScene()' in finale and 'returnToMenu()' in finale
+assert 'startLevel(1)' not in finale
+assert finale.index('CreditsRE:FireAllClients(true)') < finale.index('playSecretScene()') < finale.index('returnToMenu()')
+secret=server.split('local function playSecretScene()',1)[1].split('function startBase()',1)[0]
+for prop in ['PostCreditsRoom','Floor','Wall','Ceiling','SofaBase','Television','TVStatic','Lamp']:
+ assert prop in secret
+assert 'secretActor(room,"eurtyoeyrntiu","Артем"' in secret
+assert 'secretActor(room,"ZamestitelDiomchica","Демид"' in secret
+actor_loader=server.split('local function secretActor(',1)[1].split('local function playSecretScene()',1)[0]
+assert 'ServerStorage:FindFirstChild(sourceName)' in actor_loader
+assert 'return source:Clone()' in actor_loader
+assert 'object.Disabled=true' in actor_loader
+assert 'rig:SetAttribute("Placeholder",true)' in actor_loader
+assert secret.index('FadeRE:FireAllClients(true') < secret.index('room:Destroy()')
+reset=server.split('returnToMenu=function()',1)[1]
+assert 'sessionRoster=nil; rosterWaitStart=nil; hasFinishedSession=true' in reset
+assert 'table.clear(lobbies); table.clear(membership); table.clear(launching)' in reset
+assert 'LobbyRE:FireAllClients("menu")' in reset
+assert 'currentSpawn=CFrame.new(0,4,0)' in reset
+assert 'if command=="menu" then showMainMenu(); return end' in client
+assert 'local function showMainMenu()' in client
+assert 'Text=GAME_TITLE' in client
+assert 'Уничтожь Тянку 3' in client and 'Уничтожь Тянку 3' in server
+assert 'SECTOR 7  /  ОПЕРАЦИЯ' not in client and 'КАРТЕЛЬ ТЯНОК: КОНЕЦ?' not in client
+
+import re
+expected=[
+ ('Артем','Мда, им вроде за это платят, да? Каким образом андроиды, которых мы в свое время легко контрили, так сильно переигрывают компанию, спонсируемую государством, которая как раз и создана для борьбы с ними?'),
+ ('Демид','Ага, есть такое. Я думаю, что они не справятся. Нам нужно вернуться в старые добрые и поставить их на место, согласен?'),
+ ('Артем','Ага, думаю, хорошая идея, а то они что-то совсем попутали.'),
+ ('Демид','Короче, выдвигаемся помогать уже завтра. Так что нам нужно потренироваться и вспомнить скилл, согласен?'),
+ ('Артем','Хах, ну хорошо. С чего начнем? С тренировочной площадки или с чего-то еще?'),
+ ('Демид','Лучше давай заходим в Blade Ball быстрее, а то у нас всего лишь одна ночь, чтобы вспомнить скилл.'),
+]
+block=server.split('local SECRET_DIALOGUE={',1)[1].split('local function secretActor',1)[0]
+assert re.findall(r'\{name="([^"]+)",text="([^"]+)"\}',block)==expected
+literal=client.split('if action=="dialogue" then',1)[1].split('if action=="reveal"',1)[0]
+assert 'sub.Text=frame.text' in literal and 'conversationalSubtitle' not in literal
+print('PASS: factory-only boss destroyed, clean base return, literal six-line secret scene, optional supplied rigs, reusable main menu reset')

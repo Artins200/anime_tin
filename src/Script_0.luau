@@ -4,6 +4,9 @@ local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
+local ServerStorage=game:GetService("ServerStorage")
+local GAME_TITLE="Уничтожь Тянку 3"
+workspace:SetAttribute("GameTitle",GAME_TITLE)
 
 local WD = require(RS:WaitForChild("WeaponData"))
 Players.RespawnTime = 3
@@ -17,6 +20,8 @@ local KickRE, FocusRE, DoorStateRE = newRemote("Kick"), newRemote("Focus"), newR
 local CutsceneRE, MusicRE, CreditsRE = newRemote("Cutscene"), newRemote("Music"), newRemote("Credits")
 local LobbyRE=newRemote("Lobby")
 local sessionSize, sessionStarted, pushLobbyState=1,false,nil
+local returnToMenu
+local buildConversionFactory
 local STORIES={
  [1]={name="ОДИНОЧНЫЙ СЛЕД",brief="На этот раз идешь один. Найди их архив и попробуй выяснить, куда увозят людей.",plan="В доме спрятан маршрут перевозок. Забери данные, затем двигайся к лаборатории.",office="В архиве есть адрес закрытого цеха. Мафиози наверняка знает, кому его отдали.",ending="Последний агент не вышел на связь. Запись с его камеры пережила его."},
  [2]={name="ДВОЙНОЙ СИГНАЛ",brief="Работаете вдвоем. Один проверяет маршрут, второй ищет следы пропавших людей. Держитесь рядом.",plan="Держитесь вместе. Один прикрывает дом, второй проверяет архив. Данные нужны обоим.",office="Смотри, записи совпадают. На обоих приказах о перевозке стоит одна подпись.",ending="Оба канала погасли. Но общая запись группы уже ушла в штаб."},
@@ -162,7 +167,7 @@ end
 ------------------------------------------------------------------ ТИПЫ ВРАГОВ
 local Base = {
 	Skin=C(195,170,155), Shirt=C(160,160,180), Skirt=C(30,30,65), Legs=C(18,18,30),
-	Hair=C(165,75,120), Eye=C(35,105,115), Accent=C(150,45,95), HP=60, Speed=14, Name="Андроид-тянка",
+	Hair=C(165,75,120), Eye=C(35,105,115), Accent=C(150,45,95), HP=60, Speed=14, Name="Боец картеля",
 }
 local function T(o) for k, v in pairs(Base) do if o[k] == nil then o[k] = v end end return o end
 local Types = {
@@ -1365,123 +1370,43 @@ local function sceneLine(text,minimum)
  task.wait(duration+0.35)
 end
 local function playMafioziScene()
-	introActive = true
-	canFight = false
- sceneLock(true)
-	FadeRE:FireAllClients(true, "ОФИС ГЛАВНОЙ ТЯНКИ")
-	task.wait(2)
-	clearLevel(); newFolders()
-	currentLevel, currentName = 5, "Офис"
-
-	-- Строим офис
-	local office = levelFolder
-	local W, H, D = 30, 12, 30
- -- Entrance starts at Z=18: the original room floor ended at Z=15.5.
- part(office,Vector3.new(44,2,60),Vector3.new(0,-1,7),C(65,62,62),Enum.Material.Concrete)
- for _, sign in ipairs({-1,1}) do
-  part(office,Vector3.new(11,12,1),Vector3.new(sign*9.5,6,15.5),C(60,45,35),Enum.Material.Wood)
- end
- part(office,Vector3.new(8,2,1),Vector3.new(0,11,15.5),C(60,45,35),Enum.Material.Wood)
-	part(office, Vector3.new(W+2, 1, D+2), Vector3.new(0, -0.38, 0), C(80, 60, 50), Enum.Material.WoodPlanks)
-	part(office, Vector3.new(W+2, 1, D+2), Vector3.new(0, H+0.5, 0), C(40, 30, 25), Enum.Material.Wood)
-	part(office, Vector3.new(W+2, H, 1), Vector3.new(0, H/2, -D/2-0.5), C(60, 45, 35), Enum.Material.Wood)
-	part(office, Vector3.new(1, H, D+2), Vector3.new(-W/2-0.5, H/2, 0), C(60, 45, 35), Enum.Material.Wood)
-	part(office, Vector3.new(1, H, D+2), Vector3.new(W/2+0.5, H/2, 0), C(60, 45, 35), Enum.Material.Wood)
-	-- Стол
-	part(office, Vector3.new(10, 0.3, 5), Vector3.new(0, 3, -8), C(50, 30, 20), Enum.Material.Wood)
-	for _, p in ipairs({{-4, -10}, {4, -10}, {-4, -6}, {4, -6}}) do
-		part(office, Vector3.new(0.4, 3, 0.4), Vector3.new(p[1], 1.5, p[2]), C(40, 25, 15), Enum.Material.Wood)
-	end
-	-- Кресло мафиози (спинка)
-	part(office, Vector3.new(3, 4, 0.4), Vector3.new(0, 4, -11), C(30, 20, 15), Enum.Material.Wood)
-	-- Лампа
-	local lamp = part(office, Vector3.new(3, 0.3, 3), Vector3.new(0, H-0.5, -3), C(240,220,160), Enum.Material.Neon)
-	light(lamp, C(240,220,160), 20, 2)
-	-- Дверь сзади (куда мы врываемся)
-	local backDoor = part(office, Vector3.new(8, 10, 0.5), Vector3.new(0, 5, D/2), C(60,60,60), Enum.Material.DiamondPlate)
-
-	-- Мафиози за столом (сидит)
-	local mafCfg = Types.Mafiozi
-	local maf, mafHum, mafHrp, mafJ = buildRig(mafCfg, CFrame.lookAt(Vector3.new(0, 3, -9), Vector3.new(0, 3, 10)))
-	anchorAll(maf); maf.Parent = office
-	-- Поза сидящего
-	mafJ.RH.C0 = mafJ.RH.C0 * CFrame.Angles(0, 0, math.rad(-75))
-	mafJ.LH.C0 = mafJ.LH.C0 * CFrame.Angles(0, 0, math.rad(75))
-	-- Руки на стол (опущены)
-	mafJ.RS.C0 = mafJ.RS.C0 * CFrame.Angles(math.rad(-20), 0, 0)
-	mafJ.LS.C0 = mafJ.LS.C0 * CFrame.Angles(math.rad(-20), 0, 0)
-
-	-- Игрок за дверью
-	local plr = Players:GetPlayers()[1]
-	local char = plr.Character
- currentSpawn=CFrame.lookAt(Vector3.new(0,3.2,20),Vector3.new(0,3.2,0))
- placeAll()
- sceneLock(true)
-	-- Управление выкл
-	local h = char:FindFirstChildOfClass("Humanoid")
-	if h then h.WalkSpeed = 0; h.JumpPower = 0; h.AutoRotate = false end
-
-	applyPreset("Office", 0.5)
-	CutsceneRE:FireAllClients("start")
- CutsceneRE:FireAllClients("pov",Vector3.new(0,5,15))
+ introActive=true; canFight=false; sceneLock(true)
+ FadeRE:FireAllClients(true,"Завод синдиката")
+ task.wait(0.8)
+ clearLevel(); newFolders()
+ currentLevel,currentName=5,"Завод синдиката"
+ local factory=buildConversionFactory()
+ currentSpawn=factory.Spawn
+ applyPreset("Base",0.1)
+ placeAll(); sceneLock(true)
+ local maf,mafHum=buildRig(Types.Mafiozi,CFrame.lookAt(factory.Origin+Vector3.new(0,3,9),factory.Origin+Vector3.new(0,3,-18)))
+ maf.Name="Главный антагонист"; maf:SetAttribute("FactoryAntagonist",true)
+ anchorAll(maf); maf.Parent=factory.Model
+ CutsceneRE:FireAllClients("start")
+ CutsceneRE:FireAllClients("pov",maf.Head)
  prepareView(currentSpawn.Position)
  CutsceneRE:FireAllClients("reveal")
-	task.wait(1)
-
-	-- Врываемся через дверь
-	NotifyRE:FireAllClients("Дверь открыта, заходим.", 2)
- backDoor.CanCollide=false
- TweenService:Create(backDoor,TweenInfo.new(0.6),{CFrame=CFrame.new(0,0.65,10)*CFrame.Angles(math.rad(-90),0,0)}):Play()
-	ShakeRE:FireAllClients(12)
-	task.wait(0.8)
-
-	-- Забегаем внутрь
-	tweenCharTo(char, CFrame.lookAt(Vector3.new(0, 3, 5), Vector3.new(0, 3, -8)), 1.5)
- CutsceneRE:FireAllClients("pov",maf:FindFirstChild("Head"))
  sceneLine(story().office,6)
-
-	-- Мафиози видит нас, поднимает руки
  sceneLine("Стой, не стреляй. Я сдаюсь, я все расскажу.",5)
-	mafJ.RS.C0 = mafJ.RS.C0 * CFrame.Angles(math.rad(100), 0, math.rad(-30))
-	mafJ.LS.C0 = mafJ.LS.C0 * CFrame.Angles(math.rad(100), 0, math.rad(30))
-	task.wait(1.5)
-
- -- Keep the actor and weapon on screen before firing.
  CutsceneRE:FireAllClients("blaster",true)
  task.wait(1.5)
  CutsceneRE:FireAllClients("pulse")
-
-	-- Стреляем
-	local headPos = char:FindFirstChild("Head") and char.Head.Position or char.HumanoidRootPart.Position
- local bullet=part(fxFolder,Vector3.new(0.6,0.6,0.6),headPos,C(100,200,210),Enum.Material.Neon)
+ local target=maf.Head.Position
+ local bullet=part(fxFolder,Vector3.new(0.7,0.7,0.7),factory.Origin+Vector3.new(1,4,-16),C(90,200,210),Enum.Material.Neon)
  bullet.Shape=Enum.PartType.Ball; bullet.CanCollide=false; bullet.CanQuery=false
- TweenService:Create(bullet,TweenInfo.new(0.4,Enum.EasingStyle.Linear),{Position=maf.Head.Position}):Play()
- Debris:AddItem(bullet,0.5)
-	ShakeRE:FireAllClients(10)
-	task.wait(0.45)
-
- -- A scripted rig does not have the enemies' Died connection: animate the reaction explicitly.
- CutsceneRE:FireAllClients("blood",0.18)
- local wound=Instance.new("ParticleEmitter")
- wound.Texture="rbxasset://textures/particles/sparkles_main.dds"
- wound.Color=ColorSequence.new(C(130,12,20)); wound.LightEmission=0
- wound.Size=NumberSequence.new(0.15,0); wound.Lifetime=NumberRange.new(0.2,0.5)
- wound.Speed=NumberRange.new(5,10); wound.Rate=0; wound.SpreadAngle=Vector2.new(60,60)
- wound.Parent=maf:FindFirstChild("Torso"); wound:Emit(22)
+ TweenService:Create(bullet,TweenInfo.new(0.4),{Position=target}):Play()
+ task.wait(0.45); bullet:Destroy()
  local hitCF=maf:GetPivot()
- moveModel(maf,hitCF*CFrame.Angles(math.rad(-18),0,math.rad(10)),0.18)
+ moveModel(maf,hitCF*CFrame.Angles(math.rad(-18),0,0),0.18)
  mafHum.BreakJointsOnDeath=false; mafHum.Health=0
- moveModel(maf,hitCF*CFrame.new(7,-1.8,1)*CFrame.Angles(math.rad(-80),0,math.rad(12)),0.7)
- local stain=part(office,Vector3.new(2.5,0.03,1.8),Vector3.new(7,0.15,-8),C(95,12,18),Enum.Material.SmoothPlastic)
- stain.CanCollide=false
+ moveModel(maf,hitCF*CFrame.new(7,-1.8,1)*CFrame.Angles(math.rad(-80),0,0),0.8)
  task.wait(4)
  CutsceneRE:FireAllClients("blaster",false)
  FadeRE:FireAllClients(true,"")
  task.wait(0.8)
-	CutsceneRE:FireAllClients("end")
- -- Keep actors frozen across the office -> plane -> base transition.
-	FadeRE:FireAllClients(true, "")
-	task.wait(1.5)
+ -- Only player Characters travel. This factory-owned NPC is never reparented or cloned to the base.
+ maf:Destroy()
+ CutsceneRE:FireAllClients("end")
 end
 
 ------------------------------------------------------------------ САМОЛЁТ-КАТСЦЕНА
@@ -1532,7 +1457,7 @@ end
 ------------------------------------------------------------------ ФИНАЛ НА БАЗЕ , смерть агента и раскрытие нейро-армии
 local function say(text, dur) sceneLine(text,dur) end
 
-local function buildConversionFactory()
+buildConversionFactory=function()
  local f=Instance.new("Model"); f.Name="ConversionFactory"; f.Parent=levelFolder
  local origin=Vector3.new(4000,0,0)
  local lamps,emergency={},{}
@@ -1654,6 +1579,90 @@ local function awaitFinalAck(states,id,timeout)
  until os.clock()>=deadline
  return false
 end
+local SECRET_DIALOGUE={
+ {name="Артем",text="Мда, им вроде за это платят, да? Каким образом андроиды, которых мы в свое время легко контрили, так сильно переигрывают компанию, спонсируемую государством, которая как раз и создана для борьбы с ними?"},
+ {name="Демид",text="Ага, есть такое. Я думаю, что они не справятся. Нам нужно вернуться в старые добрые и поставить их на место, согласен?"},
+ {name="Артем",text="Ага, думаю, хорошая идея, а то они что-то совсем попутали."},
+ {name="Демид",text="Короче, выдвигаемся помогать уже завтра. Так что нам нужно потренироваться и вспомнить скилл, согласен?"},
+ {name="Артем",text="Хах, ну хорошо. С чего начнем? С тренировочной площадки или с чего-то еще?"},
+ {name="Демид",text="Лучше давай заходим в Blade Ball быстрее, а то у нас всего лишь одна ночь, чтобы вспомнить скилл."},
+}
+local function secretActor(room,sourceName,displayName,target)
+ local source=ServerStorage:FindFirstChild(sourceName)
+ local rig
+ if source and source:IsA("Model") and source:FindFirstChildWhichIsA("BasePart",true) then
+  local archivable=source.Archivable; source.Archivable=true
+  local ok,copy=pcall(function() return source:Clone() end)
+  source.Archivable=archivable
+  if ok then rig=copy end
+ end
+ if not rig then
+  warn("[SecretScene] ServerStorage."..sourceName.." is missing. Using a temporary placeholder for "..displayName)
+  local cfg=table.clone(Types.Commander); cfg.Name=displayName
+  cfg.Shirt=displayName=="Артем" and C(70,75,85) or C(45,65,95)
+  rig=buildRig(cfg,CFrame.new())
+  rig:SetAttribute("Placeholder",true)
+ end
+ rig.Name=displayName; rig:SetAttribute("SourceModel",sourceName)
+ for _,object in ipairs(rig:GetDescendants()) do
+  if object:IsA("BaseScript") then object.Disabled=true end
+  if object:IsA("BasePart") then object.Anchored=true; object.CanCollide=false; object.CanTouch=false end
+  if object:IsA("Humanoid") then object.DisplayDistanceType=Enum.HumanoidDisplayDistanceType.None end
+ end
+ rig.Parent=room; rig:PivotTo(target)
+ local bounds,size=rig:GetBoundingBox()
+ local floorY=target.Position.Y
+ rig:PivotTo(rig:GetPivot()+Vector3.new(0,floorY-(bounds.Position.Y-size.Y/2),0))
+ return rig
+end
+local function playSecretScene()
+ sceneLock(true); introActive=true; canFight=false
+ -- Credits left the screen opaque. Do not end the cutscene or release controls between scenes.
+ local room=Instance.new("Model"); room.Name="PostCreditsRoom"; room.Parent=levelFolder
+ local origin=Vector3.new(10000,0,0)
+ local function prop(name,size,offset,color,material)
+  local p=part(room,size,origin+offset,color,material or Enum.Material.SmoothPlastic); p.Name=name; return p
+ end
+ prop("Floor",Vector3.new(52,1,40),Vector3.new(0,-0.5,0),C(63,58,55),Enum.Material.WoodPlanks)
+ prop("Ceiling",Vector3.new(52,1,40),Vector3.new(0,13.5,0),C(63,65,70))
+ for _,x in ipairs({-26,26}) do prop("Wall",Vector3.new(1,13,40),Vector3.new(x,6.5,0),C(80,83,90)) end
+ for _,z in ipairs({-20,20}) do prop("Wall",Vector3.new(52,13,1),Vector3.new(0,6.5,z),C(80,83,90)) end
+ prop("SofaBase",Vector3.new(17,1.5,5),Vector3.new(0,0.75,-5),C(42,56,65),Enum.Material.Fabric)
+ prop("SofaBack",Vector3.new(17,3,0.8),Vector3.new(0,2,-7.1),C(42,56,65),Enum.Material.Fabric)
+ for _,x in ipairs({-8,8}) do prop("SofaArm",Vector3.new(1,2.5,5),Vector3.new(x,1.5,-5),C(48,62,70),Enum.Material.Fabric) end
+ for _,x in ipairs({-4.5,0,4.5}) do prop("Cushion",Vector3.new(4.2,0.5,3.6),Vector3.new(x,1.75,-4.7),C(57,72,80),Enum.Material.Fabric) end
+ prop("CoffeeTable",Vector3.new(10,1.2,4),Vector3.new(0,0.6,4),C(65,50,42),Enum.Material.Wood)
+ local tv=prop("Television",Vector3.new(23,9,0.6),Vector3.new(0,7.2,19.2),C(12,14,18))
+ local display=Instance.new("SurfaceGui"); display.Name="TVStatic"; display.Face=Enum.NormalId.Front; display.CanvasSize=Vector2.new(920,360); display.Parent=tv
+ for row=0,7 do
+  for column=0,19 do
+   local value=((row*19+column*31)%90)+35
+   local pixel=Instance.new("Frame"); pixel.Size=UDim2.fromScale(0.05,0.125); pixel.Position=UDim2.fromScale(column/20,row/8)
+   pixel.BackgroundColor3=C(value,value,value); pixel.BorderSizePixel=0; pixel.Parent=display
+  end
+ end
+ for _,x in ipairs({-13,13}) do
+  local fixture=prop("Lamp",Vector3.new(5,0.3,3),Vector3.new(x,12,1),C(190,180,160))
+  light(fixture,C(235,220,195),35,1)
+ end
+ light(tv,C(150,175,200),25,0.5)
+ secretActor(room,"eurtyoeyrntiu","Артем",CFrame.lookAt(origin+Vector3.new(-4,0.1,-1),origin+Vector3.new(0,0.1,8)))
+ secretActor(room,"ZamestitelDiomchica","Демид",CFrame.lookAt(origin+Vector3.new(4,0.1,-1),origin+Vector3.new(0,0.1,8)))
+ applyPreset("Base",0.1)
+ focusStreaming(origin+Vector3.new(0,5,4))
+ cameraPlan(origin+Vector3.new(22,9,-16),origin+Vector3.new(22,9,-16),origin+Vector3.new(0,5,5),0,78,78)
+ prepareView(origin+Vector3.new(0,5,4))
+ CutsceneRE:FireAllClients("reveal")
+ for _,line in ipairs(SECRET_DIALOGUE) do
+  local duration=math.max(4,(utf8.len(line.text) or #line.text)*0.055+2.5)
+  -- Literal dialogue bypasses the normal punctuation cleanup, preserving the supplied text exactly.
+  CutsceneRE:FireAllClients("dialogue",{name=line.name,text=line.text,duration=duration})
+  task.wait(duration+0.4)
+ end
+ FadeRE:FireAllClients(true,"")
+ task.wait(1)
+ room:Destroy()
+end
 function startBase()
  sceneLock(true); introActive=true; canFight=false; levelToken+=1
  MusicRE:FireAllClients("stop")
@@ -1661,40 +1670,21 @@ function startBase()
  FadeRE:FireAllClients(true,"")
  task.wait(0.8)
  clearLevel(); newFolders()
- currentLevel,currentName,enemiesLeft,currentWave,totalWaves=6,"Завод синдиката",-1,0,0
- local factory=buildConversionFactory()
+ currentLevel,currentName,enemiesLeft,currentWave,totalWaves=6,"Возвращение на базу",-1,0,0
+ local baseInfo=buildBase(levelFolder)
+ local factory={Origin=Vector3.zero,Spawn=baseInfo.Spawn,Door=baseInfo.Door,Lamps={},Emergency={}}
+ for _,entry in ipairs(baseInfo.Lamps) do table.insert(factory.Lamps,entry[2]) end
+ for _,entry in ipairs(baseInfo.Alarms) do table.insert(factory.Emergency,entry[2]) end
  local origin=factory.Origin
  currentSpawn=factory.Spawn
  applyPreset("Base",0.1)
  placeAll(); sceneLock(true); broadcast()
- local boss,bossHum=buildRig(Types.Mafiozi,CFrame.lookAt(origin+Vector3.new(0,3,9),origin+Vector3.new(0,3,-18)))
- anchorAll(boss); boss.Name="Глава синдиката"; boss.Parent=levelFolder
  local ally=buildRig(Types.Commander,CFrame.lookAt(origin+Vector3.new(8,3,-2),origin+Vector3.new(0,3,-18)))
  anchorAll(ally); ally.Name="Связной"; ally.Parent=levelFolder
- local androidCfg=table.clone(Types.Neuro); androidCfg.Name=ANDROID_NAME
- local android=buildRig(androidCfg,CFrame.lookAt(origin+Vector3.new(0,3,33),origin+Vector3.new(0,3,-18)))
- anchorAll(android); android.Parent=levelFolder; enhanceNeuroCyber(android)
- local visor=part(android,Vector3.new(1.8,0.22,0.15),android.Head.Position+Vector3.new(0,0,-0.55),C(45,190,180),Enum.Material.SmoothPlastic)
- visor.Name="Visor"; visor.Material=Enum.Material.Neon; visor.CanCollide=false; visor.Anchored=false
- local visorWeld=Instance.new("WeldConstraint"); visorWeld.Part0=android.Head; visorWeld.Part1=visor; visorWeld.Parent=visor
- light(visor,C(50,170,165),8,0.5)
  CutsceneRE:FireAllClients("start")
- CutsceneRE:FireAllClients("pov",boss.Head)
- CutsceneRE:FireAllClients("blaster",true)
+ CutsceneRE:FireAllClients("pov",ally.Head)
  prepareView(currentSpawn.Position)
- FadeRE:FireAllClients(false)
- say("Все, дальше ты не уйдешь.",2)
- CutsceneRE:FireAllClients("pulse")
- local pulse=part(fxFolder,Vector3.new(1,1,1),origin+Vector3.new(1,4,-16),C(75,200,220),Enum.Material.Neon)
- pulse.Shape=Enum.PartType.Ball; pulse.CanCollide=false; pulse.CanQuery=false
- TweenService:Create(pulse,TweenInfo.new(0.35),{Position=boss.Head.Position,Size=Vector3.new(2,2,2)}):Play()
- task.wait(0.35); pulse:Destroy()
- local bossCF=boss:GetPivot()
- bossHum.BreakJointsOnDeath=false; bossHum.Health=0
- moveModel(boss,bossCF*CFrame.new(1,-2,1)*CFrame.Angles(math.rad(-80),0,math.rad(12)),0.8)
- for _,piece in ipairs(boss:GetDescendants()) do if piece:IsA("BasePart") then piece.CanCollide=false end end
- CutsceneRE:FireAllClients("blaster",false)
- task.wait(3.5)
+ CutsceneRE:FireAllClients("reveal")
  CutsceneRE:FireAllClients("pov",ally.Head)
  say("Пока ты был на миссии, нашу базу на Дальнем Востоке полностью разрушили. Появилась очень опасная женщина, в народе ее уже прозвали "..ANDROID_NAME..".",10)
  for _,lamp in ipairs(factory.Lamps) do lamp.Enabled=false end
@@ -1709,6 +1699,13 @@ function startBase()
  local door=factory.Door
  TweenService:Create(door,TweenInfo.new(1.5),{CFrame=door.CFrame*CFrame.new(0,11,0)}):Play()
  task.wait(1.6)
+ local androidCfg=table.clone(Types.Neuro); androidCfg.Name=ANDROID_NAME
+ local android=buildRig(androidCfg,CFrame.lookAt(origin+Vector3.new(0,3,33),origin+Vector3.new(0,3,-18)))
+ anchorAll(android); android.Parent=levelFolder; enhanceNeuroCyber(android)
+ local visor=part(android,Vector3.new(1.8,0.22,0.15),android.Head.Position+Vector3.new(0,0,-0.55),C(45,190,180),Enum.Material.SmoothPlastic)
+ visor.Name="Visor"; visor.Material=Enum.Material.Neon; visor.CanCollide=false; visor.Anchored=false
+ local visorWeld=Instance.new("WeldConstraint"); visorWeld.Part0=android.Head; visorWeld.Part1=visor; visorWeld.Parent=visor
+ light(visor,C(50,170,165),8,0.5)
  CutsceneRE:FireAllClients("pov",android.Head,44)
  moveModel(android,CFrame.lookAt(origin+Vector3.new(0,3,18),origin+Vector3.new(0,3,-18)),1.5,true)
  say("Не трогай его. Слышишь меня.",2.5)
@@ -1745,7 +1742,7 @@ function startBase()
  charge:Destroy()
  task.wait(0.75)
  CutsceneRE:FireAllClients("blood",0.25); ShakeRE:FireAllClients(8)
- local oldRespawn=Players.RespawnTime; Players.RespawnTime=180
+ local oldRespawn=Players.RespawnTime; Players.RespawnTime=600
  for _,player in ipairs(Players:GetPlayers()) do
   local character=player.Character
   local hum=character and character:FindFirstChildOfClass("Humanoid")
@@ -1795,9 +1792,9 @@ function startBase()
  task.wait(35)
  CreditsRE:FireAllClients(false); MusicRE:FireAllClients("stop")
  CutsceneRE:FireAllClients("armyClear")
- CutsceneRE:FireAllClients("end")
+ playSecretScene()
  Players.RespawnTime=oldRespawn
- startLevel(1)
+ returnToMenu()
 end
 
 ------------------------------------------------------------------ KICK (дверь)
@@ -1987,6 +1984,7 @@ local RunService=game:GetService("RunService")
 local lobbies,membership,launching={},{},{}
 local sessionRoster
 local rosterWaitStart
+local hasFinishedSession=false
 local function snapshot()
  local list={}
  for owner,lobby in pairs(lobbies) do
@@ -2092,7 +2090,7 @@ local hubFloor=part(workspace,Vector3.new(100,2,100),Vector3.new(0,-1,0),C(30,35
 hubFloor.Name="LobbyFloor"
 local function admit(player)
  local data=player:GetJoinData().TeleportData
- if game.PrivateServerId~="" and game.PrivateServerOwnerId==0 and typeof(data)=="table" and data.animeTinMatch==true and typeof(data.roster)=="table" then
+ if not hasFinishedSession and game.PrivateServerId~="" and game.PrivateServerOwnerId==0 and typeof(data)=="table" and data.animeTinMatch==true and typeof(data.roster)=="table" then
   if #data.roster<1 or #data.roster>4 or not table.find(data.roster,player.UserId) then player:Kick("Неверный состав сессии"); return end
   if not sessionRoster then sessionRoster=data.roster; rosterWaitStart=os.clock() end
  end
@@ -2117,3 +2115,32 @@ task.spawn(function()
   task.wait(0.2)
  end
 end)
+
+
+returnToMenu=function()
+ introActive=true; canFight=false; levelToken+=1
+ sceneLock(true)
+ CreditsRE:FireAllClients(false); MusicRE:FireAllClients("stop")
+ CutsceneRE:FireAllClients("armyClear")
+ clearLevel(); newFolders()
+ local floor=workspace:FindFirstChild("LobbyFloor")
+ if not floor then
+  floor=part(workspace,Vector3.new(100,2,100),Vector3.new(0,-1,0),C(30,35,43),Enum.Material.Concrete)
+  floor.Name="LobbyFloor"
+ end
+ currentSpawn=CFrame.new(0,4,0)
+ currentLevel,currentName,enemiesLeft,currentWave,totalWaves=0,GAME_TITLE,0,0,0
+ evidenceNeeded=false; evidenceCollected={}; combatCleared=false
+ for _,player in ipairs(Players:GetPlayers()) do
+  player.ReplicationFocus=nil; player:SetAttribute("SquadRole",nil)
+  local hum=player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+  if not hum or hum.Health<=0 then player:LoadCharacter() end
+ end
+ placeAll(); sceneLock(false)
+ introActive=false; sessionStarted=false; sessionSize=1
+ sessionRoster=nil; rosterWaitStart=nil; hasFinishedSession=true
+ table.clear(lobbies); table.clear(membership); table.clear(launching); table.clear(lastLobbyAction)
+ CutsceneRE:FireAllClients("end")
+ LobbyRE:FireAllClients("menu")
+ pushLobbyState()
+end
