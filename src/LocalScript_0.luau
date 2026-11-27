@@ -212,6 +212,8 @@ end
 local vm
 local cutsceneActive = false
 local shotFrom, shotTarget, shotStart, shotDuration
+local followSubject, followOffset, followAim
+local poseJoints = {}
 local hiddenHUD = {}
 local bars = {}
 for _, bottom in ipairs({false,true}) do
@@ -231,12 +233,22 @@ local function cinematicHUD(on)
   table.clear(hiddenHUD)
  end
 end
-Remotes.Cutscene.OnClientEvent:Connect(function(action, frame, duration)
+Remotes.Cutscene.OnClientEvent:Connect(function(action, frame, duration, aim)
+ if action == "follow" then
+  followSubject=frame; followOffset=duration; followAim=aim or Vector3.new(0,1,0)
+  shotTarget=nil
+  return
+ end
  if action == "shot" then
+  followSubject=nil
   shotFrom=cam.CFrame; shotTarget=frame; shotStart=os.clock(); shotDuration=duration or 2
+  if shotDuration<=0 then cam.CFrame=frame end
   return
  end
  if action == "start" then
+  if cutsceneActive then return end
+  followSubject=nil
+  cam.FieldOfView=58
 		cutsceneActive = true
   shotTarget=nil
   cinematicHUD(true)
@@ -246,6 +258,8 @@ Remotes.Cutscene.OnClientEvent:Connect(function(action, frame, duration)
 		if vm and vm.Parent then vm.Parent = nil end
 	elseif action == "end" then
 		cutsceneActive = false
+  followSubject=nil
+  cam.FieldOfView=70
   shotTarget=nil
   cinematicHUD(false)
   cam.CameraType=Enum.CameraType.Custom
@@ -474,6 +488,7 @@ end)
 Remotes.Focus.OnClientEvent:Connect(function(point, dur)
 	focusTarget = point; focusT = dur
  if cutsceneActive then
+  followSubject=nil
   shotFrom=cam.CFrame
   shotTarget=CFrame.lookAt(point+Vector3.new(9,4,12),point)
   shotStart=os.clock(); shotDuration=math.min(dur or 2,2)
@@ -488,6 +503,62 @@ end)
 
 ------------------------------------------------------------------ РЕНДЕР
 local swayX, swayY, bobA = 0, 0, 0
+-- Local fallback poses do not depend on uploaded animation permissions.
+-- The walking track is preferred; seated/kick poses work for both R6 and R15.
+RunService:BindToRenderStep("CinematicPoses",Enum.RenderPriority.Character.Value+1,function()
+ for _, player in ipairs(Players:GetPlayers()) do
+  local character=player.Character
+  if not character then continue end
+  local walking=character:GetAttribute("CinematicWalk")
+  local seated=character:GetAttribute("CinematicSeated")
+  local kickTime=character:GetAttribute("CinematicKick")
+  local kicking=kickTime and math.clamp((workspace:GetServerTimeNow()-kickTime)/0.85,0,1)
+  local hum=character:FindFirstChildOfClass("Humanoid")
+  local animator=hum and hum:FindFirstChildOfClass("Animator")
+  local hasWalkTrack=false
+  if walking and animator then
+   for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+    if track.Priority==Enum.AnimationPriority.Action and track.Length>0 then hasWalkTrack=true; break end
+   end
+  end
+  if not walking and not seated and not kickTime then continue end
+  for _, joint in ipairs(character:GetDescendants()) do
+   if not joint:IsA("Motor6D") then continue end
+   local hip=joint.Name:find("Hip")
+   local shoulder=joint.Name:find("Shoulder")
+   if not hip and not shoulder then continue end
+   if not poseJoints[joint] then poseJoints[joint]=joint.C0 end
+   local angle=0
+   local right=joint.Name:find("Right")~=nil
+   if seated then angle=hip and -math.pi/2 or -0.2
+   elseif kicking then
+    local envelope=math.sin(kicking*math.pi)
+    angle=hip and (right and -1.5*envelope or 0.15*envelope) or 0.35*envelope
+   elseif walking and not hasWalkTrack then
+    angle=math.sin(os.clock()*8)*(right and 1 or -1)*(hip and 0.55 or -0.35)
+   end
+   local base=poseJoints[joint]
+   joint.C0=base*CFrame.fromAxisAngle(base:VectorToObjectSpace(Vector3.xAxis),angle)
+  end
+ end
+ for joint,base in pairs(poseJoints) do
+  local character=joint:FindFirstAncestorOfClass("Model")
+  if not joint.Parent or not character or not (character:GetAttribute("CinematicWalk") or character:GetAttribute("CinematicSeated") or character:GetAttribute("CinematicKick")) then
+   if joint.Parent then joint.C0=base end
+   poseJoints[joint]=nil
+  end
+ end
+end)
+
+local function unobstructedCamera(focus,position,subject)
+ local filter={}
+ for _, player in ipairs(Players:GetPlayers()) do if player.Character then table.insert(filter,player.Character) end end
+ if subject then table.insert(filter,subject) end
+ local params=RaycastParams.new(); params.FilterType=Enum.RaycastFilterType.Exclude
+ params.FilterDescendantsInstances=filter; params.RespectCanCollide=true
+ local hit=workspace:Raycast(focus,position-focus,params)
+ return hit and hit.Position+hit.Normal*0.6 or position
+end
 RunService:BindToRenderStep("ViewModel", Enum.RenderPriority.Camera.Value + 1, function(dt)
 	local now = os.clock()
 	local char = plr.Character
@@ -502,8 +573,14 @@ RunService:BindToRenderStep("ViewModel", Enum.RenderPriority.Camera.Value + 1, f
 				if d:IsA("BasePart") and d.Name ~= "HumanoidRootPart" then d.LocalTransparencyModifier = 0 end
 			end
 		end
-		if shotTarget then
-   local t=math.clamp((os.clock()-shotStart)/shotDuration,0,1)
+  if followSubject and followSubject.Parent then
+   local pivot=followSubject:GetPivot()
+   local focus=pivot.Position+followAim
+   -- World-space offsets stay on the chosen side when the actor turns.
+   local position=unobstructedCamera(focus,pivot.Position+followOffset,followSubject)
+   cam.CFrame=CFrame.lookAt(position,focus)
+  elseif shotTarget then
+   local t=shotDuration<=0 and 1 or math.clamp((os.clock()-shotStart)/shotDuration,0,1)
    cam.CFrame=shotFrom:Lerp(shotTarget,t*t*(3-2*t))
   elseif char and char.PrimaryPart then
    local hr = char.PrimaryPart

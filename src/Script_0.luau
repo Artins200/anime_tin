@@ -34,6 +34,7 @@ local fxFolder = Instance.new("Folder"); fxFolder.Name = "FX"; fxFolder.Parent =
 local currentExitDoor, currentDoorCF, doorUnlocked = nil, nil, false
 local Levels
 local introActive = false
+local breachDoor, entranceUsed = nil, false
 
 ------------------------------------------------------------------ ГРАФОН
 pcall(function()
@@ -469,6 +470,17 @@ local function makeExitDoor(cf, roomH)
  return d, ind
 end
 
+local function prepareEntrance()
+ entranceUsed=false
+ local indicator
+ breachDoor, indicator = makeExitDoor(CFrame.new(0,4,12),12)
+ breachDoor.Name="BreachableEntrance"
+ indicator.Name="BreachIndicator"
+ indicator.Color=C(255,180,60)
+ DoorStateRE:FireAllClients(breachDoor.Position,true)
+ NotifyRE:FireAllClients("Вход в дом: [E] — выбить ногой. Выход с обратной стороны откроется после зачистки.",7)
+end
+
 local function unlockDoor()
 	if not currentExitDoor then return end
 	doorUnlocked = true
@@ -491,7 +503,11 @@ local function buildForest(f)
 	local wood, dark = C(120,80,50), C(80,50,35)
 	local WM = Enum.Material.Wood
 	part(f, Vector3.new(W,0.3,W), Vector3.new(0,0.15,0), C(150,105,70), Enum.Material.WoodPlanks)
-	part(f, Vector3.new(W,H,1), Vector3.new(0,H/2,-W/2), wood, WM)
+	-- Rear exit uses the same real 6 x 8 opening as the front entrance.
+ for _, sign in ipairs({-1,1}) do
+  part(f,Vector3.new(9,H,1),Vector3.new(sign*7.5,H/2,-W/2),wood,WM)
+ end
+ part(f,Vector3.new(6,4,1),Vector3.new(0,10,-W/2),wood,WM)
 	part(f, Vector3.new(1,H,W), Vector3.new(-W/2,H/2,0), wood, WM)
 	part(f, Vector3.new(1,H,W), Vector3.new(W/2,H/2,0), wood, WM)
 	local seg = (W-6)/2
@@ -521,7 +537,7 @@ local function buildForest(f)
 	end
 	for _ = 1, 140 do
 		local x, z = rng:NextNumber(-120,120), rng:NextNumber(-120,120)
-		if (math.abs(x) < 20 and math.abs(z) < 20) or (math.abs(x) < 8 and z > 0) then continue end
+		if (math.abs(x) < 20 and math.abs(z) < 20) or (math.abs(x) < 8 and z > 0) or (x > 10 and z > 20) then continue end
 		local h = rng:NextNumber(14, 24)
 		part(f, Vector3.new(2,h,2), Vector3.new(x,h/2,z), C(75,50,35), WM)
 		for i = 0, 2 do
@@ -540,7 +556,7 @@ local function buildForest(f)
 		part(f, Vector3.new(d[3],70,d[4]), Vector3.new(d[1],35,d[2]), C(95,95,90), Enum.Material.Slate)
 	end
 	info.Spawn = CFrame.lookAt(Vector3.new(0,4,70), Vector3.new(0,4,0))
-	info.ExitDoorCF = CFrame.new(0, 4, W/2)
+	info.ExitDoorCF = CFrame.new(0, 4, -W/2)
 	info.GetSpots = function(n)
 		local t = {}
 		for i = 1, n do
@@ -688,14 +704,16 @@ local function buildHelicopter(cf)
 	m.PrimaryPart = body
  body.Transparency=1
  -- Open cabin with a visible starboard doorway for boarding.
- mk(Vector3.new(7,0.4,11),C(35,43,39),Enum.Material.Metal,CFrame.new(0,-2.4,0))
+ local cabinFloor=mk(Vector3.new(7,0.4,11),C(35,43,39),Enum.Material.Metal,CFrame.new(0,-2.4,0))
+ cabinFloor.CanCollide=true
  mk(Vector3.new(7,0.4,11),C(55,65,45),Enum.Material.Metal,CFrame.new(0,2.4,0))
  mk(Vector3.new(0.3,4.5,11),C(55,65,45),Enum.Material.Metal,CFrame.new(-3.4,0,0))
  for _, z in ipairs({-4.3,4.3}) do
   mk(Vector3.new(0.3,4.5,2.4),C(55,65,45),Enum.Material.Metal,CFrame.new(3.4,0,z))
  end
  mk(Vector3.new(7,4.5,0.3),C(55,65,45),Enum.Material.Metal,CFrame.new(0,0,-5.4))
- mk(Vector3.new(2.5,0.3,4),C(35,40,45),Enum.Material.Metal,CFrame.new(4.4,-2.4,0))
+ local boardingRamp=mk(Vector3.new(2.5,0.3,4),C(35,40,45),Enum.Material.Metal,CFrame.new(4.4,-2.4,0))
+ boardingRamp.CanCollide=true
  for _, x in ipairs({-2,2}) do
   mk(Vector3.new(1.6,0.6,6),C(20,25,30),Enum.Material.Fabric,CFrame.new(x,-1.8,0))
  end
@@ -774,13 +792,41 @@ local function moveModel(model, target, duration, walk)
  if model.Parent then model:PivotTo(target) end
  for j, cf in pairs(joints) do j.C0 = cf end
 end
+-- Walk through the world using the Humanoid, never slide a pivot through geometry.
 local function tweenCharTo(char, target, dur)
- local root = char:FindFirstChild("HumanoidRootPart")
- if not root then return end
- root.Anchored = true
- moveModel(char,target,dur,true)
- root.Anchored = false
+ local root=char:FindFirstChild("HumanoidRootPart")
+ local hum=char:FindFirstChildOfClass("Humanoid")
+ if not root or not hum then return false end
+ local wasAnchored=root.Anchored
+ root.Anchored=false
+ pcall(function() root:SetNetworkOwner(nil) end)
+ local oldSpeed, oldRotate=hum.WalkSpeed,hum.AutoRotate
+ hum.AutoRotate=true
+ hum.WalkSpeed=math.clamp((target.Position-root.Position).Magnitude/math.max(dur,0.1),3,9)
+ local animator=hum:FindFirstChildOfClass("Animator") or Instance.new("Animator",hum)
+ local animation=Instance.new("Animation")
+ animation.AnimationId=hum.RigType==Enum.HumanoidRigType.R15 and "rbxassetid://507777826" or "rbxassetid://180426354"
+ local track
+ pcall(function() track=animator:LoadAnimation(animation); track.Priority=Enum.AnimationPriority.Action; track.Looped=true; track:Play(0.2); track:AdjustSpeed(hum.WalkSpeed/8) end)
+ char:SetAttribute("CinematicWalk",true)
+ hum:MoveTo(target.Position)
+ local started=os.clock()
+ while char.Parent and hum.Health>0 and os.clock()-started < dur+4 do
+  if ((root.Position-target.Position)*Vector3.new(1,0,1)).Magnitude<0.65 then break end
+  RunService.Heartbeat:Wait()
+ end
+ local reached=((root.Position-target.Position)*Vector3.new(1,0,1)).Magnitude<1.5
+ hum:MoveTo(root.Position)
+ char:SetAttribute("CinematicWalk",false)
+ if track then track:Stop(0.2); track:Destroy() end
+ animation:Destroy()
+ hum.WalkSpeed=oldSpeed; hum.AutoRotate=oldRotate
+ root.Anchored=wasAnchored
+ -- A blocked route is reported instead of teleporting through the obstruction.
+ if not reached then warn("Cinematic walking route blocked: "..char.Name) end
+ return reached
 end
+
 local function sceneLock(on)
  for _, player in ipairs(Players:GetPlayers()) do
   player:SetAttribute("InCinematic", on)
@@ -799,6 +845,9 @@ local function sceneLock(on)
 end
 local function shot(position, target, duration)
  CutsceneRE:FireAllClients("shot", CFrame.lookAt(position,target), duration or 2)
+end
+local function follow(subject, offset, aim)
+ CutsceneRE:FireAllClients("follow",subject,offset,aim or Vector3.new(0,1,0))
 end
 
 ------------------------------------------------------------------ УРОВНИ
@@ -825,6 +874,7 @@ local function clearLevel()
 	enemies = {}
 	fxFolder:ClearAllChildren()
 	currentExitDoor = nil; doorUnlocked = false
+ breachDoor=nil
 end
 
 local function placePlayer(plr, idx)
@@ -873,6 +923,7 @@ function startLevel(n)
 	if n >= 2 then txt ..= ("\n[Новое оружие: %s — клавиша %d]"):format(WD.Stats[WD.Order[n]].Display, n) end
 	NotifyRE:FireAllClients(txt, 6)
 	canFight = true
+ if n == 1 then prepareEntrance() end
 end
 
 function onCleared(n, token)
@@ -904,94 +955,122 @@ end
 
 ------------------------------------------------------------------ ИНТРО-КАТСЦЕНА (без падения)
 local function playIntro()
-	local plr = Players:GetPlayers()[1]
-	if not plr then return end
-	if not plr.Character then plr.CharacterAdded:Wait() end
-	local char = plr.Character
-	task.wait(1)
-
-	introActive = true
-
-	-- Строим уровень 1 сразу (есть земля)
-	levelToken += 1
-	local token = levelToken
-	clearLevel(); newFolders()
-	currentLevel, currentName = 1, Levels[1].Name
-	local L = Levels[1]
-	local info = L.Build(levelFolder)
-	currentSpawn = info.Spawn
-	applyPreset(L.Preset, 0.1)
-	for _, p in ipairs(Players:GetPlayers()) do p:SetAttribute("WeaponLevel", 1) end
-	placeAll()
-
-	-- Отключаем управление
-	for _, p in ipairs(Players:GetPlayers()) do
-		local c = p.Character
-		local h = c and c:FindFirstChildOfClass("Humanoid")
-		if h then h.WalkSpeed = 0; h.JumpPower = 0; h.AutoRotate = false end
-	end
-
- sceneLock(true)
- local landBodyCF = info.Spawn * CFrame.new(15,4,-3)
- local departureCF = landBodyCF * CFrame.new(0,0,65)
- local heli = buildHelicopter(departureCF); heli.Parent=workspace
- local rotors = {}
- for _, part in ipairs(heli:GetChildren()) do
-  if part:IsA("BasePart") and part.Size.Y == 0.2 then
-   rotors[part] = heli:GetPivot():ToObjectSpace(part.CFrame)
-  end
- end
- local rotorConnection = RunService.Heartbeat:Connect(function()
-  if not heli.Parent then return end
-  for part, offset in pairs(rotors) do
-   part.CFrame = heli:GetPivot() * CFrame.Angles(0,os.clock()*35,0) * offset
-  end
- end)
- CutsceneRE:FireAllClients("start")
- placeCharAt(char, departureCF * CFrame.new(9,-1,1))
- shot(departureCF.Position+Vector3.new(20,9,20),departureCF.Position,1)
- NotifyRE:FireAllClients("КОМАНДИР: Картель захватил пять объектов. Ты — спец оперативной группы. Останови их сеть.",7)
+ local player=Players:GetPlayers()[1]
+ if not player then return end
+ local char=player.Character or player.CharacterAdded:Wait()
+ char:WaitForChild("HumanoidRootPart")
  task.wait(2)
- tweenCharTo(char,departureCF*CFrame.new(4,-1,1),2)
- tweenCharTo(char,departureCF*CFrame.new(0,-1,1),1.2)
- char.HumanoidRootPart.Anchored=true
- -- Keep the seated passenger inside the moving helicopter.
- local ride = RunService.Heartbeat:Connect(function()
-  if char.Parent and heli.Parent then char:PivotTo(heli:GetPivot()*CFrame.new(0,-1,1)) end
- end)
- shot(landBodyCF.Position+Vector3.new(45,30,35),landBodyCF.Position+Vector3.new(0,12,20),3)
- moveModel(heli,landBodyCF*CFrame.new(0,45,25),4)
- NotifyRE:FireAllClients("ПИЛОТ: Зона высадки впереди. Работаем тихо. Удачи, спец.",4)
- moveModel(heli,landBodyCF,4)
- ride:Disconnect()
- shot(landBodyCF.Position+Vector3.new(18,5,15),landBodyCF.Position,1.5)
- tweenCharTo(char,landBodyCF*CFrame.new(6,-1,1),1.5)
- tweenCharTo(char,info.Spawn*CFrame.new(6,0,0),2)
+ introActive=true; canFight=false
+ levelToken+=1
+ local token=levelToken
+ FadeRE:FireAllClients(true, "ОПЕРАТИВНАЯ БАЗА // 06:40")
+ task.wait(1)
+ clearLevel(); newFolders()
+ currentLevel,currentName=1,Levels[1].Name
+ local info=Levels[1].Build(levelFolder)
+ currentSpawn=info.Spawn
+ applyPreset("Forest",0.1)
+ for _, p in ipairs(Players:GetPlayers()) do p:SetAttribute("WeaponLevel",1) end
+ -- An open-front briefing shelter: all walking paths and camera setups stay outside walls.
+ local base=Instance.new("Model"); base.Name="OperationsBase"; base.Parent=levelFolder
+ part(base,Vector3.new(42,0.2,40),Vector3.new(70,0.1,48),C(85,94,96),Enum.Material.Concrete)
+ part(base,Vector3.new(30,12,1),Vector3.new(70,6,28),C(45,55,65),Enum.Material.Metal)
+ part(base,Vector3.new(1,12,22),Vector3.new(49,6,39),C(45,55,65),Enum.Material.Metal)
+ part(base,Vector3.new(43,0.5,24),Vector3.new(70,12,39),C(40,48,57),Enum.Material.Metal)
+ local board=part(base,Vector3.new(14,7,0.2),Vector3.new(70,6,28.7),C(12,28,35),Enum.Material.Neon)
+ local surface=Instance.new("SurfaceGui"); surface.Face=Enum.NormalId.Back; surface.Parent=board
+ local text=Instance.new("TextLabel"); text.Size=UDim2.fromScale(1,1); text.BackgroundTransparency=1
+ text.Text="РАЗВЕДКА // ОБЪЕКТ 07\nКРИМИНАЛЬНАЯ БАЗА ОБНАРУЖЕНА\nЛЕСНОЙ СЕКТОР • ВЫСАДКА В 07:00"
+ text.TextColor3=C(100,255,220); text.TextScaled=true; text.Font=Enum.Font.GothamBold; text.Parent=surface
+ local commander=buildRig(Types.Commander,CFrame.lookAt(Vector3.new(70,3,34),Vector3.new(70,3,45)))
+ anchorAll(commander); commander.Parent=base
+ -- Walk to briefing, pause, then walk to the helicopter. No hidden teleport mid-shot.
+ for i,p in ipairs(Players:GetPlayers()) do
+  if p.Character then p.Character:PivotTo(CFrame.lookAt(Vector3.new(68+i*3,3.2,54),Vector3.new(70,3.2,34))) end
+ end
  sceneLock(true)
- task.spawn(function() moveModel(heli,landBodyCF*CFrame.new(70,100,-70),5); rotorConnection:Disconnect(); heli:Destroy() end)
- NotifyRE:FireAllClients("КОМАНДИР: Высадка подтверждена. Первая цель — дом впереди.",3)
+ CutsceneRE:FireAllClients("start")
+ follow(char,Vector3.new(11,7,13))
+ FadeRE:FireAllClients(false)
+ tweenCharTo(char,CFrame.new(70,3.2,43),3)
+ shot(Vector3.new(82,7,48),Vector3.new(70,4,37),0)
+ NotifyRE:FireAllClients("КОМАНДИР: Проходи, спец. Разведка обнаружила ещё одну криминальную базу картеля.",6)
+ task.wait(6)
+ shot(Vector3.new(61,6,44),Vector3.new(71,5,29),0)
+ NotifyRE:FireAllClients("КОМАНДИР: Вот снимок объекта. Это перевалочный пункт в лесу. Нужно проникнуть внутрь и зачистить его.",7)
+ task.wait(7)
+ shot(Vector3.new(82,7,46),Vector3.new(70,4,38),0)
+ NotifyRE:FireAllClients("КОМАНДИР: Спешки нет. Подготовься. Вертолёт доставит тебя к южной тропе — дальше пешком.",7)
+ task.wait(7)
+ local departure=CFrame.new(70,4,65)
+ local landing=CFrame.new(24,4,60)
+ local heli=buildHelicopter(departure); heli.Parent=workspace
+ -- Steps align with the open starboard doorway (local X positive, Z=0).
+ local function stairs(cf)
+  local m=Instance.new("Model"); m.Name="BoardingSteps"; m.Parent=levelFolder
+  for i=1,4 do
+   local p=part(m,Vector3.new(0.8,i*0.4,4),Vector3.zero,C(50,60,66),Enum.Material.Metal)
+   p.CFrame=cf*CFrame.new(7.2-i*0.8,-4+i*0.2,0)
+  end
+  return m
+ end
+ local steps=stairs(departure)
+ local rotors={}
+ for _, p in ipairs(heli:GetChildren()) do
+  if p:IsA("BasePart") and p.Size.Y==0.2 then rotors[p]=heli:GetPivot():ToObjectSpace(p.CFrame) end
+ end
+ local rotorConnection=RunService.Heartbeat:Connect(function()
+  if heli.Parent then
+   for p,offset in pairs(rotors) do p.CFrame=heli:GetPivot()*CFrame.Angles(0,os.clock()*24,0)*offset end
+  end
+ end)
+ follow(char,Vector3.new(12,7,-10))
+ tweenCharTo(char,CFrame.new(82,3.2,48),3)
+ tweenCharTo(char,CFrame.new(82,3.2,65),3)
+ shot(Vector3.new(86,8,77),Vector3.new(72,4,65),0)
+ tweenCharTo(char,CFrame.new(77,3.2,65),2)
+ tweenCharTo(char,CFrame.new(74.5,4.8,65),2)
+ local boarded=tweenCharTo(char,CFrame.new(71.5,4.8,65),2)
+ if not boarded then
+  -- Recover only behind a full fade; never show a slide through the fuselage.
+  FadeRE:FireAllClients(true,"ПОСАДКА НА БОРТ")
+  task.wait(0.8)
+  char:PivotTo(departure*CFrame.new(1.5,0.8,0))
+ end
+ sceneLock(true)
+ char:SetAttribute("CinematicSeated",true)
+ local ride=RunService.Heartbeat:Connect(function()
+  if char.Parent and heli.Parent then char:PivotTo(heli:GetPivot()*CFrame.new(1.5,0.8,0)) end
+ end)
+ steps:Destroy()
+ NotifyRE:FireAllClients("ПИЛОТ: Все на борту. Взлетаем. До точки пара минут.",5)
+ follow(heli,Vector3.new(20,10,22),Vector3.new(0,1,0))
+ FadeRE:FireAllClients(false)
+ moveModel(heli,departure*CFrame.new(0,38,0),6)
+ moveModel(heli,landing*CFrame.new(0,38,0),8)
+ shot(Vector3.new(43,12,81),landing.Position+Vector3.new(0,5,0),0)
+ moveModel(heli,landing,7)
+ steps=stairs(landing)
+ ride:Disconnect()
+ char:SetAttribute("CinematicSeated",false)
+ follow(char,Vector3.new(13,7,12))
+ tweenCharTo(char,CFrame.new(28.5,4.8,60),2)
+ tweenCharTo(char,CFrame.new(31,3.2,60),2)
+ tweenCharTo(char,CFrame.new(12,3.2,65),5)
+ tweenCharTo(char,CFrame.new(8,3.2,55),3)
+ NotifyRE:FireAllClients("ПИЛОТ: Высадка завершена. Дом прямо по тропе. Связь с командиром открыта.",5)
  task.wait(3)
+ rotorConnection:Disconnect()
+ heli:Destroy(); steps:Destroy()
  CutsceneRE:FireAllClients("end")
- sceneLock(false)
- introActive = false
- local door = makeExitDoor(info.ExitDoorCF,14)
- currentExitDoor=door; currentDoorCF=info.ExitDoorCF; doorUnlocked=false
- totalWaves=#L.Waves
+ sceneLock(false); introActive=false
+ currentExitDoor=makeExitDoor(info.ExitDoorCF,14)
+ currentDoorCF=info.ExitDoorCF; doorUnlocked=false
+ totalWaves=#Levels[1].Waves
  spawnWave(1,token,info)
-
-	-- Запуск геймплея
-	local door, ind = makeExitDoor(info.ExitDoorCF, 14)
-	currentExitDoor = door
-	currentDoorCF = info.ExitDoorCF
-	doorUnlocked = false
-	totalWaves = #L.Waves
-	spawnWave(1, token, info)
-	task.wait(0.5)
-	NotifyRE:FireAllClients(L.Intro, 6)
-	canFight = true
-
-	-- МУЗЫКА НАЧИНАЕТ ИГРАТЬ ЗДЕСЬ (не раньше)
-	MusicRE:FireAllClients("intro")
+ canFight=true
+ prepareEntrance()
+ MusicRE:FireAllClients("intro")
 end
 
 ------------------------------------------------------------------ МАФИОЗИ-КАТСЦЕНА
@@ -1246,6 +1325,33 @@ end
 
 ------------------------------------------------------------------ KICK (дверь)
 KickRE.OnServerEvent:Connect(function(plr)
+ if not introActive and currentLevel==1 and breachDoor and not entranceUsed then
+  local char=plr.Character
+  local root=char and char:FindFirstChild("HumanoidRootPart")
+  local hum=char and char:FindFirstChildOfClass("Humanoid")
+  if not root or not hum or hum.Health<=0 or (root.Position-breachDoor.Position).Magnitude>9 then return end
+  if root.CFrame.LookVector:Dot((breachDoor.Position-root.Position).Unit)<0.2 then return end
+  entranceUsed=true -- consume before yielding; simultaneous E cannot trigger twice
+  local door=breachDoor; breachDoor=nil
+  DoorStateRE:FireAllClients(nil,false)
+  local anchored=root.Anchored; root.Anchored=true
+  CutsceneRE:FireClient(plr,"start")
+  follow(char,Vector3.new(7,4,7))
+  char:SetAttribute("CinematicKick",workspace:GetServerTimeNow())
+  task.wait(0.35)
+  door.CanCollide=false; door.Anchored=false
+  door.AssemblyLinearVelocity=Vector3.new(0,5,-28)
+  door.AssemblyAngularVelocity=Vector3.new(-4,1,2)
+  Debris:AddItem(door,3)
+  ShakeRE:FireClient(plr,5)
+  task.wait(0.65)
+  char:SetAttribute("CinematicKick",nil)
+  root.Anchored=anchored
+  CutsceneRE:FireClient(plr,"end")
+  NotifyRE:FireClient(plr,"Проход открыт. Зачисти дом. Выход — на противоположной стороне.",5)
+  return -- entrance breach never advances the level
+ end
+
 	if introActive then return end
 	if not doorUnlocked or not currentExitDoor or not currentExitDoor.Parent then return end
 	local char = plr.Character

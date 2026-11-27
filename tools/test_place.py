@@ -28,3 +28,19 @@ assert 'vm = Instance.new' in client and 'local vm\n' in client
 assert 'model:PivotTo(origin:Lerp' in server
 assert 'if introActive then return end' in server
 print('PASS: valid chunk stream, 3 exact embedded scripts, cinematic regressions')
+intro = server.split('local function playIntro()', 1)[1].split('-- МАФИОЗИ', 1)[0]
+assert intro.count('spawnWave(1,token,info)') == 1
+assert intro.count('currentExitDoor=makeExitDoor') == 1
+assert 'OperationsBase' in intro and 'BoardingSteps' in intro
+assert 'prepareEntrance()' in intro
+assert 'hum:MoveTo(target.Position)' in server
+assert 'root.Anchored=wasAnchored' in server
+assert 'entranceUsed=true -- consume before yielding' in server
+assert 'return -- entrance breach never advances the level' in server
+assert 'cabinFloor.CanCollide=true' in server
+assert 'boardingRamp.CanCollide=true' in server
+assert 'action == "follow"' in client
+assert 'shotDuration<=0 and 1' in client
+assert 'unobstructedCamera' in client
+assert 'CinematicKick' in client and 'CinematicSeated' in client
+print('PASS: one intro wave/exit, separate one-use breach, physical walking, cabin collision, camera and poses')
