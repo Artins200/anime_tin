@@ -16,6 +16,8 @@ assert 'C3.Protected(function() C3.Start(party) end)' in server
 assert 'if plr:GetAttribute("Chapter")==3 then if c3Attack' in server
 for feature in ('silv3r_candy','TransformationCapsule','SuspendedFigure','TowerStair','StairwellPartition','KirillRoomDoor','InvulnerableTowerShield','HardwareBreaker','ModuleCase'):
     assert feature in world
+assert 'SingularityLandmark' in world and 'Chapter3CityBackdrop' in world
+assert 'prepareView(C3.Pos(960,103,0))' in chapter
 assert 'cfg.Gun=false' in chapter and 'e.suppression' in chapter
 assert 'C3.confirmPlayer==p' in chapter and 'helperRoot.Position-C3.zones[10].breaker.Position' in chapter
 assert 'C3.relayCounted' not in chapter and 'z.relayCounted=true' in chapter
@@ -66,7 +68,7 @@ local c2WorldWeapon=function() end
 local c2Root=function(p) return p.Parent and p.h.Health>0 and p.root or nil,p.h end
 local Random={new=function() return {NextInteger=function(_,a,b) return math.random(a,b) end} end}
 local Instance={new=function() return {Play=function() end} end}
-local Enum={Material={},PartType={Cylinder=1,Ball=2}}
+local Enum={Material={},PartType={Cylinder=1,Ball=2},ModelStreamingMode={Persistent=1}}
 local task={wait=function() end,spawn=function() end}
 local WD={Order={"Fists","Pistol"},Stats={Fists={Cooldown=0.4,Range=7,Damage=28},Pistol={Cooldown=0.26,Range=300,Damage=24}}}
 local fxFolder={}

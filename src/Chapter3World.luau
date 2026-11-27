@@ -69,14 +69,15 @@ function C3.Build()
  C3.map=Instance.new("Model"); C3.map.Name="Chapter3Singularity"; C3.map.Parent=levelFolder
  C3.zones={}; C3.redLights={}; C3.moduleParts={}
  C3.BuildHome()
+ C3.backdrop=Instance.new("Model"); C3.backdrop.Name="Chapter3CityBackdrop"; C3.backdrop.ModelStreamingMode=Enum.ModelStreamingMode.Persistent; C3.backdrop.Parent=C3.map
  for segment=0,10 do
-  C3.Part(C3.map,"CityRoad",Vector3.new(130,1,86),C3.Pos(-155+segment*128,-0.3,0),C(40,44,52),Enum.Material.Asphalt)
+  C3.Part(C3.backdrop,"CityRoad",Vector3.new(130,1,86),C3.Pos(-155+segment*128,-0.3,0),C(40,44,52),Enum.Material.Asphalt)
   for _,side in ipairs({-1,1}) do
-   C3.Part(C3.map,"RouteBoundary",Vector3.new(130,18,2),C3.Pos(-155+segment*128,9,side*65),C(58,65,77))
-   C3.Part(C3.map,"Sidewalk",Vector3.new(130,0.5,9),C3.Pos(-155+segment*128,0.4,side*37),C(104,108,118))
+   C3.Part(C3.backdrop,"RouteBoundary",Vector3.new(130,18,2),C3.Pos(-155+segment*128,9,side*65),C(58,65,77))
+   C3.Part(C3.backdrop,"Sidewalk",Vector3.new(130,0.5,9),C3.Pos(-155+segment*128,0.4,side*37),C(104,108,118))
    local height=28+(segment*7)%40
-   C3.Part(C3.map,"CityBlock",Vector3.new(90,height,30),C3.Pos(-160+segment*128,height/2,side*72),C(70+segment*3,78,96))
-   for floor=1,math.floor(height/8) do for k=-3,3 do C3.Part(C3.map,"CityWindow",Vector3.new(5,3,0.2),C3.Pos(-160+segment*128+k*11,floor*7,side*56.8),C(163,164,146),Enum.Material.Glass) end end
+   C3.Part(C3.backdrop,"CityBlock",Vector3.new(90,height,30),C3.Pos(-160+segment*128,height/2,side*72),C(70+segment*3,78,96))
+   for floor=1,math.floor(height/8) do for k=-3,3 do C3.Part(C3.backdrop,"CityWindow",Vector3.new(5,3,0.2),C3.Pos(-160+segment*128+k*11,floor*7,side*56.8),C(163,164,146),Enum.Material.Glass) end end
   end
  end
  for i=1,4 do
@@ -92,17 +93,20 @@ function C3.Build()
    for _,side in ipairs({-1,1}) do C3.Part(C3.map,"BridgePillar",Vector3.new(7,16,7),C3.Pos(x,8,side*30),C(72,78,90)) end
   end
  end
+ -- Persistent landmark stays visible from the home window and binoculars;
+ -- actual combat floors remain separately streamable around the players.
+ C3.landmark=Instance.new("Model"); C3.landmark.Name="SingularityLandmark"; C3.landmark.ModelStreamingMode=Enum.ModelStreamingMode.Persistent; C3.landmark.Parent=C3.map
  -- Tower silhouette, actual interior and an invulnerable visual field.
- C3.Part(C3.map,"TowerFoundation",Vector3.new(110,2,110),C3.Pos(960,-0.8,0),C(47,54,68),Enum.Material.Metal)
+ C3.Part(C3.landmark,"TowerFoundation",Vector3.new(110,2,110),C3.Pos(960,-0.8,0),C(47,54,68),Enum.Material.Metal)
  for _,side in ipairs({-1,1}) do
-  C3.Part(C3.map,"TowerSideWall",Vector3.new(2,side==-1 and 96 or 112,104),C3.Pos(960+side*52,side==-1 and 64 or 56,0),C(40,50,68),Enum.Material.Metal)
-  local stripe=C3.Part(C3.map,"SignalSpine",Vector3.new(2.3,108,1.5),C3.Pos(960+side*53,55,0),C(190,40,59),Enum.Material.Neon); table.insert(C3.redLights,stripe)
+  C3.Part(C3.landmark,"TowerSideWall",Vector3.new(2,side==-1 and 96 or 112,104),C3.Pos(960+side*52,side==-1 and 64 or 56,0),C(40,50,68),Enum.Material.Metal)
+  local stripe=C3.Part(C3.landmark,"SignalSpine",Vector3.new(2.3,108,1.5),C3.Pos(960+side*53,55,0),C(190,40,59),Enum.Material.Neon); table.insert(C3.redLights,stripe)
  end
  -- Entry opening in west wall at ground level.
- for _,side in ipairs({-1,1}) do C3.Part(C3.map,"TowerEntrancePier",Vector3.new(3,16,40),C3.Pos(908,8,side*32),C(44,55,70)) end
- C3.Part(C3.map,"TowerRoof",Vector3.new(106,1,106),C3.Pos(960,113,0),C(35,46,62))
- C3.beacon=C3.Part(C3.map,"TowerBeacon",Vector3.new(8,35,8),C3.Pos(960,130,0),C(230,45,65),Enum.Material.Neon); table.insert(C3.redLights,C3.beacon); light(C3.beacon,C(235,55,65),100,1)
- C3.shield=C3.Part(C3.map,"InvulnerableTowerShield",Vector3.new(150,150,150),C3.Pos(960,65,0),C(125,45,95),Enum.Material.ForceField)
+ for _,side in ipairs({-1,1}) do C3.Part(C3.landmark,"TowerEntrancePier",Vector3.new(3,16,40),C3.Pos(908,8,side*32),C(44,55,70)) end
+ C3.Part(C3.landmark,"TowerRoof",Vector3.new(106,1,106),C3.Pos(960,113,0),C(35,46,62))
+ C3.beacon=C3.Part(C3.landmark,"TowerBeacon",Vector3.new(8,35,8),C3.Pos(960,130,0),C(230,45,65),Enum.Material.Neon); table.insert(C3.redLights,C3.beacon); light(C3.beacon,C(235,55,65),100,1)
+ C3.shield=C3.Part(C3.landmark,"InvulnerableTowerShield",Vector3.new(150,150,150),C3.Pos(960,65,0),C(125,45,95),Enum.Material.ForceField)
  C3.shield.Shape=Enum.PartType.Ball; C3.shield.CanCollide=false; C3.shield.CanTouch=false; C3.shield.CanQuery=false; C3.shield.Transparency=0.84
  for i=1,10 do
   local floor=i>=6 and (i-6)*24 or 0
@@ -159,7 +163,7 @@ function C3.Build()
  C3.previewGuards={}
  for k=1,4 do
   local cfg=table.clone(Types.Pistol); cfg.Male=false
-  local rig=buildRig(cfg,CFrame.lookAt(C3.Pos(920+k*16,100,28),C3.Pos(800,100,0))); rig.Parent=C3.map; c2Dress(rig,false); anchorAll(rig); table.insert(C3.previewGuards,rig)
+  local rig=buildRig(cfg,CFrame.lookAt(C3.Pos(920+k*16,100,28),C3.Pos(800,100,0))); rig.Parent=C3.landmark; c2Dress(rig,false); anchorAll(rig); table.insert(C3.previewGuards,rig)
  end
  C3.case=C3.Part(C3.map,"ModuleCase",Vector3.new(5,0.6,3),C3.Pos(973,97,8),C(27,37,51),Enum.Material.Metal)
  for i=1,2 do
