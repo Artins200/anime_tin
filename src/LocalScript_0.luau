@@ -73,7 +73,7 @@ local sub = new("TextLabel", {Size=UDim2.new(0.6,0,0,70), Position=UDim2.new(0.5
 
 local doorPrompt = new("TextLabel", {Size=UDim2.fromOffset(340,44), Position=UDim2.new(0.5,0,0.72,0), AnchorPoint=Vector2.new(0.5,0),
 	BackgroundColor3=Color3.fromRGB(15,20,15), BackgroundTransparency=0.2, TextColor3=Color3.fromRGB(100,255,150),
-	Font=Enum.Font.GothamBold, TextSize=18, Text="[E] — ВЫБИТЬ ДВЕРЬ", Visible=false, BorderSizePixel=0}, gui)
+	Font=Enum.Font.GothamBold, TextSize=18, Text="[E] , ВЫБИТЬ ДВЕРЬ", Visible=false, BorderSizePixel=0}, gui)
 new("UIStroke", {Color=Color3.fromRGB(100,255,150), Thickness=2}, doorPrompt)
 
 local chargeBg = new("Frame", {Size=UDim2.fromOffset(200,10), Position=UDim2.new(0.5,0,0.62,0), AnchorPoint=Vector2.new(0.5,0),
@@ -95,7 +95,9 @@ local fade = new("Frame", {Size=UDim2.fromScale(1,1), BackgroundColor3=Color3.ne
 local fadeText = new("TextLabel", {Size=UDim2.fromScale(1,1), BackgroundTransparency=1, Text="", TextColor3=NEON, Font=Enum.Font.GothamBlack,
 	TextSize=42, TextWrapped=true, ZIndex=51}, fade)
 local fadeTween, fadeGeneration = nil, 0
+local endingBlack=false
 local function showFade(on, text, t)
+ if endingBlack and not on then return end
  fadeGeneration+=1
  local generation=fadeGeneration
  if fadeTween then fadeTween:Cancel() end
@@ -106,12 +108,18 @@ local function showFade(on, text, t)
  if on then
   -- A lost reveal event or server exception must not leave an opaque overlay forever.
   task.delay(20,function()
-   if fadeGeneration~=generation then return end
+   if fadeGeneration~=generation or endingBlack then return end
    warn("Cinematic fade watchdog: removing stale black overlay")
    fadeTween:Cancel()
    fade.BackgroundTransparency=1; fadeText.Text=""
   end)
  end
+end
+
+local function forceFinalBlack()
+ endingBlack=true; fadeGeneration+=1
+ if fadeTween then fadeTween:Cancel() end
+ fade.Visible=true; fade.BackgroundTransparency=0; fadeText.Text=""
 end
 
 ------------------------------------------------------------------ МУЗЫКА (из Workspace по имени)
@@ -141,6 +149,7 @@ end
 local creditsGui, creditsText
 local function showCredits(on)
 	if on then
+  forceFinalBlack()
 		if creditsGui then creditsGui:Destroy() end
 		creditsGui = Instance.new("ScreenGui")
 		creditsGui.Name = "Credits"
@@ -150,7 +159,7 @@ local function showCredits(on)
 		local bg = Instance.new("Frame")
 		bg.Size = UDim2.fromScale(1, 1)
 		bg.BackgroundColor3 = Color3.new(0, 0, 0)
-		bg.BackgroundTransparency = 0.65
+		bg.BackgroundTransparency = 0
 		bg.BorderSizePixel = 0
 		bg.Parent = creditsGui
 		creditsText = Instance.new("TextLabel")
@@ -197,17 +206,18 @@ local function showCredits(on)
 
     В ролях
 
-    Агент — Ты
-    Командир — Голос
-    Нейро-тянка — Она
-    Тянки — Они
-    Армия картеля — 2 048 бойцов
+    Агент , Ты
+    Командир , Голос
+    Нейро-тянка , Она
+    Тянки , Они
+    Следующая глава
+    Завод синдиката
 
     ────────────
 
     Спасибо за игру!
 
-    АГЕНТ ПОГИБ. НЕЙРО-СЕТЬ АКТИВИРОВАНА.
+    КОПИРОВАНИЕ ЗАВЕРШЕНО. СВЯЗЬ ПОТЕРЯНА.
 
     ПРОДОЛЖЕНИЕ СЛЕДУЕТ
 
@@ -271,6 +281,8 @@ local function cinematicHUD(on)
  end
 end
 local firstPersonRide
+local firstPersonForward=false
+local firstPersonSnap=true
 local firstPersonTarget
 local armyFolder,armyGeneration=nil,0
 local function clearArmy()
@@ -320,7 +332,77 @@ local function bloodOverlay(strength)
   Debris:AddItem(drop,3.6)
  end
 end
+local sceneBlaster,blasterParts,scanPanel=nil,{},nil
+local scanGeneration,pulseTime=0,-100
+local scanRunning=false
+local function removeSceneProps()
+ if sceneBlaster then sceneBlaster:Destroy(); sceneBlaster=nil; table.clear(blasterParts) end
+ scanGeneration+=1; scanRunning=false
+ if scanPanel then scanPanel:Destroy(); scanPanel=nil end
+end
+local function showSceneBlaster(on)
+ if sceneBlaster then sceneBlaster:Destroy(); sceneBlaster=nil; table.clear(blasterParts) end
+ if not on then return end
+ sceneBlaster=Instance.new("Model"); sceneBlaster.Name="ImpulseBlaster"; sceneBlaster.Parent=cam
+ for _,spec in ipairs({
+  {Vector3.new(0.55,0.55,1.4),CFrame.new(0.8,-0.7,-1.6),Color3.fromRGB(45,55,68)},
+  {Vector3.new(0.35,0.35,0.8),CFrame.new(0.8,-0.65,-2.6),Color3.fromRGB(75,140,150)},
+  {Vector3.new(0.3,0.7,0.35),CFrame.new(0.8,-1.2,-1.4),Color3.fromRGB(28,34,42)},
+  {Vector3.new(0.45,0.45,1.1),CFrame.new(0.8,-1.1,-0.8),Color3.fromRGB(75,80,85)},
+ }) do
+  local p=Instance.new("Part"); p.Size=spec[1]; p.Color=spec[3]; p.Material=Enum.Material.SmoothPlastic
+  p.Anchored=true; p.CanCollide=false; p.CanQuery=false; p.CanTouch=false; p.CastShadow=false; p.Parent=sceneBlaster
+  table.insert(blasterParts,{part=p,offset=spec[2]})
+ end
+end
+RunService:BindToRenderStep("SceneBlaster",Enum.RenderPriority.Camera.Value+2,function()
+ if not sceneBlaster then return end
+ local recoil=math.max(0,1-(os.clock()-pulseTime)/0.5)
+ for _,entry in ipairs(blasterParts) do entry.part.CFrame=cam.CFrame*CFrame.new(0,0,recoil*0.22)*CFrame.Angles(-recoil*0.08,0,0)*entry.offset end
+end)
+local function startScan(data)
+ scanRunning=true
+ scanGeneration+=1; local generation=scanGeneration
+ if scanPanel then scanPanel:Destroy() end
+ scanPanel=new("Frame",{Size=UDim2.fromScale(0.7,0.25),Position=UDim2.fromScale(0.15,0.6),BackgroundColor3=Color3.fromRGB(8,20,24),BackgroundTransparency=0.15,BorderSizePixel=0,ZIndex=35},gui)
+ new("TextLabel",{Size=UDim2.fromScale(0.94,0.4),Position=UDim2.fromScale(0.03,0.08),BackgroundTransparency=1,Text="Копирование боевых данных и опыта",TextColor3=Color3.fromRGB(120,220,210),Font=Enum.Font.GothamBold,TextScaled=true,ZIndex=36},scanPanel)
+ local track=new("Frame",{Size=UDim2.fromScale(0.9,0.15),Position=UDim2.fromScale(0.05,0.65),BackgroundColor3=Color3.fromRGB(30,48,54),BorderSizePixel=0,ZIndex=36},scanPanel)
+ local fill=new("Frame",{Size=UDim2.fromScale(0,1),BackgroundColor3=Color3.fromRGB(75,180,170),BorderSizePixel=0,ZIndex=37},track)
+ local line=new("Frame",{Size=UDim2.fromScale(1,0.012),Position=UDim2.fromScale(0,0),BackgroundColor3=Color3.fromRGB(110,220,200),BorderSizePixel=0,ZIndex=38},scanPanel)
+ TweenService:Create(line,TweenInfo.new(1,Enum.EasingStyle.Linear,Enum.EasingDirection.InOut,math.ceil(data.seconds),true),{Position=UDim2.fromScale(0,0.97)}):Play()
+ task.spawn(function()
+  local tween=TweenService:Create(fill,TweenInfo.new(data.seconds,Enum.EasingStyle.Linear),{Size=UDim2.fromScale(1,1)})
+  tween:Play(); local state=tween.Completed:Wait()
+  if generation~=scanGeneration or state~=Enum.PlaybackState.Completed then return end
+  scanPanel:Destroy(); scanPanel=nil; scanRunning=false
+  Remotes.SceneReady:FireServer("scanDone",data.id)
+ end)
+end
 Remotes.Cutscene.OnClientEvent:Connect(function(action, frame, duration, aim)
+ if action=="blaster" then showSceneBlaster(frame); return end
+ if action=="pulse" then
+  pulseTime=os.clock()
+  local template=findSoundTemplate(SOUND_NAMES.pickup_other)
+  if template then local sound=template:Clone(); sound.Looped=false; sound.Volume=0.45; sound.Parent=SoundService; sound:Play(); Debris:AddItem(sound,4) end
+  return
+ end
+ if action=="scan" then startScan(frame); return end
+ if action=="blackout" then
+  task.spawn(function()
+   -- A slow client finishes its own scan before honoring even a late blackout packet.
+   while scanRunning and cutsceneActive do RunService.RenderStepped:Wait() end
+   if not cutsceneActive then return end
+   removeSceneProps(); forceFinalBlack()
+   local sound=Instance.new("Sound"); sound.SoundId="rbxasset://sounds/electronicpingshort.wav"; sound.PlaybackSpeed=0.5; sound.Volume=0.55; sound.Parent=SoundService; sound:Play(); Debris:AddItem(sound,3)
+   RunService.RenderStepped:Wait(); RunService.RenderStepped:Wait()
+   Remotes.SceneReady:FireServer("black",frame)
+  end)
+  return
+ end
+ if action=="povForward" then
+  firstPersonForward=true; firstPersonRide=nil; firstPersonTarget=Vector3.zero
+  followSubject=nil; shotTarget=nil; firstPersonSnap=true; return
+ end
  if action=="recon" then
   local surface=frame:FindFirstChildOfClass("SurfaceGui")
   if not surface then return end
@@ -333,14 +415,16 @@ Remotes.Cutscene.OnClientEvent:Connect(function(action, frame, duration, aim)
  if action=="army" then buildArmy(frame); return end
  if action=="armyClear" then clearArmy(); return end
  if action=="blood" then bloodOverlay(frame); return end
- if action=="povRide" then firstPersonRide=frame; firstPersonTarget=Vector3.zero; followSubject=nil; shotTarget=nil; return end
+ if action=="povRide" then firstPersonForward=false; firstPersonSnap=true; firstPersonRide=frame; firstPersonTarget=Vector3.zero; followSubject=nil; shotTarget=nil; return end
  if action=="pov" then
+  firstPersonForward=false
+  firstPersonSnap=not cutsceneActive
   firstPersonRide=nil
   firstPersonTarget=frame; followSubject=nil; shotTarget=nil
   setSceneFov(58,0.4)
   return
  end
- if action=="cam" or action=="shot" or action=="follow" or action=="followRig" or action=="end" or action=="recover" then firstPersonTarget=nil; firstPersonRide=nil end
+ if action=="cam" or action=="shot" or action=="follow" or action=="followRig" or action=="end" or action=="recover" then firstPersonTarget=nil; firstPersonRide=nil; firstPersonForward=false end
  if action=="prepare" then
   task.spawn(function()
    -- Streaming is optional and bounded; acknowledgements are sent even on failure.
@@ -363,6 +447,7 @@ Remotes.Cutscene.OnClientEvent:Connect(function(action, frame, duration, aim)
   return
  end
  if action=="recover" then
+  endingBlack=false; removeSceneProps()
   showFade(false,"",0.2)
   action="end"
  end
@@ -391,6 +476,7 @@ Remotes.Cutscene.OnClientEvent:Connect(function(action, frame, duration, aim)
   plr.CameraMode = Enum.CameraMode.Classic
 		if vm and vm.Parent then vm.Parent = nil end
 	elseif action == "end" then
+  endingBlack=false; removeSceneProps()
 		cutsceneActive = false
   followSubject=nil
   if fovTween then fovTween:Cancel() end
@@ -404,25 +490,20 @@ Remotes.Cutscene.OnClientEvent:Connect(function(action, frame, duration, aim)
 	end
 end)
 Remotes.Music.OnClientEvent:Connect(function(action)
-	if action == "stop" then stopMusic()
-	else
-  playMusic(action)
-  if action == "final" or action=="finalSlow" then
-   local track=currentMusic
-   task.spawn(function()
-    local started=os.clock()
-    while currentMusic==track and cutsceneActive do
-     -- TimePosition follows actual playback; wall clock is a fallback for private/unavailable audio.
-     if (track and track.IsPlaying and track.TimePosition>=30) or os.clock()-started>=30 then
-      showCredits(true); break
-     end
-     task.wait(0.05)
-    end
-   end)
-  end
- end
+ if action=="stop" then stopMusic() else playMusic(action) end
 end)
-Remotes.Credits.OnClientEvent:Connect(function(on) showCredits(on) end)
+local creditsGeneration=0
+Remotes.Credits.OnClientEvent:Connect(function(on)
+ creditsGeneration+=1; local generation=creditsGeneration
+ if not on then showCredits(false); return end
+ task.spawn(function()
+  while scanRunning and cutsceneActive do RunService.RenderStepped:Wait() end
+  if generation~=creditsGeneration or not cutsceneActive then return end
+  forceFinalBlack()
+  RunService.RenderStepped:Wait(); RunService.RenderStepped:Wait()
+  if generation==creditsGeneration and cutsceneActive then showCredits(true) end
+ end)
+end)
 
 ------------------------------------------------------------------ VIEWMODEL
 vm = Instance.new("Model"); vm.Name = "ViewModel"
@@ -711,8 +792,17 @@ RunService:BindToRenderStep("ViewModel", Enum.RenderPriority.Camera.Value + 1, f
   if firstPersonTarget then
    local head=char and char:FindFirstChild("Head")
    local eye=head and head.Position or cam.CFrame.Position
-   local focus=firstPersonRide and firstPersonRide:GetPivot():PointToWorldSpace(Vector3.new(35,0,0)) or (typeof(firstPersonTarget)=="Instance" and firstPersonTarget.Position or firstPersonTarget)
-   cam.CFrame=CFrame.lookAt(eye,focus)
+   local focus
+   if firstPersonForward then focus=eye+(hrp and hrp.CFrame.LookVector or cam.CFrame.LookVector)*12
+   elseif firstPersonRide and firstPersonRide.Parent then focus=firstPersonRide:GetPivot():PointToWorldSpace(Vector3.new(35,0,0))
+   elseif typeof(firstPersonTarget)=="Instance" then focus=firstPersonTarget.Parent and firstPersonTarget.Position or eye+cam.CFrame.LookVector*12
+   else focus=firstPersonTarget end
+   if (focus-eye).Magnitude>0.05 then
+    local goal=CFrame.lookAt(eye,focus)
+    local rotation=firstPersonSnap and goal.Rotation or cam.CFrame.Rotation:Lerp(goal.Rotation,1-math.exp(-dt*5))
+    cam.CFrame=CFrame.new(eye)*rotation
+    firstPersonSnap=false
+   end
   elseif followSubject and followSubject.Parent then
    local pivot=followSubject:GetPivot()
    local focus=followRelative and pivot:PointToWorldSpace(followAim) or pivot.Position+followAim
@@ -859,8 +949,15 @@ if plr.Character then task.spawn(onChar, plr.Character) end
 plr.CharacterAdded:Connect(onChar)
 
 ------------------------------------------------------------------ СОБЫТИЯ
+local function conversationalSubtitle(text)
+ text=tostring(text):gsub(utf8.char(0x2014),", "):gsub(utf8.char(0x2013),", "):gsub("^%s*%-+%s*",""):gsub("\n%s*%-+%s*","\n")
+ text=text:gsub(":",", "):gsub("[!%?;]","."):gsub("%[",""):gsub("%]",""):gsub("%(",""):gsub("%)",""):gsub("/",", ")
+ text=text:gsub("%.%.+","."):gsub("  +"," ")
+ return text
+end
 local subToken = 0
 Remotes.Notify.OnClientEvent:Connect(function(text, dur)
+ text=conversationalSubtitle(text)
 	subToken += 1; local my = subToken
 	sub.Text = text; sub.Visible = true
  sub.MaxVisibleGraphemes=-1
@@ -878,7 +975,7 @@ Remotes.Notify.OnClientEvent:Connect(function(text, dur)
 end)
 Remotes.Fade.OnClientEvent:Connect(function(on, text) showFade(on, text, 0.6) end)
 Remotes.State.OnClientEvent:Connect(function(level, name, left, wave, total)
-	if level >= 1 and level <= 5 then lvlLabel.Text = ("ЛОКАЦИЯ %d / 5 — %s"):format(level, name)
+	if level >= 1 and level <= 5 then lvlLabel.Text = ("ЛОКАЦИЯ %d / 5 , %s"):format(level, name)
 	else lvlLabel.Text = name end
 	local wtxt = (wave and total and total > 0) and (" • Волна %d/%d"):format(wave, total) or ""
 	enLabel.Text = left >= 0 and ("Осталось: " .. left .. wtxt) or ""
@@ -940,7 +1037,7 @@ lobbyRemote.OnClientEvent:Connect(function(command,data)
   local row=new("TextButton",{Size=UDim2.new(1,-10,0,66),Text=lobby.name.."  ["..#lobby.members.."/4]  "..(lobby.launching and "Переход…" or "Присоединиться").."\n"..table.concat(names," • "),TextWrapped=true,TextSize=16,Font=Enum.Font.Gotham,TextColor3=Color3.fromRGB(205,220,230),BackgroundColor3=Color3.fromRGB(27,40,52),BorderSizePixel=0},list)
   row.Activated:Connect(function() lobbyRemote:FireServer("join",lobby.owner) end)
  end
- waiting.Text=mine and (mine.owner==plr.UserId and "Вы — лидер лобби" or "Ждём запуска лидером") or "Выберите лобби или создайте своё"
+ waiting.Text=mine and (mine.owner==plr.UserId and "Вы , лидер лобби" or "Ждём запуска лидером") or "Выберите лобби или создайте своё"
 end)
 
 -- Last: GUI, camera, fade and gameplay listeners must all exist before startup.

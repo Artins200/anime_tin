@@ -18,21 +18,25 @@ local CutsceneRE, MusicRE, CreditsRE = newRemote("Cutscene"), newRemote("Music")
 local LobbyRE=newRemote("Lobby")
 local sessionSize, sessionStarted, pushLobbyState=1,false,nil
 local STORIES={
- [1]={name="ОДИНОЧНЫЙ СЛЕД",brief="Ты работаешь один. Найди архив картеля и выясни, куда исчезают люди.",plan="В доме спрятан маршрут перевозок. Забери данные, затем двигайся к лаборатории.",office="Архив указывает на цех переделки. Мафиози знает, кто за ним стоит.",ending="Последний агент не вышел на связь. Запись с его камеры пережила его."},
- [2]={name="ДВОЙНОЙ СИГНАЛ",brief="Вы — связка. Первый вскрывает маршрут, второй собирает доказательства исчезновений.",plan="Держитесь вместе: один прикрывает дом, второй проверяет архив. Данные нужны обоим.",office="Два архива совпали. Партнёры нашли подпись Нейро на приказах о перевозках.",ending="Оба канала погасли. Но общая запись группы уже ушла в штаб."},
- [3]={name="ТРЕТИЙ КАНАЛ",brief="Тройка: штурм, разведка и связист. Задача — вскрыть сеть принудительной переделки.",plan="Штурмовик ведёт, разведчик читает маршрут, связист сохраняет копию. Проходите точки вместе.",office="Связист перехватил третий канал: за мафиози стоит завод, а не только картель.",ending="Три сигнала исчезли. Резервный канал успел передать координаты завода."},
- [4]={name="ПРОТОКОЛ СВИДЕТЕЛЬ",brief="Четвёрка: штурм, разведка, связист и свидетель. Вы должны раскрыть конвейер картеля.",plan="Соберите четыре части архива в одной операции. Свидетель отправляет доказательства за пределы сети.",office="Четыре части архива собраны: мафиози поставлял взрослых пленников на завод.",ending="Отряд погиб. Протокол «Свидетель» опубликовал запись: тайна завода раскрыта."},
+ [1]={name="ОДИНОЧНЫЙ СЛЕД",brief="На этот раз идешь один. Найди их архив и попробуй выяснить, куда увозят людей.",plan="В доме спрятан маршрут перевозок. Забери данные, затем двигайся к лаборатории.",office="В архиве есть адрес закрытого цеха. Мафиози наверняка знает, кому его отдали.",ending="Последний агент не вышел на связь. Запись с его камеры пережила его."},
+ [2]={name="ДВОЙНОЙ СИГНАЛ",brief="Работаете вдвоем. Один проверяет маршрут, второй ищет следы пропавших людей. Держитесь рядом.",plan="Держитесь вместе. Один прикрывает дом, второй проверяет архив. Данные нужны обоим.",office="Смотри, записи совпадают. На обоих приказах о перевозке стоит одна подпись.",ending="Оба канала погасли. Но общая запись группы уже ушла в штаб."},
+ [3]={name="ТРЕТИЙ КАНАЛ",brief="Вас трое. Один идет первым, второй ищет данные, третий держит связь. Нужно узнать, что происходит с пленниками.",plan="Штурмовик ведёт, разведчик читает маршрут, связист сохраняет копию. Проходите точки вместе.",office="Удалось перехватить их связь. Похоже, мафиози работал на завод, а не только на картель.",ending="Три сигнала исчезли. Резервный канал успел передать координаты завода."},
+ [4]={name="ПРОТОКОЛ СВИДЕТЕЛЬ",brief="Вас четверо. Прикрывайте друг друга и сохраняйте все, что найдете. Нам нужны доказательства того, что делает картель.",plan="Соберите четыре части архива в одной операции. Свидетель отправляет доказательства за пределы сети.",office="Теперь у нас весь архив. Мафиози отправлял пленников прямо на завод.",ending="Отряд погиб. Протокол «Свидетель» опубликовал запись: тайна завода раскрыта."},
 }
 local function story() return STORIES[math.clamp(sessionSize,1,4)] end
 local SceneReadyRE=newRemote("SceneReady")
 local readyClients, preparedClients = {}, {}
 local prepareId=0
+local finaleId=0
+local scanAcknowledged,blackAcknowledged={},{}
 SceneReadyRE.OnServerEvent:Connect(function(player,command,id)
  if command=="ready" then readyClients[player]=true; if pushLobbyState then pushLobbyState() end
- elseif command=="prepared" and id==prepareId then preparedClients[player]=id end
+ elseif command=="prepared" and id==prepareId then preparedClients[player]=id
+ elseif command=="scanDone" and id==finaleId then scanAcknowledged[player]=id
+ elseif command=="black" and id==finaleId then blackAcknowledged[player]=id end
 end)
 Players.PlayerRemoving:Connect(function(player)
- readyClients[player]=nil; preparedClients[player]=nil
+ readyClients[player]=nil; preparedClients[player]=nil; scanAcknowledged[player]=nil; blackAcknowledged[player]=nil
 end)
 local function prepareView(position)
  prepareId+=1
@@ -116,7 +120,7 @@ local function part(parent, size, pos, color, mat, rot)
 	p.Anchored = true; p.Size = size
 	p.CFrame = CFrame.new(pos) * (rot or CFrame.new())
 	local mm, cc2 = soft(mat, color)
-	p.Material = mm; p.Color = cc2
+	p.Material = mm; p.Color = cc2; p.Reflectance=0
 	p.TopSurface = Enum.SurfaceType.Smooth; p.BottomSurface = Enum.SurfaceType.Smooth
 	p.Parent = parent
 	return p
@@ -526,14 +530,14 @@ local function prepareEntrance()
  indicator.Name="BreachIndicator"
  indicator.Color=C(255,180,60)
  DoorStateRE:FireAllClients(breachDoor.Position,true)
- NotifyRE:FireAllClients("Вход в дом: [E] — выбить ногой. Выход с обратной стороны откроется после зачистки.",7)
+ NotifyRE:FireAllClients("Подойди к двери и нажми E, чтобы выбить ее ногой. Задний выход откроется после зачистки.",7)
 end
 
 local function unlockDoor()
  if evidenceNeeded then
   for _,player in ipairs(Players:GetPlayers()) do
    if not evidenceCollected[player.UserId] then
-    NotifyRE:FireAllClients("Зачистка завершена. Каждый участник должен забрать свою часть архива у терминала у входа.",5)
+    NotifyRE:FireAllClients("Здесь чисто. Теперь каждому нужно забрать свою часть архива у входа.",5)
     return
    end
   end
@@ -547,7 +551,7 @@ local function unlockDoor()
 		if l then l.Color = C(40, 255, 130); l.Brightness = 3; l.Range = 18 end
 	end
 	DoorStateRE:FireAllClients(currentExitDoor.Position, true)
-	NotifyRE:FireAllClients("Дверь открыта! Подойди и выбей её (E).", 5)
+	NotifyRE:FireAllClients("Замок снят. Подойди к двери и нажми E.", 5)
 end
 
 local function buildEvidenceTerminal(info,n)
@@ -564,7 +568,7 @@ local function buildEvidenceTerminal(info,n)
   local root=player.Character and player.Character:FindFirstChild("HumanoidRootPart")
   if not root or (root.Position-terminal.Position).Magnitude>12 then return end
   evidenceCollected[player.UserId]=true
-  NotifyRE:FireClient(player,(player:GetAttribute("SquadRole") or "Агент")..": часть архива сохранена. "..story().office,6)
+  NotifyRE:FireClient(player,(player:GetAttribute("SquadRole") or "Агент")..". Моя часть архива у меня. "..story().office,6)
   if combatCleared then unlockDoor() end
  end)
 end
@@ -708,7 +712,7 @@ local function buildBase(f)
 	local info = {Lamps = {}, Alarms = {}}
 	local W, D, H = 50, 50, 16
 	local metal = C(70,76,88)
-	part(f, Vector3.new(600,2,600), Vector3.new(0,-1.01,0), C(35,35,40), Enum.Material.Asphalt)
+	part(f, Vector3.new(600,2,600), Vector3.new(0,-1.2,0), C(35,35,40), Enum.Material.Asphalt)
 	part(f, Vector3.new(W,0.2,D), Vector3.new(0,0.1,0), C(60,64,74), Enum.Material.DiamondPlate)
 	part(f, Vector3.new(W,H,1), Vector3.new(0,H/2,-D/2), metal, Enum.Material.Metal)
 	part(f, Vector3.new(1,H,D), Vector3.new(-W/2,H/2,0), metal, Enum.Material.Metal)
@@ -1018,22 +1022,23 @@ end
 Levels = {
 	{Name="Лес и домик", Preset="Forest", Build=buildForest,
 		Waves={{{"Melee",1}}, {{"Melee",2}}},
-		Intro="Иди к домику. Там прячутся две тянки."},
+		Intro="Иди к дому. Внутри остались двое."},
 	{Name="Квартира", Preset="Apartment", Build=function(f) return buildRoom(f, RoomCfg[2]) end,
 	Waves={{{"Melee",2}}, {{"Pistol",1},{"Melee",1}}},
-	Intro="Квартира. Одна с пистолетом — держи дистанцию."},
+	Intro="Осторожнее в квартире. У одной из них пистолет, не подходи близко."},
 	{Name="Лаборатория", Preset="Lab", Build=buildLaboratory,
 	Waves={{{"Melee",2}}, {{"Pistol",1},{"SMG",1}}, {{"Melee",1},{"SMG",1}}},
-	Intro="Лаборатория. ПП стреляют очередями — укрывайся."},
+	Intro="В лаборатории автоматическое оружие. Держись ближе к укрытиям."},
 	{Name="Склад", Preset="Warehouse", Build=function(f) return buildRoom(f, RoomCfg[4]) end,
 	Waves={{{"Melee",2},{"Pistol",1}}, {{"Shotgun",1},{"SMG",1}}, {{"Melee",2},{"Shotgun",1}}},
-	Intro="Склад. Осторожно: дробовики бьют в упор."},
+	Intro="На складе дробовики. Не подпускай их к себе."},
 	{Name="Серверная", Preset="Server", Build=function(f) return buildRoom(f, RoomCfg[5]) end,
 	Waves={{{"SMG",2}}, {{"Melee",2},{"Shotgun",1}}, {{"Boss",1}}},
-	Intro="Серверная. Здесь главная тянка."},
+	Intro="Мы добрались до серверной. Похоже, главная здесь."},
 }
 
 local function clearLevel()
+ local recovery=workspace:FindFirstChild("RecoveryFloor"); if recovery then recovery:Destroy() end
 	if levelFolder then levelFolder:Destroy() end
 	enemies = {}
 	fxFolder:ClearAllChildren()
@@ -1087,7 +1092,7 @@ function startLevel(n)
 	task.wait(0.6)
 	FadeRE:FireAllClients(false)
 	local txt = L.Intro
-	if n >= 2 then txt ..= ("\n[Новое оружие: %s — клавиша %d]"):format(WD.Stats[WD.Order[n]].Display, n) end
+	if n >= 2 then txt ..= ("\n[Новое оружие: %s , клавиша %d]"):format(WD.Stats[WD.Order[n]].Display, n) end
 	NotifyRE:FireAllClients(txt, 6)
  introActive=false
 	canFight = true
@@ -1130,7 +1135,7 @@ end
 function onCleared(n, token)
 	if token ~= levelToken then return end
 	if currentWave < totalWaves then
-		NotifyRE:FireAllClients(("Волна %d / %d зачищена. Готовься!"):format(currentWave, totalWaves), 2.5)
+		NotifyRE:FireAllClients(("С группой %d из %d разобрались. Слышно, как подходят еще."):format(currentWave, totalWaves), 2.5)
 		task.wait(2)
 		if token ~= levelToken then return end
 		local L = Levels[n]
@@ -1148,7 +1153,7 @@ function onCleared(n, token)
 		return
 	end
  combatCleared=true
-	NotifyRE:FireAllClients("Зона зачищена. Проверяем выход и архивы отряда.", 2.5)
+	NotifyRE:FireAllClients("Здесь чисто. Проверьте выход и заберите архивы.", 2.5)
 	task.wait(1.5)
 	unlockDoor()
 end
@@ -1193,7 +1198,7 @@ local function playIntro()
  for _, wall in ipairs({{70,15,-35,180,30,2},{70,15,145,180,30,2},{-20,15,55,2,30,180},{160,15,55,2,30,180}}) do
   part(base,Vector3.new(wall[4],wall[5],wall[6]),Vector3.new(wall[1],wall[2],wall[3]),C(65,78,90),Enum.Material.Concrete)
  end
- local pad=part(base,Vector3.new(24,0.15,24),Vector3.new(70,0.15,65),C(38,48,54),Enum.Material.Metal)
+ local pad=part(base,Vector3.new(24,0.15,24),Vector3.new(70,0.285,65),C(38,48,54),Enum.Material.Metal)
  for _, x in ipairs({60,80}) do
   local lamp=part(base,Vector3.new(0.5,6,0.5),Vector3.new(x,3,76),C(70,85,95),Enum.Material.Metal)
   light(lamp,C(245,235,220),20,0.6)
@@ -1239,30 +1244,30 @@ local function playIntro()
  end
  sceneLock(true)
  CutsceneRE:FireAllClients("start")
- CutsceneRE:FireAllClients("pov",basePoint(Vector3.new(70,5,34)))
+ CutsceneRE:FireAllClients("pov",basePoint(Vector3.new(82,4.8,49)))
  prepareView(basePoint(Vector3.new(82,4,48)))
  FadeRE:FireAllClients(false)
  task.wait(1)
  local closedDoor=entrance:GetPivot()
  moveModel(entrance,closedDoor*CFrame.new(0,9.5,0),1.8)
- CutsceneRE:FireAllClients("pov",basePoint(Vector3.new(82,4,48)))
+ CutsceneRE:FireAllClients("povForward")
  currentSpawn=baseCF(CFrame.new(82,3.2,46))
  tweenCharTo(char,baseCF(CFrame.new(82,3.2,46)),3)
  tweenCharTo(char,baseCF(CFrame.new(70,3.2,43)),3)
- CutsceneRE:FireAllClients("pov",basePoint(Vector3.new(70,5,34)))
- NotifyRE:FireAllClients("КОМАНДИР: "..story().name..". "..story().brief,6)
+ CutsceneRE:FireAllClients("pov",commander:FindFirstChild("Head"))
+ NotifyRE:FireAllClients(story().brief,6)
  local shoulder=commander:FindFirstChild("Right Shoulder",true)
  if shoulder then
   local original=shoulder.C0
   TweenService:Create(shoulder,TweenInfo.new(1,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,2,true),{C0=original*CFrame.Angles(math.rad(25),0,math.rad(-15))}):Play()
  end
  task.wait(6)
- CutsceneRE:FireAllClients("pov",basePoint(Vector3.new(70,5,34)))
+ CutsceneRE:FireAllClients("pov",commander:FindFirstChild("Head"))
  CutsceneRE:FireAllClients("pov",basePoint(Vector3.new(70,6,28.7)))
- NotifyRE:FireAllClients("КОМАНДИР: На экране — реальный вид объекта. "..story().plan,7)
+ NotifyRE:FireAllClients("Вот снимки дома. "..story().plan,7)
  task.wait(7)
- CutsceneRE:FireAllClients("pov",basePoint(Vector3.new(70,5,34)))
- NotifyRE:FireAllClients("КОМАНДИР: Спешки нет. Подготовься. Вертолёт доставит тебя к южной тропе — дальше пешком.",7)
+ CutsceneRE:FireAllClients("pov",commander:FindFirstChild("Head"))
+ NotifyRE:FireAllClients("Не торопись, осмотрись. Вертолет довезет до южной тропы, дальше пойдете пешком.",7)
  task.wait(7)
  local departure=baseCF(CFrame.new(70,4,65))
  local landing=CFrame.new(24,4,60)
@@ -1286,10 +1291,10 @@ local function playIntro()
    for p,offset in pairs(rotors) do p.CFrame=heli:GetPivot()*CFrame.Angles(0,os.clock()*24,0)*offset end
   end
  end)
- CutsceneRE:FireAllClients("pov",basePoint(Vector3.new(82,4,65)))
+ CutsceneRE:FireAllClients("povForward")
  tweenCharTo(char,baseCF(CFrame.new(82,3.2,48)),3)
  tweenCharTo(char,baseCF(CFrame.new(82,3.2,65)),3)
- CutsceneRE:FireAllClients("pov",basePoint(Vector3.new(71,5,65)))
+ CutsceneRE:FireAllClients("povForward")
  tweenCharTo(char,baseCF(CFrame.new(77,3.2,65)),2)
  tweenCharTo(char,baseCF(CFrame.new(74.5,4.8,65)),2)
  local boarded=tweenCharTo(char,baseCF(CFrame.new(71.5,4.8,65)),2)
@@ -1312,7 +1317,7 @@ local function playIntro()
   end
  end)
  steps:Destroy()
- NotifyRE:FireAllClients("ПИЛОТ: Все на борту. Взлетаем. До точки пара минут.",5)
+ NotifyRE:FireAllClients("Все сели. Взлетаем, скоро будем на месте.",5)
  CutsceneRE:FireAllClients("povRide",heli)
  FadeRE:FireAllClients(false)
  moveModel(heli,departure*CFrame.new(0,38,0),6)
@@ -1330,12 +1335,12 @@ local function playIntro()
  for _,passenger in ipairs(Players:GetPlayers()) do
   if passenger.Character then passenger.Character:SetAttribute("CinematicSeated",false) end
  end
- CutsceneRE:FireAllClients("pov",Vector3.new(30,4,60))
+ CutsceneRE:FireAllClients("povForward")
  tweenCharTo(char,CFrame.new(28.5,4.8,60),2)
  tweenCharTo(char,CFrame.new(31,3.2,60),2)
  tweenCharTo(char,CFrame.new(12,3.2,65),5)
  tweenCharTo(char,CFrame.new(8,3.2,55),3)
- NotifyRE:FireAllClients("ПИЛОТ: Высадка завершена. Дом прямо по тропе. Связь с командиром открыта.",5)
+ NotifyRE:FireAllClients("Приехали. Дом дальше по тропе, командир остается на связи.",5)
  task.wait(3)
  rotorConnection:Disconnect()
  heli:Destroy(); steps:Destroy()
@@ -1370,7 +1375,7 @@ local function playMafioziScene()
   part(office,Vector3.new(11,12,1),Vector3.new(sign*9.5,6,15.5),C(60,45,35),Enum.Material.Wood)
  end
  part(office,Vector3.new(8,2,1),Vector3.new(0,11,15.5),C(60,45,35),Enum.Material.Wood)
-	part(office, Vector3.new(W+2, 1, D+2), Vector3.new(0, -0.5, 0), C(80, 60, 50), Enum.Material.WoodPlanks)
+	part(office, Vector3.new(W+2, 1, D+2), Vector3.new(0, -0.38, 0), C(80, 60, 50), Enum.Material.WoodPlanks)
 	part(office, Vector3.new(W+2, 1, D+2), Vector3.new(0, H+0.5, 0), C(40, 30, 25), Enum.Material.Wood)
 	part(office, Vector3.new(W+2, H, 1), Vector3.new(0, H/2, -D/2-0.5), C(60, 45, 35), Enum.Material.Wood)
 	part(office, Vector3.new(1, H, D+2), Vector3.new(-W/2-0.5, H/2, 0), C(60, 45, 35), Enum.Material.Wood)
@@ -1416,7 +1421,7 @@ local function playMafioziScene()
 	task.wait(1)
 
 	-- Врываемся через дверь
-	NotifyRE:FireAllClients("Вы врываетесь в дверь!", 2)
+	NotifyRE:FireAllClients("Дверь открыта, заходим.", 2)
 	backDoor.Anchored = false
 	backDoor.AssemblyLinearVelocity = Vector3.new(0, 5, 25)
 	backDoor.AssemblyAngularVelocity = Vector3.new(math.random(-6,6), math.random(-6,6), math.random(-6,6))
@@ -1430,7 +1435,7 @@ local function playMafioziScene()
 	task.wait(1.2)
 
 	-- Мафиози видит нас, поднимает руки
-	NotifyRE:FireAllClients("Мафиози: Стой! Я сдаюсь! Я всё расскажу!", 3)
+	NotifyRE:FireAllClients("Стой, не стреляй. Я сдаюсь, я все расскажу.", 3)
 	mafJ.RS.C0 = mafJ.RS.C0 * CFrame.Angles(math.rad(100), 0, math.rad(-30))
 	mafJ.LS.C0 = mafJ.LS.C0 * CFrame.Angles(math.rad(100), 0, math.rad(30))
 	task.wait(1.5)
@@ -1442,7 +1447,7 @@ local function playMafioziScene()
 	local headPos = char:FindFirstChild("Head") and char.Head.Position or char.HumanoidRootPart.Position
 	tracer(headPos, mafHrp.Position, Color3.fromRGB(255, 200, 100))
 	ShakeRE:FireAllClients(10)
-	NotifyRE:FireAllClients("*ВЫСТРЕЛ*", 0.8)
+	NotifyRE:FireAllClients("", 0.8)
 	task.wait(0.3)
 
  -- A scripted rig does not have the enemies' Died connection: animate the reaction explicitly.
@@ -1495,7 +1500,7 @@ local function playPlaneScene()
 	CutsceneRE:FireAllClients("start")
 	FadeRE:FireAllClients(false, "")
  follow(plane,Vector3.new(25,12,32),Vector3.new(0,0,0))
-	NotifyRE:FireAllClients("Вы возвращаетесь на базу...", 4)
+	NotifyRE:FireAllClients("Возвращаемся. Есть о чем поговорить.", 4)
 
 	-- Самолёт летит
 	task.spawn(function() moveModel(plane,plane:GetPivot()*CFrame.new(0,0,300),7) end)
@@ -1512,152 +1517,156 @@ local function playPlaneScene()
  -- startBase builds the destination before releasing the scene lock.
 end
 
------------------------------------------------------------------- ФИНАЛ НА БАЗЕ — смерть агента и раскрытие нейро-армии
+------------------------------------------------------------------ ФИНАЛ НА БАЗЕ , смерть агента и раскрытие нейро-армии
 local function say(text, dur) NotifyRE:FireAllClients(text, dur); task.wait(dur + 0.4) end
 
 local function buildConversionFactory()
  local f=Instance.new("Model"); f.Name="ConversionFactory"; f.Parent=levelFolder
  local origin=Vector3.new(4000,0,0)
- local function machine(size,pos,color) return part(f,size,origin+pos,color,Enum.Material.Metal) end
- machine(Vector3.new(64,1,56),Vector3.new(0,-0.5,0),C(35,40,46))
- machine(Vector3.new(64,16,1),Vector3.new(0,8,25),C(55,65,72))
- for _,x in ipairs({-31,31}) do machine(Vector3.new(1,16,56),Vector3.new(x,8,0),C(55,65,72)) end
- local fixture=machine(Vector3.new(35,0.3,4),Vector3.new(0,14,0),C(155,170,175))
- light(fixture,C(190,205,215),45,1.1)
- local beforeCfg=table.clone(Types.Commander); beforeCfg.Name="Взрослый пленник"; beforeCfg.Shirt=C(95,95,100)
- local subject=buildRig(beforeCfg,CFrame.new(origin+Vector3.new(-13,3,2))); anchorAll(subject); subject.Parent=f
- machine(Vector3.new(7,0.4,22),Vector3.new(-13,0.4,2),C(65,70,74))
- local chamber=machine(Vector3.new(8,10,0.3),Vector3.new(-13,5,-0.5),C(75,85,90)); chamber.Transparency=1; chamber.CanCollide=false
- local crane=machine(Vector3.new(0.5,6,0.5),Vector3.new(-18,8,1),C(100,115,120))
- machine(Vector3.new(6,0.4,0.4),Vector3.new(-16,5,1),C(110,120,130))
- -- Storage contains synthetic replacement modules, not exposed wounds.
- for i=1,5 do machine(Vector3.new(0.7,1.8,0.7),Vector3.new(4+i*2,1,9),C(175,170,165)) end
- local outputCfg=table.clone(Types.Melee); outputCfg.Name="Перестроенная тянка"; outputCfg.Hair=C(125,75,105)
- local output=buildRig(outputCfg,CFrame.new(origin+Vector3.new(13,3,2))); anchorAll(output); output.Parent=f
- local label=machine(Vector3.new(20,3,0.3),Vector3.new(0,10,24),C(18,22,25))
- local gui=Instance.new("SurfaceGui"); gui.Face=Enum.NormalId.Front; gui.Parent=label
- local text=Instance.new("TextLabel"); text.Size=UDim2.fromScale(1,1); text.BackgroundTransparency=1; text.TextScaled=true
- text.Text="ЛИНИЯ ПРИНУДИТЕЛЬНОЙ ПЕРЕДЕЛКИ // ВЗРОСЛЫЕ"; text.TextColor3=C(210,165,120); text.Parent=gui
- return origin,subject,chamber,crane
-end
-
-function startBase()
- sceneLock(true); introActive=true; canFight=false; levelToken+=1
- MusicRE:FireAllClients("stop") -- combat track ends on returning to base
- FadeRE:FireAllClients(true,"ВОЗВРАЩЕНИЕ НА БАЗУ")
- task.wait(1)
- clearLevel(); newFolders()
- currentLevel,currentName,enemiesLeft,currentWave,totalWaves=6,"Последний приказ",-1,0,0
- local info=buildBase(levelFolder)
- currentSpawn=info.Spawn
- applyPreset("Base",0.1)
- placeAll(); sceneLock(true); broadcast()
- local cmd=buildRig(Types.Commander,info.CommanderCF); anchorAll(cmd); cmd.Parent=levelFolder
- local neuro,nHum,nRoot,nj=buildRig(Types.Neuro,CFrame.lookAt(Vector3.new(0,3,30),Vector3.new(0,3,-16)))
- anchorAll(neuro); neuro.Parent=levelFolder; enhanceNeuroCyber(neuro)
- -- The army is a client-side cinematic crowd, not thousands of expensive Humanoids.
- part(levelFolder,Vector3.new(600,2,600),Vector3.new(0,-1,360),C(28,32,38),Enum.Material.Concrete)
- CutsceneRE:FireAllClients("start")
- CutsceneRE:FireAllClients("army",Vector3.new(0,0,190))
- CutsceneRE:FireAllClients("pov",Vector3.new(7,4.5,-4))
- prepareView(currentSpawn.Position)
- FadeRE:FireAllClients(false)
- say("КОМАНДИР: Пять объектов зачищены. Но разведка ошиблась: Нейро — не одиночка.",5)
- say("КОМАНДИР: Нейро управляет сетью одна. Остальные — обычные люди, которых переделали на заводе.",4)
- CutsceneRE:FireAllClients("pov",Vector3.new(0,5,25))
- for _,lamp in ipairs(info.Lamps) do lamp[2].Brightness=0.05 end
- MusicRE:FireAllClients("finalSlow")
- local finaleStart=os.clock()
- say("КОМАНДИР: Свет... Не двигайтесь. Слышите шаги?",4)
- task.wait(3)
- ShakeRE:FireAllClients(2)
- task.wait(2)
- -- Explicitly rotate and lower the slab. No physics-dependent upright sliding door.
- local door=info.Door
- local closed=door.CFrame
- door.CanCollide=false
- local hinge=CFrame.new(closed.Position-Vector3.new(0,5,0))
- local relative=hinge:ToObjectSpace(closed)
- local began=os.clock()
- repeat
-  local t=math.clamp((os.clock()-began)/0.65,0,1)
-  door.CFrame=hinge*CFrame.Angles(math.rad(-90)*t,0,0)*relative
-  RunService.Heartbeat:Wait()
- until os.clock()-began>=0.65
- door.CFrame=CFrame.new(0,0.65,20)*CFrame.Angles(math.rad(-90),0,0)
- ShakeRE:FireAllClients(9)
- CutsceneRE:FireAllClients("pov",neuro:FindFirstChild("Head"))
- -- Place the attacker through the now-open doorway into a clear, visible lane.
- moveModel(neuro,CFrame.lookAt(Vector3.new(0,3,7),Vector3.new(0,3,-16)),2,true)
- say("НЕЙРО: Ты уничтожил аванпосты. Но не нас.",3)
- say("НЕЙРО: Я одна. А за дверями — моя армия. Завод больше не остановить.",4)
- say("НЕЙРО: Твоя миссия закончена. Наше наступление только начинается.",4)
- -- Show the attack from the victim's eyes, without giving gameplay control back.
- local hand=neuro:FindFirstChild("Right Arm")
- local orb=part(fxFolder,Vector3.new(0.8,0.8,0.8),hand.Position,C(55,190,180),Enum.Material.Neon)
- orb.Shape=Enum.PartType.Ball; orb.CanCollide=false
- local victim=Players:GetPlayers()[1]
- local victimHead=victim and victim.Character and victim.Character:FindFirstChild("Head")
- if victimHead then
-  TweenService:Create(orb,TweenInfo.new(0.4),{Position=victimHead.Position}):Play()
+ local lamps,emergency={},{}
+ local function machine(name,size,pos,color,material)
+  local p=part(f,size,origin+pos,color,material or Enum.Material.Metal); p.Name=name; return p
  end
- task.wait(0.4); orb:Destroy()
- CutsceneRE:FireAllClients("blood",0.8); ShakeRE:FireAllClients(14)
- local oldRespawn=Players.RespawnTime
- Players.RespawnTime=120 -- retain the actual dead character during the reveal/credits
- for _,player in ipairs(Players:GetPlayers()) do
-  local character=player.Character
-  local hum=character and character:FindFirstChildOfClass("Humanoid")
-  if hum then
-   hum.BreakJointsOnDeath=false
-   player:SetAttribute("FinalDeath",true)
-   hum.Health=0
+ machine("FactoryFloor",Vector3.new(72,1,80),Vector3.new(0,-0.5,5),C(40,44,49),Enum.Material.Concrete)
+ machine("FrontWall",Vector3.new(72,18,1),Vector3.new(0,9,-35),C(53,62,70))
+ machine("Roof",Vector3.new(74,1,82),Vector3.new(0,18.5,5),C(46,54,61))
+ for _,x in ipairs({-36,36}) do machine("SideWall",Vector3.new(1,18,80),Vector3.new(x,9,5),C(53,62,70)) end
+ for _,x in ipairs({-20,20}) do machine("EntranceWall",Vector3.new(32,18,1),Vector3.new(x,9,25),C(53,62,70)) end
+ machine("EntranceHeader",Vector3.new(8,8,1),Vector3.new(0,14,25),C(53,62,70))
+ machine("CorridorEnd",Vector3.new(72,18,1),Vector3.new(0,9,45),C(45,55,65))
+ local door=machine("FactoryDoor",Vector3.new(7.8,10,0.5),Vector3.new(0,5,25),C(60,70,80))
+ for _,z in ipairs({-24,-8,8,23,37}) do
+  local fixture=machine("FactoryLamp",Vector3.new(16,0.2,2),Vector3.new(0,17,z),C(170,180,185))
+  local source=light(fixture,C(200,215,225),30,0.9); source.Shadows=false; table.insert(lamps,source)
+  machine("CeilingTruss",Vector3.new(70,0.6,0.6),Vector3.new(0,16,z+2),C(75,85,95))
+ end
+ for _,x in ipairs({-33,33}) do
+  for _,z in ipairs({-24,-9,7,22,38}) do
+   local housing=machine("EmergencyLamp",Vector3.new(0.5,0.8,1.4),Vector3.new(x,8,z),C(70,28,22))
+   local source=light(housing,C(195,75,50),19,0.7); source.Enabled=false; table.insert(emergency,source)
   end
  end
- local eye=Vector3.new(0,5.5,-16)
- cameraPlan(eye,Vector3.new(0,1.4,-17),Vector3.new(0,4.5,7),1,58,65)
- for _,player in ipairs(Players:GetPlayers()) do
-  local character=player.Character
-  if character then moveModel(character,character:GetPivot()*CFrame.new(0,-2,0)*CFrame.Angles(math.rad(-80),0,0),0.7) end
+ for _,z in ipairs({-18,18,37}) do
+  local housing=machine("EmergencyCeiling",Vector3.new(1.8,0.3,1.8),Vector3.new(0,13,z),C(75,35,28))
+  local source=light(housing,C(185,90,65),28,0.4); source.Enabled=false; table.insert(emergency,source)
  end
- task.wait(1)
- -- Montage cuts, never a flight through the room's roof or walls.
- FadeRE:FireAllClients(true,"ЗА ПРЕДЕЛАМИ БАЗЫ")
- task.wait(1)
- cameraPlan(Vector3.new(0,7,183),Vector3.new(0,6,187),Vector3.new(0,4,240),7,32,26)
- prepareView(Vector3.new(0,5,195))
- FadeRE:FireAllClients(false)
- NotifyRE:FireAllClients("ОРДА // Обычные тянки и модифицированные бойцы. Нейро управляет ими одна.",7)
- task.wait(7)
- FadeRE:FireAllClients(true,"ИСТОЧНИК ПОПОЛНЕНИЯ")
- task.wait(1)
- local origin,subject,chamber,crane=buildConversionFactory()
- cameraPlan(origin+Vector3.new(-22,6,-14),origin+Vector3.new(-20,5,-11),origin+Vector3.new(-13,4,2),6,48,40)
- prepareView(origin)
- FadeRE:FireAllClients(false)
- NotifyRE:FireAllClients("ЗАВОД // Похищенных взрослых принудительно переделывают в солдат картеля.",6)
- task.wait(4)
- TweenService:Create(chamber,TweenInfo.new(1),{Transparency=0}):Play()
- task.wait(1)
- TweenService:Create(crane,TweenInfo.new(1.5,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,1,true),{Position=crane.Position+Vector3.new(3,-2,0)}):Play()
- NotifyRE:FireAllClients("За створками механизмы заменяют тело синтетическими модулями. Конвейер не останавливается.",5)
- task.wait(4)
- subject:Destroy()
+ for _,x in ipairs({-29,29}) do
+  for _,z in ipairs({-25,-15,-5,5,16,35}) do
+   machine("ServerRack",Vector3.new(4,10,5),Vector3.new(x,5,z),C(25,32,40))
+   for y=2,8,2 do
+    machine("ServerPanel",Vector3.new(3.6,1.4,0.15),Vector3.new(x,y,z-2.6),C(50,65,75))
+    machine("ServerLED",Vector3.new(0.25,0.2,0.1),Vector3.new(x+1,y,z-2.72),C(70,130,120))
+   end
+  end
+ end
+ for _,x in ipairs({-20,20}) do
+  machine("ConveyorFrame",Vector3.new(8,1.2,48),Vector3.new(x,0.6,0),C(60,69,78))
+  machine("ConveyorBelt",Vector3.new(7.4,0.2,47),Vector3.new(x,1.4,0),C(23,28,32),Enum.Material.SmoothPlastic)
+  for z=-22,22,4 do
+   machine("ConveyorRoller",Vector3.new(7.7,0.4,0.6),Vector3.new(x,1.7,z),C(90,100,110))
+  end
+  machine("MachineGantry",Vector3.new(10,1,3),Vector3.new(x,10,3),C(100,110,120))
+  for _,offset in ipairs({-4.5,4.5}) do machine("GantryPost",Vector3.new(0.6,9,0.6),Vector3.new(x+offset,5,3),C(90,100,110)) end
+  machine("Manipulator",Vector3.new(0.8,5,0.8),Vector3.new(x,7,3),C(100,115,125))
+ end
+ for _,z in ipairs({-25,15,38}) do
+  machine("StorageCrate",Vector3.new(4,3,4),Vector3.new(-11,1.5,z),C(75,82,73))
+  machine("UtilityCabinet",Vector3.new(4,6,2),Vector3.new(12,3,z),C(65,75,85))
+ end
+ return {Origin=origin,Model=f,Lamps=lamps,Emergency=emergency,Door=door,
+  Spawn=CFrame.lookAt(origin+Vector3.new(0,3.2,-18),origin+Vector3.new(0,4.5,9))}
+end
+
+-- Rename this constant to change the new character's name in dialogue and UI.
+local ANDROID_NAME="Нейро"
+local function awaitFinalAck(states,id,timeout)
+ local deadline=os.clock()+timeout
+ repeat
+  local complete=true
+  for _,player in ipairs(Players:GetPlayers()) do
+   if readyClients[player] and states[player]~=id then complete=false end
+  end
+  if complete then return true end
+  task.wait(0.05)
+ until os.clock()>=deadline
+ return false
+end
+function startBase()
+ sceneLock(true); introActive=true; canFight=false; levelToken+=1
+ MusicRE:FireAllClients("stop")
+ CreditsRE:FireAllClients(false)
  FadeRE:FireAllClients(true,"")
- task.wait(1)
- cameraPlan(origin+Vector3.new(20,5,-10),origin+Vector3.new(16,5,-8),origin+Vector3.new(13,4,2),7,42,32)
+ task.wait(0.8)
+ clearLevel(); newFolders()
+ currentLevel,currentName,enemiesLeft,currentWave,totalWaves=6,"Завод синдиката",-1,0,0
+ local factory=buildConversionFactory()
+ local origin=factory.Origin
+ currentSpawn=factory.Spawn
+ applyPreset("Base",0.1)
+ placeAll(); sceneLock(true); broadcast()
+ local boss,bossHum=buildRig(Types.Mafiozi,CFrame.lookAt(origin+Vector3.new(0,3,9),origin+Vector3.new(0,3,-18)))
+ anchorAll(boss); boss.Name="Глава синдиката"; boss.Parent=levelFolder
+ local ally=buildRig(Types.Commander,CFrame.lookAt(origin+Vector3.new(8,3,-2),origin+Vector3.new(0,3,-18)))
+ anchorAll(ally); ally.Name="Связной"; ally.Parent=levelFolder
+ local androidCfg=table.clone(Types.Neuro); androidCfg.Name=ANDROID_NAME
+ local android=buildRig(androidCfg,CFrame.lookAt(origin+Vector3.new(0,3,33),origin+Vector3.new(0,3,-18)))
+ anchorAll(android); android.Parent=levelFolder; enhanceNeuroCyber(android)
+ local visor=part(android,Vector3.new(1.8,0.22,0.15),android.Head.Position+Vector3.new(0,0,-0.55),C(45,190,180),Enum.Material.SmoothPlastic)
+ visor.Name="Visor"; visor.Material=Enum.Material.Neon; visor.CanCollide=false; visor.Anchored=false
+ local visorWeld=Instance.new("WeldConstraint"); visorWeld.Part0=android.Head; visorWeld.Part1=visor; visorWeld.Parent=visor
+ light(visor,C(50,170,165),8,0.5)
+ CutsceneRE:FireAllClients("start")
+ CutsceneRE:FireAllClients("pov",boss.Head)
+ CutsceneRE:FireAllClients("blaster",true)
+ prepareView(currentSpawn.Position)
  FadeRE:FireAllClients(false)
- NotifyRE:FireAllClients(story().ending,7)
- task.wait(7)
- task.wait(math.max(0,30-(os.clock()-finaleStart)))
+ say("Все, дальше ты не уйдешь.",2)
+ CutsceneRE:FireAllClients("pulse")
+ local pulse=part(fxFolder,Vector3.new(1,1,1),origin+Vector3.new(1,4,-16),C(75,200,220),Enum.Material.Neon)
+ pulse.Shape=Enum.PartType.Ball; pulse.CanCollide=false; pulse.CanQuery=false
+ TweenService:Create(pulse,TweenInfo.new(0.35),{Position=boss.Head.Position,Size=Vector3.new(2,2,2)}):Play()
+ task.wait(0.35); pulse:Destroy()
+ local bossCF=boss:GetPivot()
+ bossHum.BreakJointsOnDeath=false; bossHum.Health=0
+ moveModel(boss,bossCF*CFrame.new(1,-2,1)*CFrame.Angles(math.rad(-80),0,math.rad(12)),0.8)
+ for _,piece in ipairs(boss:GetDescendants()) do if piece:IsA("BasePart") then piece.CanCollide=false end end
+ CutsceneRE:FireAllClients("blaster",false)
+ task.wait(0.5)
+ CutsceneRE:FireAllClients("pov",ally.Head)
+ say("Пока ты был на миссии, нашу базу на Дальнем Востоке полностью разрушили. Появилась очень опасная женщина, в народе ее уже прозвали "..ANDROID_NAME..".",10)
+ for _,lamp in ipairs(factory.Lamps) do lamp.Enabled=false end
+ for _,lamp in ipairs(factory.Emergency) do lamp.Enabled=true end
+ -- Final-scene-only dimming. The next location's preset restores normal lighting.
+ TweenService:Create(Lighting,TweenInfo.new(0.5),{Ambient=C(25,28,35),OutdoorAmbient=C(20,23,28),Brightness=0.5}):Play()
+ MusicRE:FireAllClients("finalSlow")
+ say("Черт, кажется, нас обнаружили.",3)
+ local allyCF=ally:GetPivot()
+ moveModel(ally,CFrame.lookAt(allyCF.Position,origin+Vector3.new(0,3,25)),0.8)
+ CutsceneRE:FireAllClients("pov",origin+Vector3.new(0,5,25))
+ local door=factory.Door
+ TweenService:Create(door,TweenInfo.new(1.5),{CFrame=door.CFrame*CFrame.new(0,11,0)}):Play()
+ task.wait(1.6)
+ CutsceneRE:FireAllClients("pov",android.Head)
+ moveModel(android,CFrame.lookAt(origin+Vector3.new(0,3,18),origin+Vector3.new(0,3,-18)),1.5,true)
+ say("Не трогай его. Слышишь меня.",2.5)
+ local bolt=part(fxFolder,Vector3.new(0.7,0.7,0.7),android.Head.Position,C(65,190,195),Enum.Material.Neon)
+ bolt.Shape=Enum.PartType.Ball; bolt.CanCollide=false; bolt.CanQuery=false
+ TweenService:Create(bolt,TweenInfo.new(0.3),{Position=ally.Head.Position}):Play()
+ task.wait(0.3); bolt:Destroy(); ShakeRE:FireAllClients(4)
+ moveModel(ally,ally:GetPivot()*CFrame.new(0,-2,0)*CFrame.Angles(math.rad(80),0,0),0.7)
+ moveModel(android,CFrame.lookAt(origin+Vector3.new(0,3,-12),origin+Vector3.new(0,3,-18)),3,true)
+ finaleId+=1
+ local id=finaleId
+ CutsceneRE:FireAllClients("scan",{id=id,seconds=7})
+ if not awaitFinalAck(scanAcknowledged,id,12) then warn("Scan acknowledgement timed out") end
+ -- No movement, camera or scan animation is scheduled after this blackout.
+ CutsceneRE:FireAllClients("blackout",id)
+ if not awaitFinalAck(blackAcknowledged,id,8) then warn("Blackout acknowledgement timed out") end
+ -- Credits are server-commanded here only, never from the music playback clock.
+ CreditsRE:FireAllClients(true)
  task.wait(35)
- FadeRE:FireAllClients(true,"ПРОДОЛЖЕНИЕ СЛЕДУЕТ")
- task.wait(1)
  CreditsRE:FireAllClients(false); MusicRE:FireAllClients("stop")
- CutsceneRE:FireAllClients("armyClear")
  CutsceneRE:FireAllClients("end")
- Players.RespawnTime=oldRespawn
- for _,player in ipairs(Players:GetPlayers()) do player:SetAttribute("FinalDeath",nil) end
  startLevel(1)
 end
 
@@ -1686,7 +1695,7 @@ KickRE.OnServerEvent:Connect(function(plr)
   char:SetAttribute("CinematicKick",nil)
   root.Anchored=anchored
   CutsceneRE:FireClient(plr,"end")
-  NotifyRE:FireClient(plr,"Проход открыт. Зачисти дом. Выход — на противоположной стороне.",5)
+  NotifyRE:FireClient(plr,"Заходи, теперь проход свободен. Задний выход с другой стороны дома.",5)
   return -- entrance breach never advances the level
  end
 
@@ -1877,6 +1886,10 @@ end
 local function beginLocalMatch(party)
  if sessionStarted then return end
  sessionStarted=true; sessionSize=#party
+ -- Remove the hub floor before building a mission floor at the same elevation.
+ introActive=true; sceneLock(true)
+ FadeRE:FireAllClients(true,"")
+ local oldFloor=workspace:FindFirstChild("LobbyFloor"); if oldFloor then oldFloor:Destroy() end
  sessionRoster={}
  for _,member in ipairs(party) do table.insert(sessionRoster,member.UserId) end
  for index,player in ipairs(party) do

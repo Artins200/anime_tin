@@ -23,7 +23,7 @@ server = Path('src/Script_0.luau').read_text()
 client = Path('src/LocalScript_0.luau').read_text()
 assert 'knockPlayer(char, 0, 30)' not in server
 assert 'pickup_other  = "Realistic Gun shot"' in client
-assert 'track.TimePosition>=30' in client
+assert 'track.TimePosition>=30' not in client
 assert 'vm = Instance.new' in client and 'local vm\n' in client
 assert 'model:PivotTo(origin:Lerp' in server
 assert 'if introActive then return end' in server
@@ -95,21 +95,45 @@ assert 'moveModel(entrance,closedDoor*CFrame.new(0,9.5,0),1.8)' in intro
 print('PASS: client-ready startup, bounded streaming, fade watchdog/cancellation, recovery and camera plans')
 
 finale=server.split('function startBase()',1)[1].split('-- KICK',1)[0]
-assert 'buildCitadel(levelFolder' not in finale
-assert 'CutsceneRE:FireAllClients("pov",neuro:FindFirstChild("Head"))' in finale
-assert 'hum.Health=0' in finale and 'Players.RespawnTime=120' in finale
-assert 'door.CFrame=hinge*CFrame.Angles(math.rad(-90)*t,0,0)*relative' in finale
-assert 'CanCollide=false' in finale
-assert 'buildConversionFactory()' in finale and 'Vector3.new(0,6,187)' in finale
-assert 'for row=0,31 do' in client and 'for column=0,63 do' in client
-assert 'unit.Name="CartelSoldier"' in client
-assert 'generation~=armyGeneration' in client
-assert 'firstPersonTarget' in client and 'bloodOverlay' in client
+assert 'buildConversionFactory()' in finale
+assert 'CutsceneRE:FireAllClients("pov",boss.Head)' in finale
+assert 'CutsceneRE:FireAllClients("pov",ally.Head)' in finale
+assert 'CutsceneRE:FireAllClients("pov",android.Head)' in finale
+assert 'bossHum.Health=0' in finale
+assert 'moveModel(ally,CFrame.lookAt(allyCF.Position' in finale
+assert 'visorWeld.Part0=android.Head' in finale
+assert 'CutsceneRE:FireAllClients("blaster",true)' in finale
+assert 'Копирование боевых данных и опыта' in client
+assert 'Remotes.SceneReady:FireServer("scanDone",data.id)' in client
+assert 'Remotes.SceneReady:FireServer("black",frame)' in client
+assert finale.index('"scan",{') < finale.index('awaitFinalAck(scanAcknowledged')
+assert finale.index('awaitFinalAck(scanAcknowledged') < finale.index('"blackout",id')
+assert finale.index('"blackout",id') < finale.index('awaitFinalAck(blackAcknowledged') < finale.index('CreditsRE:FireAllClients(true)')
+assert server.count('CreditsRE:FireAllClients(true)') == 1
+music_handler=client.split('Remotes.Music.OnClientEvent:Connect',1)[1].split('Remotes.Credits.OnClientEvent',1)[0]
+assert 'showCredits' not in music_handler and 'task.spawn' not in music_handler
+assert 'bg.BackgroundTransparency = 0' in client
+assert 'fadeGeneration~=generation or endingBlack' in client
+assert 'forceFinalBlack()' in client
+assert 'SceneBlaster' in client and 'ImpulseBlaster' in client
+assert 'firstPersonForward' in client
+assert 'cam.CFrame.Rotation:Lerp(goal.Rotation,1-math.exp(-dt*5))' in client
+assert 'if oldFloor then oldFloor:Destroy() end' in server
+assert 'p.Reflectance=0' in server
+assert 'Vector3.new(0, -0.38, 0)' in server
+assert 'Vector3.new(70,0.285,65)' in server
+assert 'Enum.HumanoidStateType.Freefall,not on' in server
+factory=server.split('local function buildConversionFactory()',1)[1].split('-- Rename this constant',1)[0]
+for fixture in ['FactoryFloor','FrontWall','SideWall','Roof','EntranceWall','CorridorEnd','ServerRack','ConveyorBelt','FactoryLamp','EmergencyLamp','StorageCrate']:
+ assert fixture in factory
+assert 'Vector3.new(72,1,80)' in factory
+assert 'Vector3.new(0,3.2,-18)' in factory
+assert 'ANDROID_NAME="Нейро"' in server
+assert 'нашу базу на Дальнем Востоке полностью разрушили' in finale
+assert 'hum.Health=0' not in finale  # data copying replaces the old fatal ending
 assert 'mafHum.BreakJointsOnDeath=false; mafHum.Health=0' in mafia
 assert 'moveModel(maf,hitCF*CFrame.new' in mafia
-assert 'Enum.HumanoidStateType.Freefall,not on' in server
-assert 'local duration=math.max(distance/12,0.12)' in server
-print('PASS: grounded 12-stud walking, explicit hit/death reaction, POV fatal finale, falling door, 2048-copy crowd')
+print('PASS: active-NPC POV, pulse/deactivation, ally turn, visor, scan/black acknowledgements, credits only at end')
 
 assert 'local LobbyRE=newRemote("Lobby")' in server
 assert 'options.ShouldReserveServer=true' in server
@@ -121,13 +145,12 @@ assert 'buildEvidenceTerminal(info,n)' in server
 assert 'evidenceCollected[player.UserId]=true' in server
 assert 'local STORIES={' in server and '[4]={name="ПРОТОКОЛ СВИДЕТЕЛЬ"' in server
 assert 'MusicRE:FireAllClients("finalSlow")' in finale
-assert finale.index('MusicRE:FireAllClients("stop")') < finale.index('local info=buildBase')
-assert finale.index('task.wait(3)') < finale.index('local door=info.Door')
+assert finale.index('MusicRE:FireAllClients("stop")') < finale.index('local factory=buildConversionFactory')
 assert 'TweenInfo.new(8,Enum.EasingStyle.Sine),{Volume=0.5}' in client
 assert 'CutsceneRE:FireAllClients("recon",board,recon)' in intro
 assert 'local view=new("ViewportFrame"' in client
 assert 'cameraPlan(basePoint' not in intro
-assert 'CinematicNeuroArmy' in client  # folder holds the crowd, not duplicate Neuro rigs
 assert 'MissionMenu' in client and 'lobbyRemote:FireServer("join",lobby.owner)' in client
-assert 'ЛИНИЯ ПРИНУДИТЕЛЬНОЙ ПЕРЕДЕЛКИ // ВЗРОСЛЫЕ' in server
-print('PASS: explicit lobby launch, private match isolation, 1–4 story variants, coop evidence/HP, recon and factory montage')
+assert 'conversationalSubtitle(text)' in client
+assert chr(0x2014) not in server and chr(0x2014) not in client
+print('PASS: coop/menu retained, original combat lighting retained, enclosed factory, separated floor elevations and subtitle policy')
