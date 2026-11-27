@@ -199,13 +199,13 @@ local function showCredits(on)
     Командир — Голос
     Нейро-тянка — Она
     Тянки — Они
-    Цитадель — Они все
+    Нейро-армия — 2 048 копий
 
     ────────────
 
     Спасибо за игру!
 
-    АГЕНТ ЖИВ. ПРОТОКОЛ ЦИТАДЕЛИ АКТИВЕН.
+    АГЕНТ ПОГИБ. НЕЙРО-СЕТЬ АКТИВИРОВАНА.
 
     ПРОДОЛЖЕНИЕ СЛЕДУЕТ
 
@@ -268,7 +268,65 @@ local function cinematicHUD(on)
   table.clear(hiddenHUD)
  end
 end
+local firstPersonTarget
+local armyFolder,armyGeneration=nil,0
+local function clearArmy()
+ armyGeneration+=1
+ if armyFolder then armyFolder:Destroy(); armyFolder=nil end
+end
+local function buildArmy(origin)
+ clearArmy()
+ local generation=armyGeneration
+ local folder=Instance.new("Folder"); folder.Name="CinematicNeuroArmy"; folder.Parent=workspace
+ armyFolder=folder
+ local function piece(parent,size,position,color)
+  local p=Instance.new("Part"); p.Size=size; p.Position=position; p.Color=color
+  p.Material=Enum.Material.SmoothPlastic; p.Anchored=true
+  p.CanCollide=false; p.CanTouch=false; p.CanQuery=false; p.CastShadow=false; p.Parent=parent
+ end
+ task.spawn(function()
+  for row=0,31 do
+   if generation~=armyGeneration then return end
+   for column=0,63 do
+    local position=origin+Vector3.new((column-31.5)*6,0,row*8)
+    local unit=Instance.new("Model"); unit.Name="NeuroCopy"; unit.Parent=folder
+    -- Far ranks are lightweight silhouettes. Only front ranks need separate limbs.
+    piece(unit,Vector3.new(1.8,2.2,1),position+Vector3.new(0,3.2,0),Color3.fromRGB(20,28,35))
+    piece(unit,Vector3.new(2.1,1.3,1.2),position+Vector3.new(0,1.7,0),Color3.fromRGB(13,20,28))
+    piece(unit,Vector3.new(1.6,1.4,1.3),position+Vector3.new(0,4.9,0),Color3.fromRGB(60,145,145))
+    piece(unit,Vector3.new(1.2,0.8,0.12),position+Vector3.new(0,4.8,-0.7),Color3.fromRGB(200,190,180))
+    if row<4 then
+     for _,sign in ipairs({-1,1}) do
+      piece(unit,Vector3.new(0.55,2,0.65),position+Vector3.new(sign*1.25,3.1,0),Color3.fromRGB(45,100,110))
+      piece(unit,Vector3.new(0.65,1.3,0.7),position+Vector3.new(sign*0.5,0.65,0),Color3.fromRGB(25,35,43))
+     end
+     piece(unit,Vector3.new(0.35,1.5,0.12),position+Vector3.new(0,3.2,-0.56),Color3.fromRGB(70,185,180))
+    end
+   end
+   RunService.Heartbeat:Wait() -- batch creation; no thousands-of-Humanoids replication spike
+  end
+ end)
+end
+local function bloodOverlay(strength)
+ for i=1,16 do
+  local size=math.random(12,45)*(strength or 0.5)
+  local drop=new("Frame",{Size=UDim2.fromOffset(size,size*math.random(1,3)),Position=UDim2.fromScale(math.random(),math.random()),
+   BackgroundColor3=Color3.fromRGB(105,8,18),BackgroundTransparency=0.25,BorderSizePixel=0,ZIndex=30,Rotation=math.random(-35,35)},gui)
+  new("UICorner",{CornerRadius=UDim.new(1,0)},drop)
+  TweenService:Create(drop,TweenInfo.new(3.5),{BackgroundTransparency=1,Position=drop.Position+UDim2.fromOffset(0,35)}):Play()
+  Debris:AddItem(drop,3.6)
+ end
+end
 Remotes.Cutscene.OnClientEvent:Connect(function(action, frame, duration, aim)
+ if action=="army" then buildArmy(frame); return end
+ if action=="armyClear" then clearArmy(); return end
+ if action=="blood" then bloodOverlay(frame); return end
+ if action=="pov" then
+  firstPersonTarget=frame; followSubject=nil; shotTarget=nil
+  setSceneFov(58,0.4)
+  return
+ end
+ if action=="cam" or action=="shot" or action=="follow" or action=="followRig" or action=="end" or action=="recover" then firstPersonTarget=nil end
  if action=="prepare" then
   task.spawn(function()
    -- Streaming is optional and bounded; acknowledgements are sent even on failure.
@@ -633,10 +691,15 @@ RunService:BindToRenderStep("ViewModel", Enum.RenderPriority.Camera.Value + 1, f
   cam.CameraType=Enum.CameraType.Scriptable
   if char then
 			for _, d in ipairs(char:GetDescendants()) do
-				if d:IsA("BasePart") and d.Name ~= "HumanoidRootPart" then d.LocalTransparencyModifier = 0 end
+				if d:IsA("BasePart") and d.Name ~= "HumanoidRootPart" then d.LocalTransparencyModifier = firstPersonTarget and 1 or 0 end
 			end
 		end
-  if followSubject and followSubject.Parent then
+  if firstPersonTarget then
+   local head=char and char:FindFirstChild("Head")
+   local eye=head and head.Position or cam.CFrame.Position
+   local focus=typeof(firstPersonTarget)=="Instance" and firstPersonTarget.Position or firstPersonTarget
+   cam.CFrame=CFrame.lookAt(eye,focus)
+  elseif followSubject and followSubject.Parent then
    local pivot=followSubject:GetPivot()
    local focus=followRelative and pivot:PointToWorldSpace(followAim) or pivot.Position+followAim
    local desired=followRelative and pivot:PointToWorldSpace(followOffset) or pivot.Position+followOffset

@@ -33,7 +33,8 @@ assert intro.count('spawnWave(1,token,info)') == 1
 assert intro.count('currentExitDoor=makeExitDoor') == 1
 assert 'BriefingLaboratory' in intro and 'BoardingSteps' in intro
 assert 'prepareEntrance()' in intro
-assert 'hum:MoveTo(target.Position)' in server
+assert 'local duration=math.max(distance/12,0.12)' in server
+assert 'floor.Position.Y+clearance' in server
 assert 'root.Anchored=wasAnchored' in server
 assert 'entranceUsed=true -- consume before yielding' in server
 assert 'return -- entrance breach never advances the level' in server
@@ -92,3 +93,20 @@ assert 'action=="cam"' in client
 assert '1-math.exp(-dt*followSmooth)' in client
 assert 'moveModel(entrance,closedDoor*CFrame.new(0,9.5,0),1.8)' in intro
 print('PASS: client-ready startup, bounded streaming, fade watchdog/cancellation, recovery and camera plans')
+
+finale=server.split('function startBase()',1)[1].split('-- KICK',1)[0]
+assert 'buildCitadel(levelFolder' not in finale
+assert 'CutsceneRE:FireAllClients("pov",neuro:FindFirstChild("Head"))' in finale
+assert 'hum.Health=0' in finale and 'Players.RespawnTime=120' in finale
+assert 'door.CFrame=hinge*CFrame.Angles(math.rad(-90)*t,0,0)*relative' in finale
+assert 'CanCollide=false' in finale
+assert 'object:Destroy()' in finale and 'Vector3.new(0,85,-17)' in finale
+assert 'for row=0,31 do' in client and 'for column=0,63 do' in client
+assert 'unit.Name="NeuroCopy"' in client
+assert 'generation~=armyGeneration' in client
+assert 'firstPersonTarget' in client and 'bloodOverlay' in client
+assert 'mafHum.BreakJointsOnDeath=false; mafHum.Health=0' in mafia
+assert 'moveModel(maf,hitCF*CFrame.new' in mafia
+assert 'Enum.HumanoidStateType.Freefall,not on' in server
+assert 'local duration=math.max(distance/12,0.12)' in server
+print('PASS: grounded 12-stud walking, explicit hit/death reaction, POV fatal finale, falling door, 2048-copy crowd')

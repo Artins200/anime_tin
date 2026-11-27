@@ -838,45 +838,74 @@ local function moveModel(model, target, duration, walk)
   model:PivotTo(origin:Lerp(target, t*t*(3-2*t)))
   for j, cf in pairs(joints) do
    local sign = j.Name:find("Left") and -1 or 1
-   j.C0 = cf * CFrame.Angles(math.sin(t*duration*9)*0.35*sign,0,0)
+   local hip=j.Name:find("Hip")
+   local angle=math.sin(t*duration*10)*0.5*sign*(hip and 1 or -0.7)
+   j.C0=cf*CFrame.fromAxisAngle(cf:VectorToObjectSpace(Vector3.xAxis),angle)
+  end
+  if walk then
+   -- NPC rigs are anchored: explicitly solve their motors so legs actually move.
+   for _=1,3 do
+    for _,motor in ipairs(model:GetDescendants()) do
+     if motor:IsA("Motor6D") and motor.Part0 and motor.Part1 then
+      motor.Part1.CFrame=motor.Part0.CFrame*motor.C0*motor.Transform*motor.C1:Inverse()
+     end
+    end
+   end
   end
   RunService.Heartbeat:Wait()
  until os.clock()-start >= duration or not model.Parent
  if model.Parent then model:PivotTo(target) end
  for j, cf in pairs(joints) do j.C0 = cf end
 end
--- Walk through the world using the Humanoid, never slide a pivot through geometry.
-local function tweenCharTo(char, target, dur)
+-- Grounded cinematic blocking: fixed walking speed, raycast support and no physics fall state.
+local function tweenCharTo(char, target, _duration)
  local root=char:FindFirstChild("HumanoidRootPart")
  local hum=char:FindFirstChildOfClass("Humanoid")
- if not root or not hum then return false end
+ if not root or not hum or hum.Health<=0 then return false end
  local wasAnchored=root.Anchored
- root.Anchored=false
- pcall(function() root:SetNetworkOwner(nil) end)
- local oldSpeed, oldRotate=hum.WalkSpeed,hum.AutoRotate
- hum.AutoRotate=true
- hum.WalkSpeed=math.clamp((target.Position-root.Position).Magnitude/math.max(dur,0.1),3,9)
+ root.Anchored=true; root.AssemblyLinearVelocity=Vector3.zero
+ local animate=char:FindFirstChild("Animate")
+ local animateEnabled=animate and not animate.Disabled
+ if animate then animate.Disabled=true end
  local animator=hum:FindFirstChildOfClass("Animator") or Instance.new("Animator",hum)
+ for _,track in ipairs(animator:GetPlayingAnimationTracks()) do track:Stop(0.1) end
  local animation=Instance.new("Animation")
  animation.AnimationId=hum.RigType==Enum.HumanoidRigType.R15 and "rbxassetid://507777826" or "rbxassetid://180426354"
  local track
- pcall(function() track=animator:LoadAnimation(animation); track.Priority=Enum.AnimationPriority.Action; track.Looped=true; track:Play(0.2); track:AdjustSpeed(hum.WalkSpeed/8) end)
+ pcall(function() track=animator:LoadAnimation(animation); track.Priority=Enum.AnimationPriority.Action; track.Looped=true; track:Play(0.12); track:AdjustSpeed(1.5) end)
+ local filter={char}
+ for _,player in ipairs(Players:GetPlayers()) do if player.Character then table.insert(filter,player.Character) end end
+ local params=RaycastParams.new(); params.FilterType=Enum.RaycastFilterType.Exclude; params.FilterDescendantsInstances=filter; params.RespectCanCollide=true
+ local clearance=hum.HipHeight+root.Size.Y/2
+ if hum.RigType==Enum.HumanoidRigType.R6 then clearance=3 end
+ local start=root.Position
+ local distance=((target.Position-start)*Vector3.new(1,0,1)).Magnitude
+ local duration=math.max(distance/12,0.12) -- consistent 12 studs/s, not 3-stud/s shuffling
+ local began=os.clock(); local reached=true
  char:SetAttribute("CinematicWalk",true)
- hum:MoveTo(target.Position)
- local started=os.clock()
- while char.Parent and hum.Health>0 and os.clock()-started < dur+4 do
-  if ((root.Position-target.Position)*Vector3.new(1,0,1)).Magnitude<0.65 then break end
+ repeat
+  local t=math.clamp((os.clock()-began)/duration,0,1)
+  local nextPosition=start:Lerp(target.Position,t)
+  local floor=workspace:Raycast(nextPosition+Vector3.new(0,4,0),Vector3.new(0,-12,0),params)
+  if not floor then reached=false; break end
+  nextPosition=Vector3.new(nextPosition.X,floor.Position.Y+clearance,nextPosition.Z)
+  local delta=(nextPosition-root.Position)*Vector3.new(1,0,1)
+  local obstacle=workspace:Raycast(root.Position,delta,params)
+  if obstacle and obstacle.Normal.Y<0.5 then reached=false; break end
+  if delta.Magnitude>0.001 then
+   local facing=CFrame.lookAt(nextPosition,nextPosition+delta.Unit)
+   local rotation=root.CFrame:Lerp(facing,0.45).Rotation
+   root.CFrame=CFrame.new(nextPosition)*rotation
+  else root.Position=nextPosition end
   RunService.Heartbeat:Wait()
- end
- local reached=((root.Position-target.Position)*Vector3.new(1,0,1)).Magnitude<1.5
- hum:MoveTo(root.Position)
+ until os.clock()-began>=duration or not char.Parent or hum.Health<=0
  char:SetAttribute("CinematicWalk",false)
- if track then track:Stop(0.2); track:Destroy() end
+ if track then track:Stop(0.12); track:Destroy() end
  animation:Destroy()
- hum.WalkSpeed=oldSpeed; hum.AutoRotate=oldRotate
+ if animate then animate.Disabled=not animateEnabled end
+ root.AssemblyLinearVelocity=Vector3.zero
  root.Anchored=wasAnchored
- -- A blocked route is reported instead of teleporting through the obstruction.
- if not reached then warn("Cinematic walking route blocked: "..char.Name) end
+ if not reached then warn("Cinematic route has no support or is obstructed: "..char.Name) end
  return reached
 end
 
@@ -886,7 +915,24 @@ local function sceneLock(on)
   local char = player.Character
   local hum = char and char:FindFirstChildOfClass("Humanoid")
   local root = char and char:FindFirstChild("HumanoidRootPart")
+  local animate=char and char:FindFirstChild("Animate")
+  if animate then
+   if on then
+    if animate:GetAttribute("SceneOriginalDisabled")==nil then animate:SetAttribute("SceneOriginalDisabled",animate.Disabled) end
+    animate.Disabled=true
+   else
+    local disabled=animate:GetAttribute("SceneOriginalDisabled")
+    if disabled~=nil then animate.Disabled=disabled; animate:SetAttribute("SceneOriginalDisabled",nil) end
+   end
+  end
   if hum then
+   hum:SetStateEnabled(Enum.HumanoidStateType.Freefall,not on)
+   hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown,not on)
+   if on and hum.Health>0 then
+    hum:ChangeState(Enum.HumanoidStateType.Running)
+    local animator=hum:FindFirstChildOfClass("Animator")
+    if animator then for _,track in ipairs(animator:GetPlayingAnimationTracks()) do track:Stop(0.1) end end
+   end
    hum.WalkSpeed = on and 0 or 16
    hum.JumpPower = on and 0 or 50
    hum.JumpHeight = on and 0 or 7.2
@@ -1002,6 +1048,8 @@ recoverScene=function()
  if recovering then return end
  recovering=true
  introActive=false; canFight=false; levelToken+=1
+ Players.RespawnTime=3
+ CutsceneRE:FireAllClients("armyClear")
  for _,object in ipairs(workspace:GetChildren()) do
   if object.Name=="Helicopter" or object.Name=="Plane" then object:Destroy() end
  end
@@ -1334,11 +1382,21 @@ local function playMafioziScene()
 	NotifyRE:FireAllClients("*ВЫСТРЕЛ*", 0.8)
 	task.wait(0.3)
 
-	-- Мафиози падает
-	mafHum:TakeDamage(1000)
-	maf:SetAttribute("LastDir", Vector3.new(0, 0, 1))
-	maf:SetAttribute("LastKnock", 20)
-	task.wait(2.5)
+ -- A scripted rig does not have the enemies' Died connection: animate the reaction explicitly.
+ CutsceneRE:FireAllClients("blood",0.45)
+ local wound=Instance.new("ParticleEmitter")
+ wound.Texture="rbxasset://textures/particles/sparkles_main.dds"
+ wound.Color=ColorSequence.new(C(130,12,20)); wound.LightEmission=0
+ wound.Size=NumberSequence.new(0.15,0); wound.Lifetime=NumberRange.new(0.2,0.5)
+ wound.Speed=NumberRange.new(5,10); wound.Rate=0; wound.SpreadAngle=Vector2.new(60,60)
+ wound.Parent=maf:FindFirstChild("Torso"); wound:Emit(22)
+ local hitCF=maf:GetPivot()
+ moveModel(maf,hitCF*CFrame.Angles(math.rad(-18),0,math.rad(10)),0.18)
+ mafHum.BreakJointsOnDeath=false; mafHum.Health=0
+ moveModel(maf,hitCF*CFrame.new(1,-2,2)*CFrame.Angles(math.rad(-80),0,math.rad(12)),0.7)
+ local stain=part(office,Vector3.new(2.5,0.03,1.8),Vector3.new(1,0.03,-7),C(95,12,18),Enum.Material.SmoothPlastic)
+ stain.CanCollide=false
+ task.wait(1.5)
 
 	CutsceneRE:FireAllClients("end")
  -- Keep actors frozen across the office -> plane -> base transition.
@@ -1391,135 +1449,104 @@ local function playPlaneScene()
  -- startBase builds the destination before releasing the scene lock.
 end
 
------------------------------------------------------------------- ФИНАЛ НА БАЗЕ — не смертельное столкновение и цитадель
+------------------------------------------------------------------ ФИНАЛ НА БАЗЕ — смерть агента и раскрытие нейро-армии
 local function say(text, dur) NotifyRE:FireAllClients(text, dur); task.wait(dur + 0.4) end
 
 function startBase()
- sceneLock(true)
-	introActive = true
-	levelToken += 1
-	canFight = false
-	FadeRE:FireAllClients(true, "БАЗА")
-	task.wait(1.3)
-	clearLevel(); newFolders()
-	currentLevel, currentName, enemiesLeft, currentWave, totalWaves = 6, "База", -1, 0, 0
-	local info = buildBase(levelFolder)
-	currentSpawn = info.Spawn
-	applyPreset("Base", 0.1)
-	placeAll()
-	broadcast()
-
-	sceneLock(true)
-	CutsceneRE:FireAllClients("start")
-	buildCitadel(levelFolder, info.CitadelPos)
-
-	local cmd = buildRig(Types.Commander, info.CommanderCF); anchorAll(cmd); cmd.Parent = levelFolder
-	local neuro, nHum, nHrp, nj = buildRig(Types.Neuro, info.NeuroCF); anchorAll(neuro); neuro.Parent = levelFolder
-	enhanceNeuroCyber(neuro)
-
-	task.wait(0.6)
-	FadeRE:FireAllClients(false)
-	task.wait(1)
-	FocusRE:FireAllClients(Vector3.new(7, 4, -4), 4)
-	say("Командир: Отличная работа, боец. Все пять точек зачищены.", 4)
-	FocusRE:FireAllClients(Vector3.new(7, 4, -4), 4.5)
-	say("Командир: Но есть плохие новости. Недавно уничтожили целую нашу базу...", 4.5)
-	say("Командир: Подозревают нейро-тянку. Она внедрила в себя чип и скопировала все данные.", 5.5)
-	say("Командир: Теперь она очень опасна. Будь на связи, мы ещё...", 3.5)
-
-	for _, l in ipairs(info.Lamps) do l[2].Enabled = false; l[1].Material = Enum.Material.SmoothPlastic; l[1].Color = C(30,30,35) end
-	applyPreset("BaseDark", 0.15)
-	playSound(SOUNDS.PowerOff)
-	task.wait(1.8)
-	say("Командир: Что за... Почему погас свет?!", 2.5)
-
-	local door = info.Door
-	local ex = Instance.new("Explosion"); ex.Position = door.Position; ex.BlastPressure = 0; ex.BlastRadius = 8
-	ex.DestroyJointRadiusPercent = 0; ex.Parent = workspace
-	door.Anchored = false
-	door.AssemblyLinearVelocity = Vector3.new(0, 14, -60)
-	door.AssemblyAngularVelocity = Vector3.new(4, 1, 0)
-	playSound(SOUNDS.DoorBreak)
-	ShakeRE:FireAllClients(15)
-	for _, a in ipairs(info.Alarms) do a[2].Enabled = true; a[1].Material = Enum.Material.SmoothPlastic; a[1].Color = C(255,30,40) end
-	FocusRE:FireAllClients(Vector3.new(0, 5, 25), 3)
-	task.wait(1.5)
-	say("Командир: Это она... Нейро-тянка...", 3)
-
-	introActive = true
-	CutsceneRE:FireAllClients("start")
-	for _, p in ipairs(Players:GetPlayers()) do
-		local c = p.Character
-		local h = c and c:FindFirstChildOfClass("Humanoid")
-		if h then h.WalkSpeed = 0; h.JumpPower = 0; h.AutoRotate = false end
-	end
-	task.wait(0.3)
-
-	-- Нейро входит
-	local startCF = info.NeuroCF
-	local insideCF = CFrame.lookAt(Vector3.new(0, 3, 15), Vector3.new(0, 3, -10))
-	local walkT = 4.5
-	local t0 = os.clock()
-	local walkAnim = task.spawn(function()
-		while os.clock() - t0 < walkT do
-			local a = (os.clock() - t0) / walkT
-			neuro:PivotTo(startCF:Lerp(insideCF, math.min(1, a)))
-			local t = os.clock()
-			local s = math.sin(t * 6) * 0.6
-			nj.RH.C0 = CFrame.new(1,-1,0, 0,0,1, 0,1,0, -1,0,0) * CFrame.Angles(0, 0, s)
-			nj.LH.C0 = CFrame.new(-1,-1,0, 0,0,-1, 0,1,0, 1,0,0) * CFrame.Angles(0, 0, s)
-			RunService.Heartbeat:Wait()
-		end
-		neuro:PivotTo(insideCF)
-	end)
-	FocusRE:FireAllClients(Vector3.new(0, 4, 15), walkT)
-	task.wait(walkT)
-
-	say("Нейро-тянка: Командир, ты слишком многого не понимаешь.", 3.5)
-	say("Нейро-тянка: Я — не просто тянка. Я — новая форма жизни.", 4)
-	FocusRE:FireAllClients(Vector3.new(0, 4, 60), 2.5)
-	task.wait(2)
-	say("Нейро-тянка: За мной — цитадель. Миллионы моих сестёр. Они ждут.", 4.5)
-	FocusRE:FireAllClients(Vector3.new(0, 4, 15), 2)
-	task.wait(2)
-
- -- Music and credits share the same local clock on every client.
+ sceneLock(true); introActive=true; canFight=false; levelToken+=1
+ FadeRE:FireAllClients(true,"ВОЗВРАЩЕНИЕ НА БАЗУ")
+ task.wait(1)
+ clearLevel(); newFolders()
+ currentLevel,currentName,enemiesLeft,currentWave,totalWaves=6,"Последний приказ",-1,0,0
+ local info=buildBase(levelFolder)
+ currentSpawn=info.Spawn
+ applyPreset("Base",0.1)
+ placeAll(); sceneLock(true); broadcast()
+ local cmd=buildRig(Types.Commander,info.CommanderCF); anchorAll(cmd); cmd.Parent=levelFolder
+ local neuro,nHum,nRoot,nj=buildRig(Types.Neuro,CFrame.lookAt(Vector3.new(0,3,30),Vector3.new(0,3,-16)))
+ anchorAll(neuro); neuro.Parent=levelFolder; enhanceNeuroCyber(neuro)
+ -- The army is a client-side cinematic crowd, not thousands of expensive Humanoids.
+ part(levelFolder,Vector3.new(600,2,600),Vector3.new(0,-1,360),C(28,32,38),Enum.Material.Concrete)
+ CutsceneRE:FireAllClients("start")
+ CutsceneRE:FireAllClients("army",Vector3.new(0,0,190))
+ CutsceneRE:FireAllClients("pov",Vector3.new(7,4.5,-4))
+ prepareView(currentSpawn.Position)
+ FadeRE:FireAllClients(false)
+ say("КОМАНДИР: Пять объектов зачищены. Но разведка ошиблась: Нейро — не одиночка.",5)
+ say("КОМАНДИР: Её тело синтетическое. Каждая копия подключена к одной сети.",4)
+ CutsceneRE:FireAllClients("pov",Vector3.new(0,5,25))
+ for _,lamp in ipairs(info.Lamps) do lamp[2].Brightness=0.25 end
+ task.wait(1)
+ -- Explicitly rotate and lower the slab. No physics-dependent upright sliding door.
+ local door=info.Door
+ local closed=door.CFrame
+ door.CanCollide=false
+ local hinge=CFrame.new(closed.Position-Vector3.new(0,5,0))
+ local relative=hinge:ToObjectSpace(closed)
+ local began=os.clock()
+ repeat
+  local t=math.clamp((os.clock()-began)/0.65,0,1)
+  door.CFrame=hinge*CFrame.Angles(math.rad(-90)*t,0,0)*relative
+  RunService.Heartbeat:Wait()
+ until os.clock()-began>=0.65
+ door.CFrame=CFrame.new(0,0.65,20)*CFrame.Angles(math.rad(-90),0,0)
+ ShakeRE:FireAllClients(9)
+ CutsceneRE:FireAllClients("pov",neuro:FindFirstChild("Head"))
+ -- Place the attacker through the now-open doorway into a clear, visible lane.
+ moveModel(neuro,CFrame.lookAt(Vector3.new(0,3,7),Vector3.new(0,3,-16)),2,true)
+ say("НЕЙРО: Ты уничтожил аванпосты. Но не нас.",3)
+ say("НЕЙРО: Посмотри на меня. Это тело — лишь одна из тысяч копий.",4)
  MusicRE:FireAllClients("final")
- local finaleStart = os.clock()
- shot(Vector3.new(5,6,21),Vector3.new(0,4,15),2)
- say("Нейро: Это не броня. Моё тело — синтетическое. В нём живёт вся наша сеть.",5)
- local torso = neuro:FindFirstChild("Torso")
- if torso then
-  local pulse = light(torso,C(0,255,220),18,1)
-  TweenService:Create(pulse,TweenInfo.new(1,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,5,true),{Brightness=4}):Play()
+ local finaleStart=os.clock()
+ say("НЕЙРО: Твоя миссия закончена. Наше наступление только начинается.",4)
+ -- Show the attack from the victim's eyes, without giving gameplay control back.
+ local hand=neuro:FindFirstChild("Right Arm")
+ local orb=part(fxFolder,Vector3.new(0.8,0.8,0.8),hand.Position,C(55,190,180),Enum.Material.Neon)
+ orb.Shape=Enum.PartType.Ball; orb.CanCollide=false
+ local victim=Players:GetPlayers()[1]
+ local victimHead=victim and victim.Character and victim.Character:FindFirstChild("Head")
+ if victimHead then
+  TweenService:Create(orb,TweenInfo.new(0.4),{Position=victimHead.Position}):Play()
  end
- shot(Vector3.new(-9,6,4),Vector3.new(0,4,15),2)
- say("Нейро: Тебя использовали. Цитадель создана, чтобы остановить таких, как ты.",5)
- say("Нейро: Я не стану тебя убивать. Вернись и расскажи им, что видел.",4)
- -- Nonlethal collapse is visible in third person. No damage or physics fling.
- for _, player in ipairs(Players:GetPlayers()) do
-  local c = player.Character
-  if c then
-   shot(c:GetPivot().Position+Vector3.new(10,5,10),c:GetPivot().Position,1)
-   moveModel(c,c:GetPivot()*CFrame.new(0,-2,0)*CFrame.Angles(0,0,math.rad(80)),1.4)
+ task.wait(0.4); orb:Destroy()
+ CutsceneRE:FireAllClients("blood",0.8); ShakeRE:FireAllClients(14)
+ local oldRespawn=Players.RespawnTime
+ Players.RespawnTime=120 -- retain the actual dead character during the reveal/credits
+ for _,player in ipairs(Players:GetPlayers()) do
+  local character=player.Character
+  local hum=character and character:FindFirstChildOfClass("Humanoid")
+  if hum then
+   hum.BreakJointsOnDeath=false
+   player:SetAttribute("FinalDeath",true)
+   hum.Health=0
   end
  end
- say("АГЕНТ: Я жив... Она намеренно оставила меня в живых.",3)
- shot(Vector3.new(95,90,140),info.CitadelPos+Vector3.new(0,45,0),5)
- NotifyRE:FireAllClients("ЦИТАДЕЛЬ // Протокол противодействия спецгруппе активирован",6)
+ local eye=Vector3.new(0,5.5,-16)
+ cameraPlan(eye,Vector3.new(0,1.4,-17),Vector3.new(0,4.5,7),1,58,65)
+ for _,player in ipairs(Players:GetPlayers()) do
+  local character=player.Character
+  if character then moveModel(character,character:GetPivot()*CFrame.new(0,-2,0)*CFrame.Angles(math.rad(-80),0,0),0.7) end
+ end
+ task.wait(1)
+ -- Open the roof BEFORE the camera rises. It never interpolates through an intact wall.
+ for _,object in ipairs(levelFolder:GetChildren()) do
+  if object:IsA("BasePart") and object.Size.Y==1 and object.Position.Y>16 and object.Position.Y<17 then object:Destroy() end
+ end
+ cameraPlan(Vector3.new(0,1.4,-17),Vector3.new(0,85,-17),Vector3.new(0,4,7),5,65,70)
+ task.wait(5)
+ cameraPlan(Vector3.new(0,85,-17),Vector3.new(0,180,90),Vector3.new(0,0,315),7,70,78)
+ task.wait(7)
+ NotifyRE:FireAllClients("НЕЙРО-СЕТЬ // 2 048 АКТИВНЫХ КОПИЙ // НАСТУПЛЕНИЕ НАЧАЛОСЬ",6)
  task.wait(math.max(0,30-(os.clock()-finaleStart)))
- -- Credits are triggered by the music clock client-side at exactly 30 seconds.
  task.wait(35)
  FadeRE:FireAllClients(true,"ПРОДОЛЖЕНИЕ СЛЕДУЕТ")
- task.wait(2)
- CreditsRE:FireAllClients(false)
- MusicRE:FireAllClients("stop")
+ task.wait(1)
+ CreditsRE:FireAllClients(false); MusicRE:FireAllClients("stop")
+ CutsceneRE:FireAllClients("armyClear")
  CutsceneRE:FireAllClients("end")
- -- Keep transition protection active until the replay floor is ready.
- introActive=true
-	EndRE:FireAllClients()
-	task.wait(8)
-	startLevel(1)
+ Players.RespawnTime=oldRespawn
+ for _,player in ipairs(Players:GetPlayers()) do player:SetAttribute("FinalDeath",nil) end
+ startLevel(1)
 end
 
 ------------------------------------------------------------------ KICK (дверь)
