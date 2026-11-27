@@ -5,7 +5,48 @@ C3.origin=Vector3.new(0,0,12000)
 C3.names={"ЖИЛОЙ КВАРТАЛ","ТОРГОВАЯ УЛИЦА","РАЗВЯЗКА","КВАРТАЛ НТЯН","ПЛОЩАДЬ БАШНИ","СЕРВИСНЫЙ ЭТАЖ","СИЛОВОЙ ЯРУС","СЕРВЕРНЫЙ ЯРУС","АНТЕННЫЙ ЯРУС","ВЕРХНИЙ ПОСТ"}
 function C3.Pos(x,y,z) return C3.origin+Vector3.new(x,y,z or 0) end
 function C3.Part(parent,name,size,pos,color,mat)
- local p=part(parent,size,pos,color,mat or Enum.Material.Concrete); p.Name=name; return p
+ if parent==C3.map and C3.structure and C3.structure.Parent==C3.map then parent=C3.structure end
+ local p=part(parent,size,pos,color,mat or Enum.Material.Concrete); p.Name=name
+ if name=="TowerBeacon" or name=="SignalSpine" or name=="SignalRing" then p.Material=Enum.Material.Neon end
+ return p
+end
+function C3.ApplyLighting()
+ C3.lightingSaved={}
+ for _,key in ipairs({"Ambient","OutdoorAmbient","Brightness","ClockTime","ExposureCompensation","FogStart","FogEnd","EnvironmentDiffuseScale","EnvironmentSpecularScale"}) do C3.lightingSaved[key]=Lighting[key] end
+ C3.effectsSaved={density=atm.Density,haze=atm.Haze,color=atm.Color,contrast=cc.Contrast,saturation=cc.Saturation,tint=cc.TintColor,brightness=cc.Brightness,bloom=bloom.Intensity}
+ Lighting.Ambient=C(155,164,181); Lighting.OutdoorAmbient=C(173,183,198); Lighting.Brightness=2.4; Lighting.ClockTime=14.2; Lighting.ExposureCompensation=.2
+ Lighting.FogStart=500; Lighting.FogEnd=20000; Lighting.EnvironmentDiffuseScale=0.65; Lighting.EnvironmentSpecularScale=0.4
+ atm.Density=0.06; atm.Haze=0.35; atm.Color=C(210,224,238)
+ cc.Contrast=0.01; cc.Saturation=-0.03; cc.TintColor=C(255,255,255); cc.Brightness=0; bloom.Intensity=0.03
+end
+function C3.RestoreLighting()
+ if not C3.lightingSaved then return end
+ for key,value in pairs(C3.lightingSaved) do Lighting[key]=value end
+ local e=C3.effectsSaved
+ atm.Density=e.density; atm.Haze=e.haze; atm.Color=e.color; cc.Contrast=e.contrast; cc.Saturation=e.saturation; cc.TintColor=e.tint; cc.Brightness=e.brightness; bloom.Intensity=e.bloom
+ C3.lightingSaved=nil; C3.effectsSaved=nil
+end
+function C3.ProtectCivilian(model,hum)
+ model:SetAttribute("Enemy",false); model:SetAttribute("ProtectedCivilian",true)
+ hum.BreakJointsOnDeath=false; hum.HealthDisplayType=Enum.HumanoidHealthDisplayType.AlwaysOff
+ hum:SetStateEnabled(Enum.HumanoidStateType.Dead,false)
+ local field=Instance.new("ForceField"); field.Name="NonlethalProtection"; field.Visible=false; field.Parent=model
+ table.insert(C3.connections,hum.HealthChanged:Connect(function(health)
+  if model.Parent and health<hum.MaxHealth then hum.Health=hum.MaxHealth end
+ end))
+end
+function C3.Suppress(model,e,player,amount)
+ if e.down then return end
+ e.suppression=math.min(100,(e.suppression or 0)+amount); e.stun=os.clock()+2
+ e.hum.Health=e.hum.MaxHealth
+ if e.suppression>=80 then
+  e.down=true; e.hum:MoveTo(e.root.Position); e.hum.WalkSpeed=0; e.hum.Sit=true
+  e.root.Anchored=true; C2.SitRig(model)
+  model:SetAttribute("SubduedAlive",true)
+  for _,p in ipairs(model:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide=false end end
+  NotifyRE:FireClient(player,"Гражданин обезврежен. Жив, помощь будет оказана.",3)
+ end
+ C3RE:FireClient(player,"nonlethal",{subdued=e.down,progress=e.suppression})
 end
 function C3.Valid(player)
  return C3.active and not C3.finished and table.find(C3.party,player)~=nil and player.Parent~=nil
@@ -36,7 +77,7 @@ function C3.Protected(fn)
  if not ok then warn("[Chapter3] "..tostring(err)); C3.Stop(); returnToMenu() end
 end
 function C3.Stop()
- C3.active=false; C3.serial+=1
+ C3.active=false; C3.serial+=1; C3.RestoreLighting()
  for _,c in ipairs(C3.connections) do c:Disconnect() end; C3.connections={}
  for _,p in ipairs(C3.party) do if p.Parent then p:SetAttribute("IsSprinting",false); p:SetAttribute("Chapter",1); p:SetAttribute("SprintStamina",100); p:SetAttribute("C3GrabbedUntil",nil) end end
  C3RE:FireAllClients("clear"); C2RE:FireAllClients("clear"); CreditsRE:FireAllClients(false)
@@ -62,6 +103,46 @@ function C3.Prompt(part_,text,callback,hold)
 end
 -- BEGIN CHAPTER THREE WORLD
 -- Geometry and physical interactions for Chapter III; embedded into Chapter3.
+function C3.Lamp(parent,pos,range,brightness,name)
+ local fixture=C3.Part(parent,name or "AreaLamp",Vector3.new(3,0.25,2),pos,C(235,231,216),Enum.Material.SmoothPlastic)
+ fixture.CanCollide=false; fixture.CanQuery=false
+ local lamp=light(fixture,C(240,238,225),range,brightness); lamp.Shadows=false
+ return fixture
+end
+function C3.Beam(parent,name,a,b,width,color)
+ local p=C3.Part(parent,name,Vector3.new(width,width,(b-a).Magnitude),(a+b)*0.5,color,Enum.Material.Metal)
+ p.CFrame=CFrame.lookAt((a+b)*0.5,b); return p
+end
+function C3.BuildRadioMast()
+ for _,sx in ipairs({-1,1}) do for _,sz in ipairs({-1,1}) do
+  C3.Part(C3.landmark,"RadioMastLeg",Vector3.new(2.5,204,2.5),C3.Pos(960+sx*13,216,sz*13),C(170,181,192),Enum.Material.Metal)
+ end end
+ for level=0,8 do
+  local y=114+level*24
+  for _,side in ipairs({-1,1}) do
+   C3.Beam(C3.landmark,"TrussCrossBrace",C3.Pos(947,y,side*13),C3.Pos(973,y+24,side*13),1.2,C(187,196,206))
+   C3.Beam(C3.landmark,"TrussCrossBrace",C3.Pos(960+side*13,y,-13),C3.Pos(960+side*13,y+24,13),1.2,C(187,196,206))
+   local ring=C3.Part(C3.landmark,"SignalRing",Vector3.new(29,0.3,0.5),C3.Pos(960,y,side*14),C(220,70,65),Enum.Material.Neon); table.insert(C3.redLights,ring)
+  end
+ end
+ for _,y in ipairs({157,205,253,301}) do
+  for _,side in ipairs({-1,1}) do
+   C3.Part(C3.landmark,"CellularPanelAntenna",Vector3.new(3,16,7),C3.Pos(960+side*20,y,0),C(214,220,223),Enum.Material.Metal)
+   C3.Beam(C3.landmark,"AntennaMount",C3.Pos(960+side*13,y,0),C3.Pos(960+side*20,y,0),1,C(95,111,128))
+   local dish=C3.Part(C3.landmark,"MicrowaveDish",Vector3.new(2,14,14),C3.Pos(960+side*19,y,20),C(201,211,220),Enum.Material.SmoothPlastic); dish.Shape=Enum.PartType.Ball
+   C3.Beam(C3.landmark,"DishFeed",C3.Pos(960+side*19,y,20),C3.Pos(960+side*27,y,20),0.7,C(70,86,104))
+  end
+ end
+end
+function C3.CommunicationEquipment(index,floor)
+ local core=C3.Part(C3.map,"SignalWaveguideCore",Vector3.new(8,16,8),C3.Pos(960,floor+8,0),C(99,120,138),Enum.Material.Metal)
+ local stripe=C3.Part(C3.map,"CoreSignalIndicator",Vector3.new(8.2,0.5,8.2),C3.Pos(960,floor+10,0),C(200,66,66),Enum.Material.Neon); table.insert(C3.redLights,stripe)
+ for _,side in ipairs({-1,1}) do
+  C3.Part(C3.map,"CableTray",Vector3.new(64,0.35,1.1),C3.Pos(960,floor+0.8,side*9),C(190,169,92),Enum.Material.Metal)
+  C3.Part(C3.map,"RFEquipmentRack",Vector3.new(5,7,4),C3.Pos(960+side*35,floor+3.8,8),C(65,90,112),Enum.Material.Metal)
+  for channel=1,4 do C3.Part(C3.map,"ReceiverModule",Vector3.new(5.1,0.6,4.1),C3.Pos(960+side*35,floor+channel*1.4,8),C(145,166,178),Enum.Material.Metal) end
+ end
+end
 function C3.Room(parent,name,center,size)
  local room=Instance.new("Model"); room.Name=name; room.Parent=parent
  C3.Part(room,"Floor",Vector3.new(size.X,0.6,size.Z),center,C(62,66,73))
@@ -90,51 +171,70 @@ function C3.BuildVillain()
   end
  end
  for k=0,11 do C3.Part(m,"DistantProductionBlock",Vector3.new(95,80,100),o+Vector3.new(-400+k*80,20,350+k%2*80),C(35,46,61)) end
+ for _,offset in ipairs({Vector3.new(-23,13,-2),Vector3.new(4,13,-4),Vector3.new(-15,17,17)}) do C3.Lamp(m,o+offset,42,2.5,"CinematicKeyLight") end
  local cfg=table.clone(Types.Neuro); cfg.Name=ANDROID_NAME
- local neuro=buildRig(cfg,CFrame.new(o+Vector3.new(-15,3.5,5))); neuro.Parent=m; enhanceNeuroCyber(neuro); anchorAll(neuro)
+ local neuro=buildRig(cfg,CFrame.lookAt(o+Vector3.new(-15,3.5,5),screen.Position)); neuro.Parent=m; enhanceNeuroCyber(neuro); anchorAll(neuro)
  cfg=table.clone(Types.Pistol); cfg.Name="Тян C-3B1"; cfg.Male=false
  local assistant=buildRig(cfg,CFrame.lookAt(o+Vector3.new(9,3.5,2),o+Vector3.new(-15,3.5,5))); assistant.Parent=m; c2Dress(assistant,false); anchorAll(assistant)
  return m,neuro,assistant,screen
 end
 function C3.BuildHome()
- local h=Instance.new("Model"); h.Name="HeroesHouse"; h.Parent=C3.map
- C3.Part(h,"HouseFoundation",Vector3.new(90,1,70),C3.Pos(-170,-0.3,0),C(78,74,69))
- C3.Part(h,"HouseRoof",Vector3.new(90,1,70),C3.Pos(-170,25,0),C(43,49,60))
- for _,side in ipairs({-1,1}) do C3.Part(h,"HouseSideWall",Vector3.new(90,25,1),C3.Pos(-170,12.5,side*35),C(94,88,85)) end
- C3.Part(h,"HouseBack",Vector3.new(1,25,70),C3.Pos(-215,12.5,0),C(91,86,82))
- -- East facade leaves a real window and front doorway, with frames, not a missing wall.
- C3.Part(h,"FacadeBottom",Vector3.new(1,2,70),C3.Pos(-125,1,0),C(91,86,82))
- C3.Part(h,"FacadeTop",Vector3.new(1,15,70),C3.Pos(-125,17.5,0),C(91,86,82))
- for _,side in ipairs({-1,1}) do C3.Part(h,"WindowFrame",Vector3.new(1,8,20),C3.Pos(-125,6,side*25),C(91,86,82)) end
- local glass=C3.Part(h,"LivingWindow",Vector3.new(0.15,7,20),C3.Pos(-125,6,0),C(130,160,175),Enum.Material.Glass); glass.Transparency=0.75; glass.CanCollide=true
- -- Upstairs floor has a staircase opening at the south side.
- C3.Part(h,"UpperFloor",Vector3.new(88,0.7,48),C3.Pos(-170,12,10),C(103,89,78),Enum.Material.WoodPlanks)
- for k=1,12 do C3.Part(h,"HouseStair",Vector3.new(4,1,12),C3.Pos(-207+k*4,k-0.5,-23),C(94,80,69),Enum.Material.WoodPlanks) end
- C3.Part(h,"StairLanding",Vector3.new(16,0.7,18),C3.Pos(-153,12,-23),C(94,80,69))
- C3.Part(h,"Sofa",Vector3.new(5,2,13),C3.Pos(-184,1.5,1),C(60,77,89),Enum.Material.Fabric)
- C3.Part(h,"CoffeeTable",Vector3.new(9,1.5,6),C3.Pos(-174,1,1),C(81,67,58),Enum.Material.Wood)
- C3.tv=C3.Part(h,"NewsTV",Vector3.new(0.4,5,8),C3.Pos(-157,5,0),C(18,28,42),Enum.Material.Glass)
- C3.Part(h,"BedroomWall",Vector3.new(38,12,1),C3.Pos(-183,18,-6),C(90,86,90))
- C3.Part(h,"BedroomWallRight",Vector3.new(20,12,1),C3.Pos(-146,18,-6),C(90,86,90))
- C3.kirillDoor=C3.Part(h,"KirillRoomDoor",Vector3.new(8,12,0.5),C3.Pos(-160,18,-6),C(88,71,61),Enum.Material.Wood)
- C3.doorClosed=C3.kirillDoor.CFrame
- C3.doorOpen=CFrame.new(C3.Pos(-164,18,-6))*CFrame.Angles(0,-math.pi/2,0)*CFrame.new(4,0,0)
- C3.Part(h,"Bed",Vector3.new(7,2,12),C3.Pos(-202,13.5,22),C(67,82,107),Enum.Material.Fabric)
- C3.Part(h,"Desk",Vector3.new(10,1,5),C3.Pos(-184,15,25),C(99,79,64),Enum.Material.Wood)
- C3.kirill=secretActor(h,"silv3r_candy","Кирилл",CFrame.lookAt(C3.Pos(-184,12.5,19),C3.Pos(-184,14,25)))
+ -- Reuse the actual Chapter-II house builder, not a vaguely similar replacement.
+ local previousMap,previousHome=C2.map,C2.home
+ C2.map=C3.map; C2.home=nil
+ local h=c2Home()
+ C2.map=previousMap; C2.home=previousHome
+ h:PivotTo(h:GetPivot()+C3.origin); h.ModelStreamingMode=Enum.ModelStreamingMode.Persistent
+ h:SetAttribute("OriginalChapter2House",true); C3.home=h
+ C3.tv=h:FindFirstChild("TVScreen")
+ local function item(name,size,pos,color,mat) return C3.Part(h,name,size,C3.Pos(pos.X,pos.Y,pos.Z),color,mat) end
+ -- Keep the lounge/kitchen/sofa/TV in their original positions. Only cut a
+ -- real window and the two stair-wing doorways into the original side walls.
+ for _,wall in ipairs(h:GetChildren()) do
+  if wall.Name=="HouseSideWall" then wall:Destroy() end
+ end
+ for _,z in ipairs({-21,21}) do item("OriginalEastWall",Vector3.new(1,14,6),Vector3.new(-148,7,z),C(141,133,121)) end
+ item("EastWindowSill",Vector3.new(1,3,36),Vector3.new(-148,1.5,0),C(141,133,121))
+ item("EastWindowLintel",Vector3.new(1,4,36),Vector3.new(-148,12,0),C(141,133,121))
+ local window=item("LivingWindow",Vector3.new(0.15,7,36),Vector3.new(-148,6.5,0),C(175,198,211),Enum.Material.Glass); window.Transparency=0.88
+ item("OriginalWestWall",Vector3.new(1,14,35),Vector3.new(-212,7,6.5),C(141,133,121))
+ item("WestDoorLintel",Vector3.new(1,3,12),Vector3.new(-212,12.5,-18),C(141,133,121))
+ -- The second floor is an addition OVER the old house. Its existing ceiling
+ -- remains the floor; a side stair wing avoids punching a pit into the lounge.
+ item("UpperRoof",Vector3.new(65,1,49),Vector3.new(-180,28,0),C(160,154,142))
+ for _,side in ipairs({-1,1}) do item("UpperEndWall",Vector3.new(64,13,1),Vector3.new(-180,21.5,side*24),C(136,130,119)) end
+ item("UpperEastWall",Vector3.new(1,13,48),Vector3.new(-148,21.5,0),C(141,133,121))
+ item("UpperWestWall",Vector3.new(1,13,36),Vector3.new(-212,21.5,-6),C(141,133,121))
+ item("UpperDoorLintel",Vector3.new(1,3,12),Vector3.new(-212,26.5,18),C(141,133,121))
+ item("StairWingFoundation",Vector3.new(24,1,56),Vector3.new(-222,-0.4,0),C(91,84,74))
+ item("StairWingRoof",Vector3.new(24,1,56),Vector3.new(-222,28,0),C(160,154,142))
+ item("StairWingWall",Vector3.new(1,28,56),Vector3.new(-234,14,0),C(141,133,121))
+ for _,side in ipairs({-1,1}) do item("StairWingEnd",Vector3.new(24,28,1),Vector3.new(-222,14,side*28),C(141,133,121)) end
+ for k=1,15 do item("HouseStair",Vector3.new(12,k,2.7),Vector3.new(-222,k/2,-20+k*2.5),C(104,79,57),Enum.Material.WoodPlanks) end
+ item("UpperHouseLanding",Vector3.new(24,1,10),Vector3.new(-222,14.5,22),C(104,79,57),Enum.Material.WoodPlanks)
+ item("BedroomWall",Vector3.new(48,13,1),Vector3.new(-188,21.5,-6),C(136,130,119))
+ item("BedroomWallRight",Vector3.new(8,13,1),Vector3.new(-152,21.5,-6),C(136,130,119))
+ C3.kirillDoor=item("KirillRoomDoor",Vector3.new(8,12,0.5),Vector3.new(-160,21,-6),C(88,71,61),Enum.Material.Wood)
+ C3.doorClosed=C3.kirillDoor.CFrame; C3.doorOpen=CFrame.new(C3.Pos(-164,21,-6))*CFrame.Angles(0,-math.pi/2,0)*CFrame.new(4,0,0)
+ item("Bed",Vector3.new(7,2,12),Vector3.new(-202,16.5,15),C(67,82,107),Enum.Material.Fabric)
+ item("Desk",Vector3.new(10,1,5),Vector3.new(-184,18,20),C(99,79,64),Enum.Material.Wood)
+ C3.kirill=secretActor(h,"silv3r_candy","Кирилл",CFrame.lookAt(C3.Pos(-184,15.2,15),C3.Pos(-184,18,22)))
  C3.kirill:SetAttribute("ProtectedCivilian",true); C3.kirillPose={}
  for _,motor in ipairs(C3.kirill:GetDescendants()) do if motor:IsA("Motor6D") then C3.kirillPose[motor]=motor.C0 end end
  C2.SitRig(C3.kirill)
- local phone=C3.Part(h,"KirillPhone",Vector3.new(0.7,0.1,1.3),C3.Pos(-184,15.6,23),C(35,65,91),Enum.Material.Glass)
- light(phone,C(105,150,195),6,0.4)
+ local phone=item("KirillPhone",Vector3.new(0.7,0.1,1.3),Vector3.new(-184,18.6,19),C(35,65,91),Enum.Material.Glass); light(phone,C(105,150,195),6,0.4)
+ for _,pos in ipairs({Vector3.new(-187,26,5),Vector3.new(-160,26,-15),Vector3.new(-223,26,0)}) do C3.Lamp(h,C3.Pos(pos.X,pos.Y,pos.Z),36,2.3,"HomeFillLamp") end
 end
 function C3.Build()
  C3.map=Instance.new("Model"); C3.map.Name="Chapter3Singularity"; C3.map.Parent=levelFolder
  C3.zones={}; C3.redLights={}; C3.moduleParts={}
+ C3.structure=Instance.new("Model"); C3.structure.Name="PersistentWalkableStructure"; C3.structure.ModelStreamingMode=Enum.ModelStreamingMode.Persistent; C3.structure.Parent=C3.map
  C3.BuildHome()
  C3.backdrop=Instance.new("Model"); C3.backdrop.Name="Chapter3CityBackdrop"; C3.backdrop.ModelStreamingMode=Enum.ModelStreamingMode.Persistent; C3.backdrop.Parent=C3.map
  for segment=0,10 do
-  C3.Part(C3.backdrop,"CityRoad",Vector3.new(130,1,86),C3.Pos(-155+segment*128,-0.3,0),C(40,44,52),Enum.Material.Asphalt)
+  C3.Part(C3.backdrop,"CityRoad",Vector3.new(130,1,130),C3.Pos(-155+segment*128,-0.3,0),C(40,44,52),Enum.Material.Asphalt)
+  C3.Part(C3.backdrop,"CitySafetyFoundation",Vector3.new(130,2,240),C3.Pos(-155+segment*128,-1.9,0),C(88,91,94))
+  for offset=0,1 do C3.Lamp(C3.backdrop,C3.Pos(-155+segment*128+offset*64,12,0),48,2.5,"StreetAreaLamp") end
   for _,side in ipairs({-1,1}) do
    C3.Part(C3.backdrop,"RouteBoundary",Vector3.new(130,18,2),C3.Pos(-155+segment*128,9,side*65),C(58,65,77))
    C3.Part(C3.backdrop,"Sidewalk",Vector3.new(130,0.5,9),C3.Pos(-155+segment*128,0.4,side*37),C(104,108,118))
@@ -168,9 +268,10 @@ function C3.Build()
  -- Entry opening in west wall at ground level.
  for _,side in ipairs({-1,1}) do C3.Part(C3.landmark,"TowerEntrancePier",Vector3.new(3,16,40),C3.Pos(908,8,side*32),C(44,55,70)) end
  C3.Part(C3.landmark,"TowerRoof",Vector3.new(106,1,106),C3.Pos(960,113,0),C(35,46,62))
- C3.beacon=C3.Part(C3.landmark,"TowerBeacon",Vector3.new(8,35,8),C3.Pos(960,130,0),C(230,45,65),Enum.Material.Neon); table.insert(C3.redLights,C3.beacon); light(C3.beacon,C(235,55,65),100,1)
- C3.shield=C3.Part(C3.landmark,"InvulnerableTowerShield",Vector3.new(150,150,150),C3.Pos(960,65,0),C(125,45,95),Enum.Material.ForceField)
- C3.shield.Shape=Enum.PartType.Ball; C3.shield.CanCollide=false; C3.shield.CanTouch=false; C3.shield.CanQuery=false; C3.shield.Transparency=0.84
+ C3.BuildRadioMast()
+ C3.beacon=C3.Part(C3.landmark,"TowerBeacon",Vector3.new(12,8,12),C3.Pos(960,324,0),C(230,45,65),Enum.Material.Neon); table.insert(C3.redLights,C3.beacon); light(C3.beacon,C(235,55,65),100,1)
+ C3.shield=C3.Part(C3.landmark,"InvulnerableTowerShield",Vector3.new(155,370,155),C3.Pos(960,175,0),C(125,45,95),Enum.Material.ForceField)
+ C3.shield.Shape=Enum.PartType.Ball; C3.shield.CanCollide=false; C3.shield.CanTouch=false; C3.shield.CanQuery=false; C3.shield.Transparency=0.94
  for i=1,10 do
   local floor=i>=6 and (i-6)*24 or 0
   local x=i<=5 and 80+(i-1)*175 or 960
@@ -180,20 +281,37 @@ function C3.Build()
    z.start=C3.Pos(x-65,4,0); z.exit=C3.Pos(x+70,4,0)
    z.gate=C3.Part(C3.map,"DistrictGate",Vector3.new(1,14,130),C3.Pos(x+78,7,0),C(57,78,99),Enum.Material.Metal)
   else
-   z.start=C3.Pos(960+(i%2==0 and -42 or 42),floor+4,-23)
-   z.exit=C3.Pos(960+(i%2==0 and -42 or 42),floor+4,-40)
+   local lane=i%2==0 and -40 or 40
+   local arrival=i==6 and -23 or (i%2==0 and 23 or -23)
+   z.start=C3.Pos(960+(i%2==0 and -42 or 42),floor+4,arrival)
+   z.exit=C3.Pos(960+(i%2==0 and 42 or -42),floor+28,lane)
    -- Main floor deliberately leaves a 20-stud-wide stairwell slot.
-   C3.Part(C3.map,"TowerFloor",Vector3.new(100,0.7,80),C3.Pos(960,floor,10),C(61,67,80),Enum.Material.Metal)
-   for _,side in ipairs({-1,1}) do C3.Part(C3.map,"StairLanding",Vector3.new(16,0.7,20),C3.Pos(960+side*42,floor,-40),C(64,73,87)) end
+   C3.Part(C3.map,"TowerFloor",Vector3.new(100,0.7,60),C3.Pos(960,floor,0),C(61,67,80),Enum.Material.Metal)
+   for _,side in ipairs({-1,1}) do for _,edge in ipairs({-1,1}) do
+    C3.Part(C3.map,"StairLanding",Vector3.new(10,0.7,20),C3.Pos(960+side*45,floor,edge*40),C(112,124,138))
+   end end
    C3.Part(C3.map,"TowerBackWall",Vector3.new(100,24,1),C3.Pos(960,floor+12,-50),C(47,58,74))
    for _,side in ipairs({-1,1}) do C3.Part(C3.map,"TowerFrontWall",Vector3.new(40,24,1),C3.Pos(960+side*30,floor+12,50),C(47,58,74)) end
    if i<10 then
     local sign=i%2==0 and 1 or -1
-    for step=1,24 do C3.Part(C3.map,"TowerStair",Vector3.new(3.4,1,13),C3.Pos(960-sign*39+sign*step*3.25,floor+step-0.5,-40),C(75,85,102),Enum.Material.Metal) end
-    z.gate=C3.Part(C3.map,"StairGate",Vector3.new(1,14,18),C3.Pos(960-sign*32,floor+7,-40),C(67,86,111),Enum.Material.Metal)
+    for step=1,24 do
+     local sx=960-sign*40+sign*(step-0.5)*3.4
+     C3.Part(C3.map,"TowerStair",Vector3.new(3.4,1,13),C3.Pos(sx,floor+step-0.5,lane),C(126,141,157),Enum.Material.Metal)
+     if step>1 then C3.Part(C3.map,"StairSolidSupport",Vector3.new(3.4,step-1,13),C3.Pos(sx,floor+(step-1)/2,lane),C(91,105,121)) end
+     for _,edge in ipairs({-1,1}) do C3.Part(C3.map,"StairSafetyRail",Vector3.new(3.4,3.5,0.35),C3.Pos(sx,floor+step+1.75,lane+edge*7),C(173,187,196),Enum.Material.Metal) end
+    end
+    z.gate=C3.Part(C3.map,"StairGate",Vector3.new(1,14,18),C3.Pos(960-sign*32,floor+7,lane),C(67,86,111),Enum.Material.Metal)
    else z.gate=C3.Part(C3.map,"FinalShutter",Vector3.new(1,14,10),C3.Pos(1004,floor+7,-40),C(67,86,111)) end
-   C3.Part(C3.map,"StairwellPartition",Vector3.new(64,14,1),C3.Pos(960,floor+7,-30),C(48,58,74))
-   local lamp=C3.Part(C3.map,"TowerCeilingLamp",Vector3.new(8,0.2,3),C3.Pos(960,floor+(i==10 and 15 or 21),0),C(180,190,210),Enum.Material.Neon); light(lamp,C(190,205,225),52,1.2)
+   for _,edge in ipairs({-1,1}) do
+    local rail=C3.Part(C3.map,"StairwellPartition",Vector3.new(64,12,0.5),C3.Pos(960,floor+6,edge*30),C(173,197,208),Enum.Material.Glass); rail.Transparency=0.55
+   end
+   if i==6 or i==10 then
+    local safeLane=i==6 and 40 or -40
+    C3.Part(C3.map,"ClosedShaftSafetyFloor",Vector3.new(68,0.7,20),C3.Pos(960,floor,safeLane),C(100,115,132))
+   end
+   for _,lx in ipairs({-32,0,32}) do for _,lz in ipairs({-20,20}) do C3.Lamp(C3.map,C3.Pos(960+lx,floor+14,lz),38,2.2,"TowerCeilingLamp") end end
+   for _,edge in ipairs({-1,1}) do C3.Lamp(C3.map,C3.Pos(960,floor+16,edge*40),48,1.8,"StairwellLamp") end
+   C3.CommunicationEquipment(i,floor)
    for k=1,3 do C3.Part(C3.map,i==8 and "ServerRack" or "PowerCabinet",Vector3.new(5,7,4),C3.Pos(932+k*13,floor+3.8,-10),C(42,54,72),Enum.Material.Metal) end
   end
   z.covers={}
@@ -213,9 +331,10 @@ function C3.Build()
   end)
   -- Spawn vestibule is outside the playable wall, with a real opening/door.
   if i==5 then for _,side in ipairs({-1,1}) do C3.Part(C3.map,"StreetDeploymentWall",Vector3.new(70,18,1),C3.Pos(x+side*45,9,44),C(58,65,77)) end end
-  local doorZ=i>=6 and 50 or 44
+  local doorZ=i>=6 and 5 or 44
   z.spawnDoor=C3.Part(C3.map,"DeploymentDoor",Vector3.new(18,12,1),C3.Pos(x, floor+6,doorZ),C(51,65,84),Enum.Material.Metal); z.spawnClosed=z.spawnDoor.CFrame
   z.spawnPos=C3.Pos(x-4,floor+4,doorZ+7)
+  C3.Lamp(C3.map,C3.Pos(x,floor+11,doorZ+10),26,2,"DeploymentLamp")
   C3.Part(C3.map,"VestibuleFloor",Vector3.new(20,0.7,26),C3.Pos(x,floor,doorZ+12),C(58,65,76))
   C3.Part(C3.map,"VestibuleRoof",Vector3.new(20,1,26),C3.Pos(x,floor+16,doorZ+12),C(38,46,60))
   C3.Part(C3.map,"VestibuleBack",Vector3.new(20,16,1),C3.Pos(x,floor+8,doorZ+25),C(48,57,73))
@@ -256,26 +375,26 @@ function C3.Intro()
  cameraPlan(neuro.Head.Position+Vector3.new(-5,1,-10),neuro.Head.Position+Vector3.new(-4,1,-8),neuro.Head.Position,1,55,50)
  C3.Say(ANDROID_NAME,"Идеальный выбор. Мы подчиним тысячи людей за секунды и ускорим наше влияние в тысячи раз. Нам больше не придётся отлавливать людей или клонировать их вручную. Начинаем!",9)
  FadeRE:FireAllClients(true,""); task.wait(0.8)
- C3.MoveParty(C3.Pos(-174,4,2),C3.Pos(-150,4,0)); focusStreaming(C3.Pos(-170,5,0)); prepareView(C3.Pos(-170,5,0))
- C3.buddy=secretActor(C3.map,C3.party[1]:GetAttribute("Hero")=="Artem" and "ZamestitelDiomchica" or "eurtyoeyrntiu","Напарник",CFrame.lookAt(C3.Pos(-168,0.5,-7),C3.Pos(-174,3,2)))
+ C3.MoveParty(C3.Pos(-193,4,3),C3.Pos(-187,7,22)); focusStreaming(C3.Pos(-187,5,0)); prepareView(C3.Pos(-187,5,0))
+ C3.buddy=secretActor(C3.map,C3.party[1]:GetAttribute("Hero")=="Artem" and "ZamestitelDiomchica" or "eurtyoeyrntiu","Напарник",CFrame.lookAt(C3.Pos(-181,0.5,-5),C3.Pos(-193,3,3)))
  if C3.coop then C3.buddy:Destroy(); C3.buddy=nil end
  CutsceneRE:FireAllClients("pov",C3.tv,65); CutsceneRE:FireAllClients("reveal")
  C3.Say("Демид","Мы им завод снесли, а крайними всё равно оказались мы. Я до сих пор не понимаю, кто здесь с кем воюет.",5)
  C3.Say("Артём","И почему НТЯН ищет нас, а не тех, кто людей переделывает? Тут явно не вся картина.",4)
  C3RE:FireAllClients("signal"); ShakeRE:FireAllClients(2); task.wait(2)
- for i,p in ipairs(C3.party) do if C3.Root(p) then tweenCharTo(p.Character,CFrame.lookAt(C3.Pos(-143,4,(i-1)*5),C3.Pos(960,100,0)),1.5) end end
+ for i,p in ipairs(C3.party) do if C3.Root(p) then tweenCharTo(p.Character,CFrame.lookAt(C3.Pos(-153,4,(i-1)*5),C3.Pos(960,100,0)),1.5) end end
  CutsceneRE:FireAllClients("pov",C3.beacon,65)
  C3.Say("Демид","Ты это слышал?! Что там происходит?",3)
  focusStreaming(C3.Pos(960,103,0)); prepareView(C3.Pos(960,103,0))
  C3RE:FireAllClients("binocular",true)
- CutsceneRE:FireAllClients("cam",{cf=CFrame.lookAt(C3.Pos(-142,6,0),C3.Pos(960,103,0)),fov=7,time=1.4}); task.wait(3)
+ CutsceneRE:FireAllClients("cam",{cf=CFrame.lookAt(C3.Pos(-153,6,0),C3.Pos(960,103,0)),fov=7,time=1.4}); task.wait(3)
  C3.Say("Артём","Сигнал идёт оттуда. Смотри на охрану наверху.",3)
  C3.Say("Демид","Значит, эту штуку нужно выключить. Сейчас, пока она весь город не накрыла.",4)
  C3RE:FireAllClients("binocular",false)
  C3.Say("Артём","Стой. Кирилл же наверху, в комнате!",3)
  FadeRE:FireAllClients(true,""); task.wait(0.7)
- focusStreaming(C3.Pos(-171,16,8)); prepareView(C3.Pos(-171,16,8))
- C3.MoveParty(C3.Pos(-171,16,8),C3.kirill.Head.Position)
+ focusStreaming(C3.Pos(-171,19,4)); prepareView(C3.Pos(-171,19,4))
+ C3.MoveParty(C3.Pos(-171,19,4),C3.kirill.Head.Position)
  TweenService:Create(C3.kirillDoor,TweenInfo.new(0.7),{CFrame=C3.doorOpen}):Play(); task.wait(0.8)
  CutsceneRE:FireAllClients("pov",C3.kirill.Head,58); CutsceneRE:FireAllClients("reveal")
  C3.Say("Кирилл","Тянки... тянки...",3)
@@ -316,10 +435,11 @@ function C3.Spawn(stage,pos,civilian,elite,k)
  local m,h,r,j=buildRig(cfg,CFrame.new(pos)); m.Parent=C3.map
  if not civilian then c2Dress(m,false) end
  c2Mobilize(m,h,r); h.MaxHealth=civilian and 80 or (elite and 145 or 85)*(C3.coop and 1.4 or 1); h.Health=h.MaxHealth; h.WalkSpeed=civilian and 9 or 13
- m:SetAttribute("Enemy",true)
+ m:SetAttribute("Enemy",not civilian)
+ if civilian then C3.ProtectCivilian(m,h) end
  local e={stage=stage,hum=h,root=r,civilian=civilian,down=false,last=0,stun=0,joints=j,base={},pathAt=0,waypoints={},waypoint=1,tactic=k%3,cover=C3.zones[stage].covers[(k-1)%2+1]}
  for name,motor in pairs(j) do e.base[name]=motor.C0 end; C3.mobs[m]=e
- table.insert(C3.connections,h.Died:Connect(function() e.down=true; ragdoll(m); Debris:AddItem(m,12) end))
+ if not civilian then table.insert(C3.connections,h.Died:Connect(function() e.down=true; ragdoll(m); Debris:AddItem(m,12) end)) end
  local serial=C3.serial
  task.spawn(function()
   while C3.active and C3.serial==serial and m.Parent and h.Health>0 and not e.down do
@@ -376,7 +496,7 @@ function C3.Activate(index)
  for _,p in ipairs(C3.Living()) do c2Grant(p,p:GetAttribute("Hero")=="Artem" and math.min(3,2+math.floor(index/7)) or math.min(5,2+math.floor(index/2))) end
  if index==5 and not C3.shieldSeen then
   C3.shieldSeen=true; C3.Scene(true); CutsceneRE:FireAllClients("pov",C3.shield,63)
-  C2.ScriptedShot(C3.shield.Position-Vector3.new(74,0,0),false)
+  C2.ScriptedShot(C3.Pos(884,8,0),false)
   C3.Say("Демид","Да ей вообще плевать на пули!",3)
   C3.Say("Артём","Снаружи не пробить. Сервисный вход подключён к внутренней сети. Поднимаемся к управляющему терминалу и гасим её изнутри.",6)
   C3.Scene(false)
@@ -436,7 +556,7 @@ function C3.Finale()
  if C3.towerOff or not C3.active then return end
  C3.towerOff=true; C3.hackPhase=4; C3.Scene(true)
  MusicRE:FireAllClients("stop"); C3RE:FireAllClients("signalOff")
- cameraPlan(C3.Pos(1080,115,-110),C3.Pos(1070,108,-100),C3.Pos(960,60,0),3,62,66)
+ cameraPlan(C3.Pos(1190,220,-240),C3.Pos(1170,200,-220),C3.Pos(960,170,0),3,62,66)
  for _,p in ipairs(C3.redLights) do
   if p.Parent then p.Color=C(38,49,58); for _,l in ipairs(p:GetChildren()) do if l:IsA("Light") then l.Enabled=false end end end
   task.wait(0.08)
@@ -542,7 +662,7 @@ function C3.Start(party)
  C3.active=true; C3.finished=false; C3.serial+=1; C3.party=table.clone(party); C3.coop=#party>1; C3.mobs={}; C3.connections={}; C3.sprint={}; C3.relays=0; C3.key=false; C3.shieldSeen=false; C3.hackPhase=1; C3.hackSerial=0; C3.shots={}; C3.recovering={}; C3.towerOff=false; C3.modules={}; C3.collecting=false; C3.confirmUntil=nil; C3.confirmPlayer=nil; C3.hacker=nil; C3.challenge=nil; C3.stage=1
  C2.originals={}; Players.RespawnTime=999999
  local physics=game:GetService("PhysicsService"); pcall(function() physics:RegisterCollisionGroup("C2Enemy") end); physics:CollisionGroupSetCollidable("C2Enemy","C2Enemy",false)
- clearLevel(); newFolders(); applyPreset("Base",0.2); C3.Build()
+ clearLevel(); newFolders(); C3.ApplyLighting(); C3.Build()
  for _,p in ipairs(party) do
   if not p.Character then p:LoadCharacter() end
   p.Character:WaitForChild("HumanoidRootPart"); p:SetAttribute("Chapter",3); c2Hero(p); c2Grant(p,2); C3.sprint[p]={held=false,energy=100}; C3.BindDeath(p)
@@ -567,15 +687,15 @@ c3Attack=function(p,name,origin,direction,charge)
  C3.shots=C3.shots or {}; if os.clock()-(C3.shots[p] or 0)<w.Cooldown*0.9 then return end; C3.shots[p]=os.clock()
  local rp=RaycastParams.new(); rp.FilterType=Enum.RaycastFilterType.Exclude; rp.FilterDescendantsInstances={p.Character,fxFolder,C3.shield}
  local hit=workspace:Raycast(origin,direction.Unit*w.Range,rp); if not hit then return end
- if name~="Fists" then tracer(origin,hit.Position,w.Color) end
  -- Kirill and the tower never enter the damage registry. Shield is not an HP pool.
  local model=hit.Instance:FindFirstAncestorOfClass("Model"); local e=model and C3.mobs[model]
  if not e or e.down or e.hum.Health<=0 then return end
  if e.civilian then
-  e.suppression=(e.suppression or 0)+(name=="Fists" and 50 or 35)
-  e.stun=os.clock()+2
-  if e.suppression>=80 then e.down=true; e.hum.WalkSpeed=0; e.hum.Sit=true; model:SetAttribute("Enemy",false); NotifyRE:FireClient(p,"Гражданин обезврежен без летального исхода",2) end
+  if name~="Fists" then tracer(origin,hit.Position,C(90,195,220)) end
+  C3.Suppress(model,e,p,name=="Fists" and 50 or 35)
+  return -- no death marker, TakeDamage, ragdoll or corpse cleanup for civilians
  else
+  if name~="Fists" then tracer(origin,hit.Position,w.Color) end
   local damage=name=="Fists" and (p:GetAttribute("Hero")=="Artem" and 25 or 48) or w.Damage*(name=="Shotgun" and 5 or 1)
   if name=="Rifle" then local c=typeof(charge)=="number" and charge==charge and math.clamp(charge,0,1) or 0; damage=45+235*c end
   if hit.Instance.Name=="Head" then damage*=1.5 end

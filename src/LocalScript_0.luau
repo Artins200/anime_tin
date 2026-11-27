@@ -667,7 +667,7 @@ local function selectWeapon(name)
 	if not idx or idx > (chapterLoadout and chapterLoadout.level or (plr:GetAttribute("WeaponLevel") or 1)) then return end
 	curName = name; switchT = 1
  if chapterLoadout then Remotes:WaitForChild(plr:GetAttribute("Chapter")==3 and "Chapter3" or "Chapter2"):FireServer("equip",name) end
- local roleParent=(name=="Fists" and (plr:GetAttribute("Chapter") or 1)>=2) and vm or nil
+ local roleParent=(name=="Fists" and (plr:GetAttribute("Chapter") or 1)==2) and vm or nil
  chapterTool.Parent=roleParent; chapterToolHandle.Parent=roleParent; chapterToolGuard.Parent=roleParent; chapterToolTip.Parent=roleParent
 	for n, list in pairs(gunParts) do
 		for _, e in ipairs(list) do e[1].Parent = (n == name) and vm or nil end
@@ -956,7 +956,7 @@ RunService:BindToRenderStep("ViewModel", Enum.RenderPriority.Camera.Value + 1, f
 	end
 	if curName == "Fists" then
   flash.Transparency = 1; flashLight.Enabled = false
-  if (plr:GetAttribute("Chapter") or 1)>=2 then
+  if (plr:GetAttribute("Chapter") or 1)==2 then
    chapterTool.Parent=vm
    local engineer=plr:GetAttribute("Hero")=="Artem"
    chapterTool.Size=engineer and Vector3.new(0.4,0.45,1.2) or Vector3.new(0.12,0.32,2)
@@ -1452,6 +1452,10 @@ do
   if action=="signal" then
    hud.Enabled=true; flash.BackgroundTransparency=0.65; TweenService:Create(flash,TweenInfo.new(0.8),{BackgroundTransparency=1}):Play()
    local s=new("Sound",{SoundId="rbxasset://sounds/electronicpingshort.wav",Volume=0.18,PlaybackSpeed=1.2},SoundService); s:Play(); Debris:AddItem(s,2); return
+  end
+  if action=="nonlethal" then
+   hitmark.TextColor3=Color3.fromRGB(100,220,170); hitmark.TextTransparency=0
+   TweenService:Create(hitmark,TweenInfo.new(0.3),{TextTransparency=1}):Play(); return
   end
   if action=="grab" then -- local damage feedback
    flash.BackgroundColor3=Color3.fromRGB(145,65,70); flash.BackgroundTransparency=0.85; TweenService:Create(flash,TweenInfo.new(0.5),{BackgroundTransparency=1}):Play(); return

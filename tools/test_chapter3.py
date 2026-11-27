@@ -76,6 +76,7 @@ local RaycastParams={new=function() return {} end}
 Enum.RaycastFilterType={Exclude=1}
 local HitRE={FireClient=function() end}
 local function tracer() end
+local C2={SitRig=function() end}
 local c3Attack
 '''
 checks=r'''
@@ -150,8 +151,8 @@ for clear=0,1 do for objective=0,1 do assert(C3.Ready({cleared=clear==1,objectiv
 print("PASS: executed role-specific relays, checkpoint idempotency and gate conjunction")
 
 C3.stage=1; C3.hacker=nil; C3.shots={}; C3.mobs={}; C3.towerOff=false
-local mob={SetAttribute=function() end}; local hum={Health=80}; function hum:TakeDamage(d) self.Health-=d end
-C3.mobs[mob]={hum=hum,civilian=true,down=false,stun=0}
+local mob={SetAttribute=function() end,GetDescendants=function() return {} end}; local hum={Health=80,MaxHealth=80,MoveTo=function() end}; function hum:TakeDamage(d) self.Health-=d end
+C3.mobs[mob]={hum=hum,root={Position=Vector3.zero},civilian=true,down=false,stun=0}
 local hit={Instance={Name="Head",FindFirstAncestorOfClass=function() return mob end},Position=Vector3.zero}
 workspace.Raycast=function() return hit end
 C3.shield={}; clock+=1
@@ -187,7 +188,7 @@ local Types={Pistol={}}
 local buildRig=function() return {} end
 local c2Dress=function() end
 local anchorAll=function() end
-local light=function() end
+local light=function() return {} end
 '''
 # These helpers are resolved lexically inside the world functions.
 world_checks=r'''
@@ -208,13 +209,37 @@ for level=0,3 do
  table.sort(row,function(a,b) return a.Position.Y<b.Position.Y end)
  for i=2,#row do
   assert(math.abs(row[i].Position.Y-row[i-1].Position.Y-1)<0.001)
-  assert(math.abs(row[i].Position.X-row[i-1].Position.X)<=row[i].Size.X)
+  assert(math.abs(row[i].Position.X-row[i-1].Position.X)<=row[i].Size.X+0.001)
  end
 end
 for x=-210,1100 do
  local supported=false
- for _,p in ipairs(roads) do if math.abs(x-p.Position.X)<=p.Size.X/2 then supported=true end end
+ for _,p in ipairs(roads) do if math.abs(x-p.Position.X)<=p.Size.X/2 and p.Size.Z>=130 then supported=true end end
  assert(supported,"street gap at "..x)
+end
+for stage=6,9 do
+ local z=C3.zones[stage]
+ assert(z.exit.Y==z.start.Y+24,"exit must be at the top of the staircase")
+ assert(math.abs(z.exit.X-z.start.X)==84,"exit must be across the stair run")
+ assert(math.abs(z.spawnPos.Z-C3.origin.Z)<25,"guards must spawn on main floor, not over shaft")
+end
+local supports,rails,lamps,antenna=0,0,0,0
+for _,p in ipairs(generated) do
+ if p.Name=="StairSolidSupport" then supports+=1 end
+ if p.Name=="StairSafetyRail" then rails+=1 end
+ if p.Name=="TowerCeilingLamp" then lamps+=1 end
+ if p.Name=="CellularPanelAntenna" then antenna+=1 end
+end
+assert(supports==92 and rails==192 and lamps==30 and antenna==8)
+-- A ceiling/landing must not cut through the last stair treads (head trap).
+for _,step in ipairs(steps) do
+ for _,p in ipairs(generated) do
+  if p.Name=="StairLanding" and p.Position.Y>step.Position.Y+1.2 and p.Position.Y<step.Position.Y+5 then
+   local overlapX=math.abs(p.Position.X-step.Position.X)<(p.Size.X+step.Size.X)/2-0.01
+   local overlapZ=math.abs(p.Position.Z-step.Position.Z)<(p.Size.Z+step.Size.Z)/2-0.01
+   assert(not (overlapX and overlapZ),"upper landing blocks stair headroom")
+  end
+ end
 end
 print("PASS: executed full world builder: ten arenas, 96 contiguous stair steps, five full-width gates and continuous city road")
 '''
