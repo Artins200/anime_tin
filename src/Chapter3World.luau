@@ -211,7 +211,7 @@ function C3.BuildHome()
  for _,motor in ipairs(C3.kirill:GetDescendants()) do if motor:IsA("Motor6D") then C3.kirillPose[motor]=motor.C0 end end
  C2.SitRig(C3.kirill)
  local phone=item("KirillPhone",Vector3.new(0.7,0.1,1.3),Vector3.new(-184,18.6,19),C(35,65,91),Enum.Material.Glass); light(phone,C(105,150,195),6,0.4)
- for _,pos in ipairs({Vector3.new(-187,26,5),Vector3.new(-160,26,-15),Vector3.new(-223,26,0)}) do C3.Lamp(h,C3.Pos(pos.X,pos.Y,pos.Z),36,2.3,"HomeFillLamp") end
+ for _,pos in ipairs({Vector3.new(-187,26,5),Vector3.new(-160,26,-15),Vector3.new(-223,26,0)}) do C3.Lamp(h,C3.Pos(pos.X,pos.Y,pos.Z),28,0.8,"HomeFillLamp") end
  -- Kirill's upstairs room gets real emissive tubes plus local point lights:
  -- cool blue near the desk and a softer violet accent behind the bed.
  for _,spec in ipairs({
@@ -220,7 +220,7 @@ function C3.BuildHome()
  }) do
   local tube=item(spec.name,spec.size,spec.pos,spec.color,Enum.Material.SmoothPlastic)
   tube.Material=Enum.Material.Neon; tube.CanCollide=false; tube.CanTouch=false; tube.CanQuery=false
-  light(tube,spec.color,24,0.9)
+  light(tube,spec.color,18,0.45)
  end
 end
 function C3.Build()

@@ -26,6 +26,8 @@ assert 'TowerSignalFin' not in world and 'TowerBeacon",Vector3.new(3,2,3)' in wo
 assert chapter.count('CutsceneRE:FireAllClients("pov"')==1
 assert 'cameraPlan(C3.Pos(-196,9,-15)' in chapter and 'cameraPlan(C3.Pos(-205,24,2)' in chapter
 assert 'KirillNeonBlue' in world and 'KirillNeonViolet' in world
+assert 'C3.Pos(pos.X,pos.Y,pos.Z),28,0.8,"HomeFillLamp"' in world
+assert 'light(tube,spec.color,18,0.45)' in world
 assert 'C3.Lamp(m,o+Vector3.new(x,47,z),72,1.45' in world
 assert 'tweenCharTo(p.Character,windowView,1.5,true)' in chapter
 assert 'if lockFacing then' in server and 'root.CFrame=CFrame.lookAt(root.Position,root.Position+faceDirection,Vector3.yAxis)' in server
