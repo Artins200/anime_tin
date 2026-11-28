@@ -7,7 +7,7 @@ do
  local stamina=new("Frame",{Size=UDim2.fromOffset(180,9),Position=UDim2.new(0,30,1,-108),BackgroundColor3=Color3.fromRGB(30,40,55)},hud)
  local fill=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(85,185,175),BorderSizePixel=0},stamina)
  local scope=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.new(),BackgroundTransparency=0.3,Visible=false},hud)
- new("TextLabel",{Size=UDim2.fromScale(0.6,0.12),Position=UDim2.fromScale(0.2,0.8),Text="ОПТИКА  ×12  •  СИГНАЛ С ВЕРШИНЫ",TextColor3=Color3.fromRGB(175,220,190),TextSize=22,BackgroundTransparency=1},scope)
+ new("TextLabel",{Size=UDim2.fromScale(0.6,0.12),Position=UDim2.fromScale(0.2,0.8),Text="ОПТИКА  ×3  •  СИГНАЛ С ВЕРШИНЫ",TextColor3=Color3.fromRGB(175,220,190),TextSize=22,BackgroundTransparency=1},scope)
  local flash=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(210,220,225),BackgroundTransparency=1,ZIndex=40},hud)
  local terminal=new("Frame",{Size=UDim2.fromScale(0.76,0.77),Position=UDim2.fromScale(0.12,0.12),BackgroundColor3=Color3.fromRGB(14,24,38),Visible=false,ZIndex=60},hud)
  local title=new("TextLabel",{Size=UDim2.fromScale(0.86,0.15),Position=UDim2.fromScale(0.04,0.02),TextColor3=Color3.fromRGB(145,215,200),TextSize=23,TextWrapped=true,BackgroundTransparency=1,ZIndex=61},terminal)

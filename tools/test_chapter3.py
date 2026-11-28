@@ -19,6 +19,11 @@ for feature in ('silv3r_candy','TransformationCapsule','SuspendedClone','Factory
 assert 'Эммм, что это было?' in chapter and 'Чекни в окно.' in chapter
 assert 'Lighting.Brightness=1.65' in chapter and 'bloom.Intensity=0' in chapter
 assert 'CFrame.lookAt(slotPosition,flatLook,Vector3.yAxis)' in chapter
+assert 'CFrame.lookAt(neuroPivot.Position,assistantFocus,Vector3.yAxis)' in chapter
+assert 'KirillNeonBlue' in world and 'KirillNeonViolet' in world
+assert 'C3.Lamp(m,o+Vector3.new(x,47,z),72,1.45' in world
+assert 'tweenCharTo(p.Character,windowView,1.5,true)' in chapter
+assert 'if lockFacing then' in server and 'root.CFrame=CFrame.lookAt(root.Position,root.Position+faceDirection,Vector3.yAxis)' in server
 assert 'SingularityLandmark' in world and 'Chapter3CityBackdrop' in world
 assert 'C3_CollisionAndGameplay' in world and 'TowerStairGate' in world
 assert 'Landmark geometry is a non-colliding visual shell' in world

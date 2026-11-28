@@ -107,8 +107,13 @@ function C3.BuildVillain()
    local hum=clone:FindFirstChildOfClass("Humanoid"); if hum then hum.DisplayDistanceType=Enum.HumanoidDisplayDistanceType.None; hum.HealthDisplayType=Enum.HumanoidHealthDisplayType.AlwaysOff end
   end
  end
- -- Low-key amber work lights, mounted to the ceiling instead of glowing props.
- for _,pos in ipairs({Vector3.new(-110,47,30),Vector3.new(0,47,95),Vector3.new(110,47,165)}) do C3.Lamp(m,o+pos,42,0.75,"FactoryWorkLight") end
+ -- Even ceiling fill across the production floor so the enclosure and clones
+ -- read clearly without washing the room in neon.
+ for _,z in ipairs({35,105,175}) do
+  for _,x in ipairs({-100,0,100}) do
+   C3.Lamp(m,o+Vector3.new(x,47,z),72,1.45,"FactoryWorkLight")
+  end
+ end
  -- The camera-side control deck remains uncluttered so characters read clearly.
  local neuroPos=o+Vector3.new(-25,3.15,76); local assistantPos=o+Vector3.new(18,3.15,82)
  local function faceLevel(position,target)
@@ -169,6 +174,16 @@ function C3.BuildHome()
  C2.SitRig(C3.kirill)
  local phone=item("KirillPhone",Vector3.new(0.7,0.1,1.3),Vector3.new(-184,18.6,19),C(35,65,91),Enum.Material.Glass); light(phone,C(105,150,195),6,0.4)
  for _,pos in ipairs({Vector3.new(-187,26,5),Vector3.new(-160,26,-15),Vector3.new(-223,26,0)}) do C3.Lamp(h,C3.Pos(pos.X,pos.Y,pos.Z),36,2.3,"HomeFillLamp") end
+ -- Kirill's upstairs room gets real emissive tubes plus local point lights:
+ -- cool blue near the desk and a softer violet accent behind the bed.
+ for _,spec in ipairs({
+  {name="KirillNeonBlue",size=Vector3.new(18,0.16,0.12),pos=Vector3.new(-184,25.6,23.35),color=C(77,166,255)},
+  {name="KirillNeonViolet",size=Vector3.new(15,0.16,0.12),pos=Vector3.new(-184,25.6,-5.35),color=C(177,105,255)},
+ }) do
+  local tube=item(spec.name,spec.size,spec.pos,spec.color,Enum.Material.SmoothPlastic)
+  tube.Material=Enum.Material.Neon; tube.CanCollide=false; tube.CanTouch=false; tube.CanQuery=false
+  light(tube,spec.color,24,0.9)
+ end
 end
 function C3.Build()
  -- Chapter III rebuilt around one continuous route and a traversable tower.

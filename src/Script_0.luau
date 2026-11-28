@@ -907,7 +907,7 @@ local function moveModel(model, target, duration, walk)
  for j, cf in pairs(joints) do j.C0 = cf end
 end
 -- Grounded cinematic blocking: fixed walking speed, raycast support and no physics fall state.
-local function tweenCharTo(char, target, _duration)
+local function tweenCharTo(char, target, _duration, lockFacing)
  local root=char:FindFirstChild("HumanoidRootPart")
  local hum=char:FindFirstChildOfClass("Humanoid")
  if not root or not hum or hum.Health<=0 then return false end
@@ -930,6 +930,16 @@ local function tweenCharTo(char, target, _duration)
  local start=root.Position
  local partnerAnchors={}
  local distance=((target.Position-start)*Vector3.new(1,0,1)).Magnitude
+ local faceDirection
+ if lockFacing then
+  faceDirection=target.LookVector*Vector3.new(1,0,1)
+  if faceDirection.Magnitude<0.001 then faceDirection=(target.Position-start)*Vector3.new(1,0,1) end
+  if faceDirection.Magnitude<0.001 then faceDirection=root.CFrame.LookVector*Vector3.new(1,0,1) end
+  faceDirection=faceDirection.Unit
+  -- Turn toward the marked destination before the first walking frame, then
+  -- keep that heading throughout the path instead of snapping at the window.
+  root.CFrame=CFrame.lookAt(root.Position,root.Position+faceDirection,Vector3.yAxis)
+ end
  local duration=math.max(distance/12,0.12) -- consistent 12 studs/s, not 3-stud/s shuffling
  local began=os.clock(); local reached=true
  char:SetAttribute("CinematicWalk",true)
@@ -942,16 +952,18 @@ local function tweenCharTo(char, target, _duration)
   local delta=(nextPosition-root.Position)*Vector3.new(1,0,1)
   local obstacle=workspace:Raycast(root.Position,delta,params)
   if obstacle and obstacle.Normal.Y<0.5 then reached=false; break end
-  if delta.Magnitude>0.001 then
+  local direction
+  if lockFacing then
+   direction=faceDirection
+  elseif delta.Magnitude>0.001 then
    -- Face the horizontal travel vector directly; smoothing the whole rotation
    -- frame-by-frame caused visible sideways drift and tilted-looking turns.
-   local direction=delta.Unit
-   root.CFrame=CFrame.lookAt(nextPosition,nextPosition+direction,Vector3.yAxis)
+   direction=delta.Unit
   else
-   local direction=target.LookVector*Vector3.new(1,0,1)
+   direction=target.LookVector*Vector3.new(1,0,1)
    if direction.Magnitude<0.001 then direction=Vector3.new(0,0,-1) else direction=direction.Unit end
-   root.CFrame=CFrame.lookAt(nextPosition,nextPosition+direction,Vector3.yAxis)
   end
+  root.CFrame=CFrame.lookAt(nextPosition,nextPosition+direction,Vector3.yAxis)
   for _,partner in ipairs(Players:GetPlayers()) do
    local other=partner.Character
    local partnerRoot=other and other~=char and other:FindFirstChild("HumanoidRootPart")
@@ -3603,8 +3615,13 @@ function C3.BuildVillain()
    local hum=clone:FindFirstChildOfClass("Humanoid"); if hum then hum.DisplayDistanceType=Enum.HumanoidDisplayDistanceType.None; hum.HealthDisplayType=Enum.HumanoidHealthDisplayType.AlwaysOff end
   end
  end
- -- Low-key amber work lights, mounted to the ceiling instead of glowing props.
- for _,pos in ipairs({Vector3.new(-110,47,30),Vector3.new(0,47,95),Vector3.new(110,47,165)}) do C3.Lamp(m,o+pos,42,0.75,"FactoryWorkLight") end
+ -- Even ceiling fill across the production floor so the enclosure and clones
+ -- read clearly without washing the room in neon.
+ for _,z in ipairs({35,105,175}) do
+  for _,x in ipairs({-100,0,100}) do
+   C3.Lamp(m,o+Vector3.new(x,47,z),72,1.45,"FactoryWorkLight")
+  end
+ end
  -- The camera-side control deck remains uncluttered so characters read clearly.
  local neuroPos=o+Vector3.new(-25,3.15,76); local assistantPos=o+Vector3.new(18,3.15,82)
  local function faceLevel(position,target)
@@ -3665,6 +3682,16 @@ function C3.BuildHome()
  C2.SitRig(C3.kirill)
  local phone=item("KirillPhone",Vector3.new(0.7,0.1,1.3),Vector3.new(-184,18.6,19),C(35,65,91),Enum.Material.Glass); light(phone,C(105,150,195),6,0.4)
  for _,pos in ipairs({Vector3.new(-187,26,5),Vector3.new(-160,26,-15),Vector3.new(-223,26,0)}) do C3.Lamp(h,C3.Pos(pos.X,pos.Y,pos.Z),36,2.3,"HomeFillLamp") end
+ -- Kirill's upstairs room gets real emissive tubes plus local point lights:
+ -- cool blue near the desk and a softer violet accent behind the bed.
+ for _,spec in ipairs({
+  {name="KirillNeonBlue",size=Vector3.new(18,0.16,0.12),pos=Vector3.new(-184,25.6,23.35),color=C(77,166,255)},
+  {name="KirillNeonViolet",size=Vector3.new(15,0.16,0.12),pos=Vector3.new(-184,25.6,-5.35),color=C(177,105,255)},
+ }) do
+  local tube=item(spec.name,spec.size,spec.pos,spec.color,Enum.Material.SmoothPlastic)
+  tube.Material=Enum.Material.Neon; tube.CanCollide=false; tube.CanTouch=false; tube.CanQuery=false
+  light(tube,spec.color,24,0.9)
+ end
 end
 function C3.Build()
  -- Chapter III rebuilt around one continuous route and a traversable tower.
@@ -3947,7 +3974,9 @@ function C3.Intro()
  cameraPlan(neuro.Head.Position+Vector3.new(-9,2,-16),neuro.Head.Position+Vector3.new(-6,1,-10),neuro.Head.Position,2,60,52)
  CutsceneRE:FireAllClients("reveal")
  C3.Say(ANDROID_NAME,"Они уничтожили один из наших незначительных заводов... Это даже потерей тяжело назвать. Скоро весь мир покроется нашими рядами, и всё будет по нашим правилам. Идеальное общество, всё будет замечательно. Но хватит разговоров — пора действовать",12)
- moveModel(neuro,neuro:GetPivot()*CFrame.Angles(0,-0.8,0),0.8)
+ local neuroPivot=neuro:GetPivot()
+ local assistantFocus=Vector3.new(assistant.Head.Position.X,neuroPivot.Position.Y,assistant.Head.Position.Z)
+ moveModel(neuro,CFrame.lookAt(neuroPivot.Position,assistantFocus,Vector3.yAxis),0.8)
  C3.Say(ANDROID_NAME,"Эй, Тян C-3B1! Как успехи с нашим проектом Вышки Нейро-Сингулярной Связи?",5)
  moveModel(assistant,assistant:GetPivot()+Vector3.new(-6,0,0),1.5,true)
  cameraPlan(assistant.Head.Position+Vector3.new(3,1,-9),assistant.Head.Position+Vector3.new(2,1,-8),assistant.Head.Position,1,54,52)
@@ -3962,13 +3991,19 @@ function C3.Intro()
  C3.Say("Демид","Мы им завод снесли, а крайними всё равно оказались мы. Я до сих пор не понимаю, кто здесь с кем воюет.",5)
  C3.Say("Артём","И почему НТЯН ищет нас, а не тех, кто людей переделывает? Тут явно не вся картина.",4)
  C3RE:FireAllClients("signal"); ShakeRE:FireAllClients(2); task.wait(2)
- for i,p in ipairs(C3.party) do if C3.Root(p) then tweenCharTo(p.Character,CFrame.lookAt(C3.Pos(-153,4,(i-1)*5),C3.Pos(960,100,0)),1.5) end end
+ for i,p in ipairs(C3.party) do
+  if C3.Root(p) then
+   local windowPosition=C3.Pos(-153,4,(i-1)*5)
+   local windowView=CFrame.lookAt(windowPosition,C3.Pos(960,100,0),Vector3.yAxis)
+   tweenCharTo(p.Character,windowView,1.5,true)
+  end
+ end
  CutsceneRE:FireAllClients("pov",C3.beacon,65)
  C3.Say(C3.party[1]:GetAttribute("Hero")=="Artem" and "Артём" or "Демид","Эммм, что это было?",3)
  C3.Say("Демид","Чекни в окно.",3)
  focusStreaming(C3.Pos(960,103,0)); prepareView(C3.Pos(960,103,0))
  C3RE:FireAllClients("binocular",true)
- CutsceneRE:FireAllClients("cam",{cf=CFrame.lookAt(C3.Pos(-153,6,0),C3.Pos(960,103,0)),fov=7,time=1.4}); task.wait(3)
+ CutsceneRE:FireAllClients("cam",{cf=CFrame.lookAt(C3.Pos(-153,6,0),C3.Pos(960,103,0),Vector3.yAxis),fov=26,time=1.6}); task.wait(3)
  C3.Say("Артём","Сигнал идёт оттуда. Смотри на охрану наверху.",3)
  C3.Say("Демид","Значит, эту штуку нужно выключить. Сейчас, пока она весь город не накрыла.",4)
  C3RE:FireAllClients("binocular",false)
