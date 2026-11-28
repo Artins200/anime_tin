@@ -33,7 +33,8 @@ assert intro.count('spawnWave(1,token,info)') == 1
 assert intro.count('currentExitDoor=makeExitDoor') == 1
 assert 'BriefingLaboratory' in intro and 'BoardingSteps' in intro
 assert 'prepareEntrance()' in intro
-assert 'local duration=math.max(distance/12,0.12)' in server
+assert 'local duration=math.max(distance/(speedOverride or 12),0.12)' in server
+assert 'obstacle.Normal.Y<0.5 and not ignoreStepFaces' in server
 assert 'floor.Position.Y+clearance' in server
 assert 'root.Anchored=wasAnchored' in server
 assert 'entranceUsed=true -- consume before yielding' in server
@@ -75,7 +76,8 @@ assert 'briefingLight' not in room and 'SurfaceLight' not in room
 combat_lab=server.split('local function buildLaboratory(',1)[1].split('-- БАЗА',1)[0]
 assert 'ceilingLight(' not in combat_lab and 'briefingLight(' not in combat_lab
 assert 'Enum.Material.Neon' not in combat_lab
-assert 'ExposureCompensation=0' not in server
+assert 'ExposureCompensation=0' not in server.split('-- BEGIN CHAPTER THREE\n')[0]
+assert 'Lighting.ExposureCompensation=0.03' in server
 print('PASS: soft non-neon briefing-only lighting; original combat-room lighting restored')
 # Black-screen regressions: readiness ordering, bounded preparation and error cleanup.
 assert client.rfind('FireServer("ready")') > client.index('Remotes.Fade.OnClientEvent')

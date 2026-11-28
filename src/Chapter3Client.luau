@@ -6,8 +6,18 @@ do
  local objective=new("TextLabel",{Size=UDim2.new(0.7,0,0,55),Position=UDim2.new(0.15,0,0,125),BackgroundColor3=Color3.fromRGB(17,26,42),BackgroundTransparency=0.15,TextColor3=Color3.fromRGB(220,230,240),TextSize=17,TextWrapped=true,Font=Enum.Font.GothamBold},hud)
  local stamina=new("Frame",{Size=UDim2.fromOffset(180,9),Position=UDim2.new(0,30,1,-108),BackgroundColor3=Color3.fromRGB(30,40,55)},hud)
  local fill=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(85,185,175),BorderSizePixel=0},stamina)
- local scope=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.new(),BackgroundTransparency=0.3,Visible=false},hud)
- new("TextLabel",{Size=UDim2.fromScale(0.6,0.12),Position=UDim2.fromScale(0.2,0.8),Text="ОПТИКА  ×12  •  СИГНАЛ С ВЕРШИНЫ",TextColor3=Color3.fromRGB(175,220,190),TextSize=22,BackgroundTransparency=1},scope)
+ local scope=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Visible=false},hud)
+ -- A quiet, transparent reticle keeps the street bright; no opaque mask or zoom label.
+ local scopeColor=Color3.fromRGB(190,222,205)
+ for _,sx in ipairs({-1,1}) do for _,sy in ipairs({-1,1}) do
+  local x=sx<0 and 0.045 or 0.955; local y=sy<0 and 0.06 or 0.94
+  local ox=sx<0 and 0 or -26; local oy=sy<0 and 0 or -2
+  new("Frame",{Size=UDim2.fromOffset(26,2),Position=UDim2.new(x,ox,y,oy),BackgroundColor3=scopeColor,BackgroundTransparency=0.22,BorderSizePixel=0},scope)
+  new("Frame",{Size=UDim2.fromOffset(2,26),Position=UDim2.new(x,sx<0 and 0 or -2,y,sy<0 and 0 or -26),BackgroundColor3=scopeColor,BackgroundTransparency=0.22,BorderSizePixel=0},scope)
+ end end
+ new("Frame",{Size=UDim2.fromOffset(14,2),Position=UDim2.new(0.5,-7,0.5,-1),BackgroundColor3=scopeColor,BackgroundTransparency=0.35,BorderSizePixel=0},scope)
+ new("Frame",{Size=UDim2.fromOffset(2,14),Position=UDim2.new(0.5,-1,0.5,-7),BackgroundColor3=scopeColor,BackgroundTransparency=0.35,BorderSizePixel=0},scope)
+ new("Frame",{Size=UDim2.fromOffset(3,3),Position=UDim2.new(0.5,-1.5,0.5,-1.5),BackgroundColor3=scopeColor,BackgroundTransparency=0.05,BorderSizePixel=0},scope)
  local flash=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(210,220,225),BackgroundTransparency=1,ZIndex=40},hud)
  local terminal=new("Frame",{Size=UDim2.fromScale(0.76,0.77),Position=UDim2.fromScale(0.12,0.12),BackgroundColor3=Color3.fromRGB(14,24,38),Visible=false,ZIndex=60},hud)
  local title=new("TextLabel",{Size=UDim2.fromScale(0.86,0.15),Position=UDim2.fromScale(0.04,0.02),TextColor3=Color3.fromRGB(145,215,200),TextSize=23,TextWrapped=true,BackgroundTransparency=1,ZIndex=61},terminal)
@@ -68,10 +78,6 @@ do
   if action=="signal" then
    hud.Enabled=true; flash.BackgroundTransparency=0.65; TweenService:Create(flash,TweenInfo.new(0.8),{BackgroundTransparency=1}):Play()
    local s=new("Sound",{SoundId="rbxasset://sounds/electronicpingshort.wav",Volume=0.18,PlaybackSpeed=1.2},SoundService); s:Play(); Debris:AddItem(s,2); return
-  end
-  if action=="nonlethal" then
-   hitmark.TextColor3=Color3.fromRGB(100,220,170); hitmark.TextTransparency=0
-   TweenService:Create(hitmark,TweenInfo.new(0.3),{TextTransparency=1}):Play(); return
   end
   if action=="grab" then -- local damage feedback
    flash.BackgroundColor3=Color3.fromRGB(145,65,70); flash.BackgroundTransparency=0.85; TweenService:Create(flash,TweenInfo.new(0.5),{BackgroundTransparency=1}):Play(); return

@@ -1,5 +1,6 @@
 """Chapter III integration contracts and executed server policies (not Roblox)."""
 from pathlib import Path
+import math
 import subprocess
 
 server=Path('src/Script_0.luau').read_text()
@@ -14,11 +15,97 @@ assert 'selectedChapter=selectedChapter%3+1' in client
 assert '(data.chapter==2 or data.chapter==3) and data.chapter or 1' in server
 assert 'C3.Protected(function() C3.Start(party) end)' in server
 assert 'if plr:GetAttribute("Chapter")==3 then if c3Attack' in server
-for feature in ('silv3r_candy','TransformationCapsule','SuspendedFigure','TowerStair','StairwellPartition','KirillRoomDoor','InvulnerableTowerShield','HardwareBreaker','ModuleCase'):
+for feature in ('silv3r_candy','TransformationCapsule','SuspendedClone','FactoryLeftWall','FactoryRightWall','FactoryRearWall','TowerStair','StairwellPartition','KirillRoomDoor','InvulnerableTowerShield','HardwareBreaker','ModuleCase'):
     assert feature in world
+assert 'function C3.HeroName()' in chapter and 'Посмотри в окно.' in chapter and 'Башня. Сигнал идёт оттуда.' in chapter
+assert 'Lighting.ClockTime=19.45' in chapter and 'Lighting.Brightness=2.05' in chapter and 'atm.Density=0.065' in chapter
+assert 'LEDStreetLampHead' in world and 'WarmStreetLamp' in world and 'NTyanArmoredTransport' in chapter
+assert 'function buildSedan' in world and 'SedanTire' in world and 'WreckedCar' not in world
+assert 'FarNeighborhoodBuilding' in world and 'BoulevardTreeCanopy' in world and 'StreetEdgeKerb' in world
+assert 'StorefrontCanopy' in world and 'StorefrontLightFascia' in world and 'StorefrontMullion' in world
+assert 'TowerObjectiveRouteStrip' in world and 'TowerDeckEdgeInlay' in world
+assert 'HorizonHighrise' in world and 'HorizonEndcap' in world and 'CitySafetyPerimeter' in world
+assert 'outerGround.CanCollide=true' in world and 'Vector3.new(1.5,16,174)' in world
+assert 'StairwellPartition' in world and 'slab(82,31,0,-25.5); slab(82,31,0,25.5)' in world
+assert 'Vector3.new(2.65,0.65,18.5)' in world and 'DistrictTitle' not in world and 'DistrictGateHeader' not in world
+assert 'PrepareCapturedCivilian' in chapter and 'hum:SetStateEnabled(Enum.HumanoidStateType.Dead,true)' in chapter
+assert 'e.hum:TakeDamage(damage)' in chapter and 'ragdoll(m,not civilian)' in chapter
+assert 'SubduedAlive' not in chapter and 'NonlethalProtection' not in chapter and 'nonlethal' not in ui
+assert 'C3.ProtectCivilian' not in chapter and 'C3.Suppress' not in chapter
+assert 'NeuroFactoryCityBackdrop' in world and 'DistantLitWindow' in world
+assert 'local factory,neuro,assistant,screen=C3.BuildVillain()' in chapter and 'cameraPlan(C3.Pos(-340,166,1880)' not in chapter
+assert 'Begin at eye level with Neuro already speaking' in chapter
+assert 'C3.sceneCollision[piece]=piece.CanCollide' in chapter and 'part.Name=="SofaSeat"' in world
+assert 'CinematicIgnoreObstacles' in chapter and 'followAuthoredRoute' in server
+assert 'if C3.coop then C3.Say("Демид","Посмотри в окно.",3)' in chapter and 'recoverChapter(introError)' in chapter
+assert 'function C3.TowerReinforcement()' in chapter and 'Поднимайте захваченный отряд НТЯН' in chapter
+assert 'Дуговой карабин' in Path('src/ModuleScript_0.luau').read_text() and 'Enum.KeyCode.Six' in client
+assert 'ShieldResonanceShell' in world and 'ShieldEnergyArc' in world and 'C3.shieldParts' in chapter
+assert 'KeyboardKeyCode=Enum.KeyCode.E' in chapter and 'GamepadKeyCode=Enum.KeyCode.ButtonX' in chapter
+assert 'CFrame.lookAt(slotPosition,flatLook,Vector3.yAxis)' in chapter
+assert 'CFrame.lookAt(neuroPivot.Position,assistantFocus,Vector3.yAxis)' in chapter
+for feature in ('TaperedTowerLeg','TowerXBrace','TowerAnchorShoe','TopWhipAntenna','TowerSignalMarker'):
+    assert feature in world
+assert 'TowerSignalFin' not in world and 'TowerBeacon",Vector3.new(3,2,3)' in world
+assert 'CutsceneRE:FireAllClients("pov",C3.Pos(960,150,0),54)' in chapter
+assert 'cameraPlan(C3.Pos(-178,9,0),C3.Pos(-175,8,0),C3.Pos(-50,3,0)' in chapter
+assert 'CutsceneRE:FireAllClients("followRig",C3.party[1].Character' in chapter
+assert 'buddyRoute=' in chapter and 'C3.buddy:SetAttribute("StayingWithKirill",true)' in chapter
+assert 'C3.Pos(-160,18,-10)' in chapter and 'C3.Pos(-193,18,-12)' in chapter
+assert 'C3.Pos(-178,18,-13)' in chapter and 'TweenService:Create(C3.kirillDoor' in chapter
+assert 'window.CanCollide=false; window.CanTouch=false; window.CanQuery=false' in world
+assert 'for stair=1,15 do' in chapter and 'local z=-20+stair*2.5; local y=stair+3' in chapter
+# All camera shots cross the window aperture (x=-148, y=3..10, z=-18..18).
+def window_crossing(camera_x,camera_y,camera_z,target_x,target_y,target_z):
+    t=(-148-camera_x)/(target_x-camera_x)
+    return (camera_y+(target_y-camera_y)*t,camera_z+(target_z-camera_z)*t)
+for camera,target in (((-204,10,-18),(-60,0,0)),((-175,8,0),(-50,3,0)),((-153,5,-5),(960,150,0))):
+    y,z=window_crossing(*camera,*target)
+    assert 3<y<10, f'window camera ray is blocked by sill/lintel at y={y}'
+    assert -18<z<18, f'window camera hits side wall at z={z}'
+assert 'C3.Pos(-184,15.2,-15),C3.Pos(-184,18,-8)' in world
+assert 'C3.Pos(-205,18,0)' in chapter and 'C3.Pos(-160,18,-10)' in chapter
+assert 'walkRoutes(mainRoute,buddyRoute)' in chapter and 'synchronizePartners~=false' in server
+assert 'if action=="pov" then' in client and 'BackgroundTransparency=1,Visible=false' in ui
+assert 'ОПТИКА' not in ui and '×3' not in ui and 'BackgroundTransparency=0.3,Visible=false' not in ui
+assert 'chosenHero=="Artem" and "Demid" or "Artem"' in chapter
+assert 'KirillNeonBlue' in world and 'KirillNeonViolet' in world
+for detail in ('CommandDais','CommandStationMonitor','FactoryWallProcessMonitor','GantryBridge','ClonePodStatus','ArtemElectronicsBench','DemidFieldKitRack','KirillBookshelf','KirillDeskMonitor','cloneStyles','SilkHeadband','SoftFringeLeft','EyeGlintLeft','TailoredCollar','UniformBrooch'):
+    assert detail in world
+assert 'if stage==10 and p:GetAttribute("Hero")=="Artem" then' not in world
+assert 'Взломать центральный терминал' in world and 'C3.OpenHack(p)' in world and 'CentralTerminalLight' in world
+assert 'C3.CanHack(p)' in world and 'stage==10 and 1.2 or nil' in world
+assert 'function C3.HeroPair' in chapter and 'function C3.HeroSay' in chapter
+assert 'if C3.coop then C3.Say(firstName,firstText,firstTime); C3.Say(secondName,secondText,secondTime); return end' in chapter
+assert 'Демид • связь' not in chapter and 'Сигнал идёт из башни. Я доберусь до передатчика' in chapter
+assert 'C3.HeroSay("Запру дверь и отключу сигнал.' in chapter and 'C3.HeroSay("Кирилл больше не ломится к двери' in chapter
+assert 'Пули не берут щит. Найду сервисный вход' in chapter and 'Ей плевать на пули. Найду другой путь' in chapter
+assert 'C3.coop and "Устранить Артёма и Демида."' in chapter
+assert 'cfg.Male=true' in chapter and 'Порабощённый житель' in chapter and 'previewGuards' not in chapter
+assert 'Связистка НТЯН' not in chapter and 'Оператор НТЯН' in chapter
+assert 'StreetCover' not in world and 'RouteBarrier' not in world and 'DeploymentBayFloor' not in world
+assert 'z.spawnDoor=nil; z.spawnClosed=nil; z.spawnPos=C3.Pos(x+58,4,0)' in world
+assert 'x+37,1.8,-62' in world and 'x-30,0.5,-62' in world
+assert 'z.spawnClosed*CFrame.new(0,23,0)' in chapter and 'z.isStreet and 15 or 23' in chapter
+assert 'C3.Pos(pos.X,pos.Y,pos.Z),28,0.8,"HomeFillLamp"' in world
+assert 'light(tube,spec.color,18,0.45)' in world
+assert 'C3.Lamp(m,o+Vector3.new(x,47,z),72,1.45' in world
+assert 'tweenCharTo(character,windowTarget,1.5,false,12,false,false)' in chapter
+assert 'local entry=C3.Pos(-174,4,zOffset)' in chapter
+assert 'if lockFacing then' in server and 'root.CFrame=CFrame.lookAt(root.Position,root.Position+faceDirection,Vector3.yAxis)' in server
 assert 'SingularityLandmark' in world and 'Chapter3CityBackdrop' in world
-assert 'prepareView(C3.Pos(960,103,0))' in chapter
-assert 'cfg.Gun=false' in chapter and 'e.suppression' in chapter
+assert 'C3_CollisionAndGameplay' in world and 'TowerStairGate' not in world and 'TowerStairLanding' in world
+assert 'local z={index=i,center=C3.Pos(x,4,0),start=C3.Pos(x-62,4,0)' in world
+assert 'C3.zones[i]=z' in world and 'C3.zones[stage]=z' in world
+assert 'Landmark geometry is a non-colliding visual shell' in world
+assert 'MainStreetAsphalt' in world and 'DistrictTitle' not in world and 'NTyanOffice' in world
+assert 'C3.Send(force)' in chapter and 'now-(C3.lastStateSent or 0)<1' in chapter
+assert 'local signature=("%d:%d:%d:%d:%d:%d:%d:%d")' in chapter
+assert 'C3.map:Destroy()' in chapter and 'C3.lastStateSignature=nil' in chapter
+assert 'task.delay(0.4,function() if held[p]==started then held[p]=nil end end)' in chapter
+assert 'held[p]=nil -- every activation consumes its own hold; no replay window' in chapter
+assert 'prepareView(C3.Pos(960,150,0))' in chapter
+assert 'cfg.Gun=not civilian' in chapter and 'C3.PrepareCapturedCivilian(m,h)' in chapter and 'C3.Suppress' not in chapter
 assert 'C3.confirmPlayer==p' in chapter and 'helperRoot.Position-C3.zones[10].breaker.Position' in chapter
 assert 'C3.relayCounted' not in chapter and 'z.relayCounted=true' in chapter
 assert 'C3.shield.CanQuery=false' in chapter
@@ -50,7 +137,7 @@ local Vector3={new=function(x,y,z) return setmetatable({X=x or 0,Y=y or 0,Z=z or
 Vector3.zero=Vector3.new(0,0,0)
 local function typeof(v) return getmetatable(v)==vec and "Vector3" or type(v) end
 local cf={}; cf.__mul=function(a,b) return a end
-local CFrame={new=function(...) return setmetatable({Position=Vector3.new(...)},cf) end,lookAt=function(pos) return setmetatable({Position=pos},cf) end}
+local CFrame={new=function(...) return setmetatable({Position=Vector3.new(...)},cf) end,lookAt=function(pos) return setmetatable({Position=pos},cf) end,Angles=function() return setmetatable({Position=Vector3.zero},cf) end}
 local function C(...) return {...} end
 local packets={}
 local handler
@@ -67,8 +154,9 @@ local TweenInfo={new=function() return {} end}
 local c2WorldWeapon=function() end
 local c2Root=function(p) return p.Parent and p.h.Health>0 and p.root or nil,p.h end
 local Random={new=function() return {NextInteger=function(_,a,b) return math.random(a,b) end} end}
-local Instance={new=function() return {Play=function() end} end}
-local Enum={Material={},PartType={Cylinder=1,Ball=2},ModelStreamingMode={Persistent=1}}
+local Instance={new=function() local o={Play=function() end}; function o:GetDescendants() return {} end; return o end}
+UDim2={fromScale=function(x,y) return {X=x,Y=y} end}
+local Enum={Material={},PartType={Cylinder=1,Ball=2},ModelStreamingMode={Persistent=1},SurfaceGuiSizingMode={PixelsPerStud=1},NormalId={Front=1,Right=2},Font={GothamBold=1}}
 local task={wait=function() end,spawn=function() end}
 local WD={Order={"Fists","Pistol"},Stats={Fists={Cooldown=0.4,Range=7,Damage=28},Pistol={Cooldown=0.26,Range=300,Damage=24}}}
 local fxFolder={}
@@ -142,27 +230,29 @@ print("PASS: executed solo terminal fallback, distance loss and expiry cancellat
 
 C3.Send=function() end
 C3.party={artem,demid}; C3.coop=true; C3.stage=6; C3.relays=0
-local relay={index=6,cleared=true,objective=false,panel={},gate={},gateClosed=CFrame.new()}
+local relay={index=6,cleared=true,objective=false,panel={},breaker={Position=Vector3.zero},gate={},gateClosed=CFrame.new()}
+C3.confirmPlayer=nil; C3.confirmUntil=nil
 C3.CompleteObjective(demid,relay); assert(not relay.objective)
 C3.CompleteObjective(artem,relay); assert(not relay.objective,"coop skipped readiness")
-relay.assaultReady=true; C3.CompleteObjective(artem,relay); assert(relay.objective and C3.relays==1)
+relay.assaultReady=true; C3.confirmPlayer=demid; C3.confirmUntil=clock-1
+C3.CompleteObjective(artem,relay); assert(not relay.objective,"expired teammate confirmation accepted")
+C3.confirmUntil=clock+12; C3.CompleteObjective(artem,relay); assert(relay.objective and C3.relays==1)
 relay.objective=false; C3.CompleteObjective(artem,relay); assert(C3.relays==1,"checkpoint duplicated relay count")
 for clear=0,1 do for objective=0,1 do assert(C3.Ready({cleared=clear==1,objective=objective==1})==(clear==1 and objective==1)) end end
 print("PASS: executed role-specific relays, checkpoint idempotency and gate conjunction")
 
 C3.stage=1; C3.hacker=nil; C3.shots={}; C3.mobs={}; C3.towerOff=false
-local mob={SetAttribute=function() end,GetDescendants=function() return {} end}; local hum={Health=80,MaxHealth=80,MoveTo=function() end}; function hum:TakeDamage(d) self.Health-=d end
+local mob={SetAttribute=function() end,GetDescendants=function() return {} end}; local hum={Health=92,MaxHealth=92,MoveTo=function() end}; function hum:TakeDamage(d) self.Health=math.max(0,self.Health-d) end
 C3.mobs[mob]={hum=hum,root={Position=Vector3.zero},civilian=true,down=false,stun=0}
 local hit={Instance={Name="Head",FindFirstAncestorOfClass=function() return mob end},Position=Vector3.zero}
 workspace.Raycast=function() return hit end
 C3.shield={}; clock+=1
-c3Attack(artem,"Fists",Vector3.zero,Vector3.new(1,0,0)); clock+=1
-c3Attack(artem,"Fists",Vector3.zero,Vector3.new(1,0,0))
-assert(C3.mobs[mob].down and hum.Health==80,"civilian was killed instead of suppressed")
+for _=1,4 do c3Attack(artem,"Fists",Vector3.zero,Vector3.new(1,0,0)); clock+=1 end
+assert(hum.Health==0,"captured civilian damage did not reach lethal health")
 local kirill={}; hit.Instance.FindFirstAncestorOfClass=function() return kirill end
-clock+=1; c3Attack(artem,"Pistol",Vector3.zero,Vector3.new(1,0,0)); assert(hum.Health==80)
+clock+=1; c3Attack(artem,"Pistol",Vector3.zero,Vector3.new(1,0,0)); assert(hum.Health==0)
 assert(C3.mobs[kirill]==nil)
-print("PASS: executed nonlethal civilian suppression and exclusion of original Kirill from combat registry")
+print("PASS: executed lethal captured-civilian damage and exclusion of original Kirill from combat registry")
 
 C3.collecting=true; C3.modules={}; C3.moduleParts={{},{}}; C3.party={artem,demid}; C3.coop=true; C3.case={}
 C3.Scene=function() end; C3.Say=function() end
@@ -173,81 +263,118 @@ C3.TakeModule(demid,2); assert(C3.modules[2] and C3.finished and returned==1)
 C3.TakeModule(demid,2); assert(returned==1)
 print("PASS: executed role-specific module collection, one-shot ending and return to menu")
 '''
-# Build the actual world against geometry-only constructors. Engine physics is
-# not emulated, but missing/oversized slabs and disconnected stair runs are caught.
+# Execute the actual rebuilt world with light geometry-only mocks. This checks
+# route continuity, stair reachability, floor holes, spawn doors and collision layers.
 geometry=r'''
 local generated={}
+levelFolder={}
+Types={Pistol={}}
+buildRig=function() return {Name="MockGuard"} end
+c2Dress=function() end
+anchorAll=function() end
+light=function() return {} end
+local UDim2={fromScale=function(x,y) return {X=x,Y=y} end}
 C3.BuildHome=function() end
+C3.Lamp=function(parent,pos,range,brightness,name) return C3.Part(parent,name or "AreaLamp",Vector3.new(2,0.2,2),pos,C(1,1,1),Enum.Material.Concrete) end
+C3.Beam=function(parent,name,a,b,width,color) return C3.Part(parent,name,Vector3.new(width,width,(b-a).Magnitude),(a+b)*0.5,color,Enum.Material.Metal) end
+C3.CommunicationEquipment=function() end
+C3.BuildRadioMast=function() end
 C3.Prompt=function() return {} end
 C3.Part=function(parent,name,size,pos)
- assert(math.max(size.X,size.Y,size.Z)<=512)
- local p={Name=name,Size=size,Position=pos,CFrame=CFrame.new(pos.X,pos.Y,pos.Z)}
+ assert(math.max(size.X,size.Y,size.Z)<=512,"oversized Roblox part: "..name)
+ local p={Name=name,Size=size,Position=pos,CFrame=CFrame.new(pos.X,pos.Y,pos.Z),Parent=parent,CanCollide=true,CanQuery=true,CanTouch=true}
  table.insert(generated,p); return p
 end
-local Types={Pistol={}}
-local buildRig=function() return {} end
-local c2Dress=function() end
-local anchorAll=function() end
-local light=function() return {} end
 '''
-# These helpers are resolved lexically inside the world functions.
 world_checks=r'''
-C3.BuildHome=function() end
 C3.Build()
 assert(#C3.zones==10)
-local steps={}; local roads={}; local gates=0
+local stairs,roads,approach,gates,airlocks,doors={}, {},nil,0,0,0
 for _,p in ipairs(generated) do
- if p.Name=="TowerStair" then table.insert(steps,p) end
- if p.Name=="CityRoad" then table.insert(roads,p) end
- if p.Name=="DistrictGate" then assert(p.Size.Z==130); gates+=1 end
+ if p.Name=="TowerStair" then table.insert(stairs,p) end
+ if p.Name=="MainStreetAsphalt" then table.insert(roads,p) end
+ if p.Name=="TowerApproach" then approach=p end
+ if p.Name=="DistrictGate" then assert(p.Size.Z==174); gates+=1 end
+ if p.Name=="TowerStairGate" then airlocks+=1 end
+ if p.Name=="DeploymentDoor" then assert(p.Size.Y==18 and math.abs(p.Position.Y%24-9)<0.001); doors+=1 end
 end
-assert(#steps==96 and gates==5)
+assert(#stairs==80 and gates==5 and airlocks==0 and doors==5)
+for _,p in ipairs(stairs) do assert(p.Size.Z==18.5,"stair tread must fully support the protected stair lane") end
 for level=0,3 do
  local row={}
- for _,p in ipairs(steps) do if p.Position.Y>level*24 and p.Position.Y<(level+1)*24 then table.insert(row,p) end end
- assert(#row==24)
+ for _,p in ipairs(stairs) do if p.Position.Y>level*24 and p.Position.Y<(level+1)*24 then table.insert(row,p) end end
+ assert(#row==20,"each of four stair flights must have 20 treads")
  table.sort(row,function(a,b) return a.Position.Y<b.Position.Y end)
  for i=2,#row do
-  assert(math.abs(row[i].Position.Y-row[i-1].Position.Y-1)<0.001)
-  assert(math.abs(row[i].Position.X-row[i-1].Position.X)<=row[i].Size.X+0.001)
+  assert(math.abs(row[i].Position.Y-row[i-1].Position.Y-1.2)<0.001,"stair rise discontinuity")
+  local deltaX=row[i].Position.X-row[i-1].Position.X
+  assert(math.abs(math.abs(deltaX)-2.4)<0.001,"stair tread gap")
+  assert(level%2==0 and deltaX>0 or level%2==1 and deltaX<0,"alternating stair direction must carry each landing straight to the next deck")
  end
 end
-for x=-210,1100 do
- local supported=false
- for _,p in ipairs(roads) do if math.abs(x-p.Position.X)<=p.Size.X/2 and p.Size.Z>=130 then supported=true end end
- assert(supported,"street gap at "..x)
+assert(#roads==5,"continuous five-segment street expected")
+table.sort(roads,function(a,b) return a.Position.X<b.Position.X end)
+for i=2,#roads do
+ assert(roads[i].Position.X-roads[i-1].Position.X<= (roads[i].Size.X+roads[i-1].Size.X)/2,"street segment gap")
 end
+assert(approach and approach.Position.X-approach.Size.X/2<=roads[#roads].Position.X+roads[#roads].Size.X/2,"road-to-tower approach gap")
 for stage=6,9 do
  local z=C3.zones[stage]
- assert(z.exit.Y==z.start.Y+24,"exit must be at the top of the staircase")
- assert(math.abs(z.exit.X-z.start.X)==84,"exit must be across the stair run")
- assert(math.abs(z.spawnPos.Z-C3.origin.Z)<25,"guards must spawn on main floor, not over shaft")
+ assert(math.abs(z.exit.Y-z.start.Y-24)<0.001,"tower gate exit must meet next floor")
+ local expectedExit=stage%2==0 and 984 or 936
+ local expectedStart=stage==6 and 930 or stage%2==1 and 984 or 936
+ assert(math.abs(z.exit.X-expectedExit)<0.01 and math.abs(z.start.X-expectedStart)<0.01,"alternating stair landing must join consecutive levels")
+ assert(math.abs(z.exit.Z-C3.origin.Z)<0.01)
 end
-local supports,rails,lamps,antenna=0,0,0,0
+assert(math.abs(C3.zones[10].start.X-936)<0.01,"top floor must begin at the final stair landing")
+assert(math.abs(C3.zones[7].start.Y-C3.zones[6].exit.Y)<0.01,"floor 7 start must meet floor 6 exit")
+for stage=1,5 do
+ local z=C3.zones[stage]
+ assert(z.spawnDoor==nil and math.abs(z.spawnPos.Z-C3.origin.Z)<0.01,"street waves must spawn on the clear street without a blocky kiosk")
+ assert(math.abs(z.panel.Position.Z-(C3.origin.Z-62))<0.01,"street console must sit on the sidewalk")
+end
+for stage=6,10 do
+ local z=C3.zones[stage]
+ assert(z.gate==z.spawnDoor and math.abs(z.spawnPos.Z-(C3.origin.Z+28))<0.01,"tower guards should spawn visibly inside the playable floor")
+end
+local towerInteriorFloors,towerLandings,routeStrips,deckInlays=0,0,0,0
 for _,p in ipairs(generated) do
- if p.Name=="StairSolidSupport" then supports+=1 end
- if p.Name=="StairSafetyRail" then rails+=1 end
- if p.Name=="TowerCeilingLamp" then lamps+=1 end
- if p.Name=="CellularPanelAntenna" then antenna+=1 end
+ if p.Name=="TowerFloor" then towerInteriorFloors+=1 end
+ if p.Name=="TowerStairLanding" then towerLandings+=1 end
+ if p.Name=="TowerObjectiveRouteStrip" then routeStrips+=1; assert(not p.CanCollide) end
+ if p.Name=="TowerDeckEdgeInlay" then deckInlays+=1; assert(not p.CanCollide) end
 end
-assert(supports==92 and rails==192 and lamps==30 and antenna==8)
--- A ceiling/landing must not cut through the last stair treads (head trap).
-for _,step in ipairs(steps) do
- for _,p in ipairs(generated) do
-  if p.Name=="StairLanding" and p.Position.Y>step.Position.Y+1.2 and p.Position.Y<step.Position.Y+5 then
-   local overlapX=math.abs(p.Position.X-step.Position.X)<(p.Size.X+step.Size.X)/2-0.01
-   local overlapZ=math.abs(p.Position.Z-step.Position.Z)<(p.Size.Z+step.Size.Z)/2-0.01
-   assert(not (overlapX and overlapZ),"upper landing blocks stair headroom")
-  end
+assert(towerInteriorFloors==9 and towerLandings==8,"four protected stair corridors need solid side floors and both end landings")
+assert(routeStrips==10 and deckInlays==10,"all five tower decks need nonblocking route and perimeter inlays")
+local facades,groundTiles,perimeterWalls,stairWalls={},0,0,0
+for _,p in ipairs(generated) do
+ if p.Name=="BlockFacade" then table.insert(facades,p) end
+ if p.Name=="OuterCityGround" then groundTiles+=1 end
+ if p.Name=="CitySafetyPerimeter" then perimeterWalls+=1 end
+ if p.Name=="StairwellPartition" then stairWalls+=1 end
+end
+assert(#facades==38 and groundTiles==12 and perimeterWalls==14 and stairWalls==24,"sealed city perimeter and protected stairwell parts missing")
+table.sort(facades,function(a,b) return a.Position.X<b.Position.X end)
+assert(facades[1].Position.X-facades[1].Size.X/2<=-409 and facades[#facades].Position.X+facades[#facades].Size.X/2>=1289,"street wall does not reach the city safety perimeter")
+for i=2,19 do assert(facades[i].Position.X-facades[i].Size.X/2<=facades[i-1].Position.X+facades[i-1].Size.X/2,"walk-around gap between street facades") end
+for stage=1,5 do
+ local gate=C3.zones[stage].gate; local joinedSides={}
+ for _,facade in ipairs(facades) do
+  local offsetZ=facade.Position.Z-C3.origin.Z; local sideZ=math.abs(offsetZ)
+  if math.abs(facade.Position.X-gate.Position.X)<=facade.Size.X/2 and sideZ==98 and gate.Size.Z/2>sideZ-facade.Size.Z/2 then joinedSides[offsetZ>0 and 1 or -1]=true end
  end
+ assert(joinedSides[1] and joinedSides[-1],"street gate must overlap both side buildings; side bypass remains")
 end
-print("PASS: executed full world builder: ten arenas, 96 contiguous stair steps, five full-width gates and continuous city road")
+print("PASS: street, approach and full-width gates are continuous; city has collision-safe ground and wrapped skyline; tower stair corridors are enclosed over solid floor wings; every gate joins building walls")
 '''
 geometry_path=Path('.tools/chapter3-geometry-test.luau')
 geometry_path.parent.mkdir(exist_ok=True)
-geometry_path.write_text(prelude+'\n'+chapter+'\n'+geometry+'\n'+world+'\n'+world_checks)
-subprocess.run(['.tools/luau/build/release/luau',str(geometry_path)],check=True)
-
-path=Path('.tools/chapter3-policy-test.luau'); path.parent.mkdir(exist_ok=True)
-path.write_text(prelude+'\n'+circuits+'\n'+chapter+'\n'+checks)
-subprocess.run(['.tools/luau/build/release/luau',str(path)],check=True)
+geometry_path.write_text(prelude+'\n'+circuits+'\n'+chapter+'\n'+geometry+'\n'+world+'\nC3.BuildHome=function() end\n'+world_checks)
+luau=Path('.tools/luau/build/release/luau')
+if not luau.is_file():
+    print('SKIP: executable geometry/policy checks need .tools/luau/build/release/luau; static integration checks passed')
+else:
+    subprocess.run([str(luau),str(geometry_path)],check=True)
+    path=Path('.tools/chapter3-policy-test.luau'); path.parent.mkdir(exist_ok=True)
+    path.write_text(prelude+'\n'+circuits+'\n'+chapter+'\n'+checks)
+    subprocess.run([str(luau),str(path)],check=True)
