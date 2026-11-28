@@ -1,5 +1,6 @@
 """Chapter III integration contracts and executed server policies (not Roblox)."""
 from pathlib import Path
+import math
 import subprocess
 
 server=Path('src/Script_0.luau').read_text()
@@ -24,10 +25,25 @@ for feature in ('TaperedTowerLeg','TowerXBrace','TowerAnchorShoe','TopWhipAntenn
     assert feature in world
 assert 'TowerSignalFin' not in world and 'TowerBeacon",Vector3.new(3,2,3)' in world
 assert 'CutsceneRE:FireAllClients("pov"' not in chapter
-assert 'cameraPlan(C3.Pos(-175,12,-22)' in chapter and 'toward the distant tower instead of snapping to POV' in chapter
-assert 'cameraPlan(C3.Pos(-196,9,-15)' in chapter and 'cameraPlan(C3.Pos(-124,10,0)' in chapter
-assert 'CutsceneRE:FireAllClients("follow",C3.party[1].Character' in chapter
+assert 'cameraPlan(C3.Pos(-204,9,-17)' in chapter and 'inside the living room' in chapter
+assert 'cameraPlan(C3.Pos(-196,9,-15)' in chapter and 'cameraPlan(C3.Pos(-204,10,-18)' in chapter
+assert 'CutsceneRE:FireAllClients("followRig",C3.party[1].Character' in chapter
 assert 'buddyRoute=' in chapter and 'C3.buddy:SetAttribute("StayingWithKirill",true)' in chapter
+assert 'C3.Pos(-160,18,-10)' in chapter and 'C3.Pos(-193,18,-12)' in chapter
+assert 'C3.Pos(-178,18,-13)' in chapter and 'TweenService:Create(C3.kirillDoor' in chapter
+assert 'window.CanCollide=false; window.CanTouch=false; window.CanQuery=false' in world
+# Sightlines from both establishing shots must pass through the real opening
+# (z -18..18 at x -148), not graze either solid window jamb.
+def window_crossing(camera_x,camera_y,camera_z,target_x,target_y,target_z):
+    t=(-148-camera_x)/(target_x-camera_x)
+    return (camera_y+(target_y-camera_y)*t,camera_z+(target_z-camera_z)*t)
+for camera,target in (((-204,10,-18),(-60,0,0)),((-201,9,-14),(-50,2,0)),((-201,9,-15),(-60,0,0))):
+    y,z=window_crossing(*camera,*target)
+    assert 3<y<10, f'window camera ray is blocked by sill/lintel at y={y}'
+    assert -18<z<18, f'window camera hits side wall at z={z}'
+assert 'C3.Pos(-184,15.2,-15),C3.Pos(-184,18,-8)' in world
+assert 'C3.Pos(-205,18,0)' in chapter and 'C3.Pos(-160,18,-10)' in chapter
+assert 'walkRoutes(mainRoute,buddyRoute)' in chapter and 'synchronizePartners~=false' in server
 assert 'chosenHero=="Artem" and "Demid" or "Artem"' in chapter
 assert 'KirillNeonBlue' in world and 'KirillNeonViolet' in world
 for detail in ('CommandDais','CommandStationMonitor','FactoryWallProcessMonitor','GantryBridge','ClonePodStatus','ArtemElectronicsBench','DemidFieldKitRack','KirillBookshelf','KirillDeskMonitor'):
@@ -37,7 +53,7 @@ assert 'C3.CanHack(p)' in world and 'stage==10 and 1.2 or nil' in world
 assert 'C3.Pos(pos.X,pos.Y,pos.Z),28,0.8,"HomeFillLamp"' in world
 assert 'light(tube,spec.color,18,0.45)' in world
 assert 'C3.Lamp(m,o+Vector3.new(x,47,z),72,1.45' in world
-assert 'tweenCharTo(p.Character,windowView,1.5,true)' in chapter
+assert 'tweenCharTo(p.Character,windowView,1.5,true,12,false,false)' in chapter
 assert 'if lockFacing then' in server and 'root.CFrame=CFrame.lookAt(root.Position,root.Position+faceDirection,Vector3.yAxis)' in server
 assert 'SingularityLandmark' in world and 'Chapter3CityBackdrop' in world
 assert 'C3_CollisionAndGameplay' in world and 'TowerStairGate' in world

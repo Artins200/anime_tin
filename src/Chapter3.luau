@@ -365,7 +365,7 @@ function C3.BuildHome()
  for _,z in ipairs({-21,21}) do item("OriginalEastWall",Vector3.new(1,14,6),Vector3.new(-148,7,z),C(141,133,121)) end
  item("EastWindowSill",Vector3.new(1,3,36),Vector3.new(-148,1.5,0),C(141,133,121))
  item("EastWindowLintel",Vector3.new(1,4,36),Vector3.new(-148,12,0),C(141,133,121))
- local window=item("LivingWindow",Vector3.new(0.15,7,36),Vector3.new(-148,6.5,0),C(175,198,211),Enum.Material.Glass); window.Transparency=0.88
+ local window=item("LivingWindow",Vector3.new(0.15,7,36),Vector3.new(-148,6.5,0),C(175,198,211),Enum.Material.Glass); window.Transparency=0.88; window.CanCollide=false; window.CanTouch=false; window.CanQuery=false
  item("OriginalWestWall",Vector3.new(1,14,35),Vector3.new(-212,7,6.5),C(141,133,121))
  item("WestDoorLintel",Vector3.new(1,3,12),Vector3.new(-212,12.5,-18),C(141,133,121))
  -- The second floor is an addition OVER the old house. Its existing ceiling
@@ -385,9 +385,9 @@ function C3.BuildHome()
  item("BedroomWallRight",Vector3.new(8,13,1),Vector3.new(-152,21.5,-6),C(136,130,119))
  C3.kirillDoor=item("KirillRoomDoor",Vector3.new(8,12,0.5),Vector3.new(-160,21,-6),C(88,71,61),Enum.Material.Wood)
  C3.doorClosed=C3.kirillDoor.CFrame; C3.doorOpen=CFrame.new(C3.Pos(-164,21,-6))*CFrame.Angles(0,-math.pi/2,0)*CFrame.new(4,0,0)
- item("Bed",Vector3.new(7,2,12),Vector3.new(-202,16.5,15),C(67,82,107),Enum.Material.Fabric)
- item("BedPillow",Vector3.new(5,0.8,2.6),Vector3.new(-202,17.8,19),C(174,177,173),Enum.Material.Fabric)
- item("Desk",Vector3.new(10,1,5),Vector3.new(-184,18,20),C(99,79,64),Enum.Material.Wood)
+ item("Bed",Vector3.new(7,2,12),Vector3.new(-202,16.5,-15),C(67,82,107),Enum.Material.Fabric)
+ item("BedPillow",Vector3.new(5,0.8,2.6),Vector3.new(-202,17.8,-20),C(174,177,173),Enum.Material.Fabric)
+ item("Desk",Vector3.new(10,1,5),Vector3.new(-176,18,-20),C(99,79,64),Enum.Material.Wood)
  -- The shared lower floor has two unmistakable personal corners: Artem's
  -- electronics bench and Demid's field-kit rack/duffel.
  local artemDesk=item("ArtemElectronicsBench",Vector3.new(12,1,6),Vector3.new(-204,1.35,14),C(75,61,48),Enum.Material.Wood)
@@ -411,30 +411,31 @@ function C3.BuildHome()
  item("DemidTrainingGloveRight",Vector3.new(1.4,1.7,1.1),Vector3.new(-156,3.5,-18),C(127,54,46),Enum.Material.Fabric)
  -- Kirill's room shows that it is lived in: books, charging cables, a work
  -- monitor, first-aid supplies and a small lamp around his existing desk/bed.
- item("KirillBookshelf",Vector3.new(6,7,2.5),Vector3.new(-208,18.5,14),C(86,67,53),Enum.Material.Wood)
+ item("KirillBookshelf",Vector3.new(6,7,2.5),Vector3.new(-208,18.5,-12),C(86,67,53),Enum.Material.Wood)
  for row=1,2 do
-  item("KirillBookshelf",Vector3.new(5.5,0.3,2.2),Vector3.new(-208,16.5+row*2.2,14),C(122,91,66),Enum.Material.Wood)
-  for book=1,4 do item("KirillBook",Vector3.new(0.55,1.45,1.6),Vector3.new(-210.1+book*0.95,16.9+row*2.2,14),book%2==0 and C(61,94,105) or C(128,71,61),Enum.Material.SmoothPlastic) end
+  item("KirillBookshelf",Vector3.new(5.5,0.3,2.2),Vector3.new(-208,16.5+row*2.2,-12),C(122,91,66),Enum.Material.Wood)
+  for book=1,4 do item("KirillBook",Vector3.new(0.55,1.45,1.6),Vector3.new(-210.1+book*0.95,16.9+row*2.2,-12),book%2==0 and C(61,94,105) or C(128,71,61),Enum.Material.SmoothPlastic) end
  end
- local kirillMonitor=item("KirillDeskMonitor",Vector3.new(8,4.6,0.35),Vector3.new(-184,21.3,22.15),C(22,33,40),Enum.Material.Metal)
+ local kirillMonitor=item("KirillDeskMonitor",Vector3.new(8,4.6,0.35),Vector3.new(-176,21.3,-22.15),C(22,33,40),Enum.Material.Metal)
+ kirillMonitor.CFrame*=CFrame.Angles(0,math.pi,0)
  local kirillGui=Instance.new("SurfaceGui"); kirillGui.Face=Enum.NormalId.Front; kirillGui.CanvasSize=Vector2.new(520,300); kirillGui.Parent=kirillMonitor
  local kirillLabel=Instance.new("TextLabel"); kirillLabel.Size=UDim2.fromScale(1,1); kirillLabel.BackgroundColor3=C(19,31,38); kirillLabel.Text="KIRILL / AUDIO LOGS"; kirillLabel.TextColor3=C(117,176,195); kirillLabel.TextScaled=true; kirillLabel.Font=Enum.Font.GothamBold; kirillLabel.Parent=kirillGui
- item("KirillDeskChair",Vector3.new(3.2,2,3.2),Vector3.new(-184,16.2,14.8),C(61,70,75),Enum.Material.Fabric)
- item("KirillNightstand",Vector3.new(4,2.5,4),Vector3.new(-194,16.1,14),C(91,70,53),Enum.Material.Wood)
- item("KirillFirstAidCase",Vector3.new(2.4,1,1.7),Vector3.new(-194,17.85,14),C(170,73,67),Enum.Material.Metal)
- item("KirillNotebook",Vector3.new(2.5,0.18,3),Vector3.new(-181,18.62,19),C(177,166,139),Enum.Material.SmoothPlastic)
- item("KirillHeadphones",Vector3.new(2,0.55,2),Vector3.new(-186,18.9,19),C(38,45,50),Enum.Material.Metal)
- C3.kirill=secretActor(h,"silv3r_candy","Кирилл",CFrame.lookAt(C3.Pos(-184,15.2,15),C3.Pos(-184,18,22)))
+ item("KirillDeskChair",Vector3.new(3.2,2,3.2),Vector3.new(-176,16.2,-14.8),C(61,70,75),Enum.Material.Fabric)
+ item("KirillNightstand",Vector3.new(4,2.5,4),Vector3.new(-194,16.1,-14),C(91,70,53),Enum.Material.Wood)
+ item("KirillFirstAidCase",Vector3.new(2.4,1,1.7),Vector3.new(-194,17.85,-14),C(170,73,67),Enum.Material.Metal)
+ item("KirillNotebook",Vector3.new(2.5,0.18,3),Vector3.new(-171,18.62,-16),C(177,166,139),Enum.Material.SmoothPlastic)
+ item("KirillHeadphones",Vector3.new(2,0.55,2),Vector3.new(-168,18.9,-16),C(38,45,50),Enum.Material.Metal)
+ C3.kirill=secretActor(h,"silv3r_candy","Кирилл",CFrame.lookAt(C3.Pos(-184,15.2,-15),C3.Pos(-184,18,-8)))
  C3.kirill:SetAttribute("ProtectedCivilian",true); C3.kirillPose={}
  for _,motor in ipairs(C3.kirill:GetDescendants()) do if motor:IsA("Motor6D") then C3.kirillPose[motor]=motor.C0 end end
  C2.SitRig(C3.kirill)
- local phone=item("KirillPhone",Vector3.new(0.7,0.1,1.3),Vector3.new(-184,18.6,19),C(35,65,91),Enum.Material.Glass); light(phone,C(105,150,195),6,0.4)
+ local phone=item("KirillPhone",Vector3.new(0.7,0.1,1.3),Vector3.new(-176,18.6,-18.5),C(35,65,91),Enum.Material.Glass); light(phone,C(105,150,195),6,0.4)
  for _,pos in ipairs({Vector3.new(-187,26,5),Vector3.new(-160,26,-15),Vector3.new(-223,26,0)}) do C3.Lamp(h,C3.Pos(pos.X,pos.Y,pos.Z),28,0.8,"HomeFillLamp") end
  -- Kirill's upstairs room gets real emissive tubes plus local point lights:
  -- cool blue near the desk and a softer violet accent behind the bed.
  for _,spec in ipairs({
-  {name="KirillNeonBlue",size=Vector3.new(18,0.16,0.12),pos=Vector3.new(-184,25.6,23.35),color=C(77,166,255)},
-  {name="KirillNeonViolet",size=Vector3.new(15,0.16,0.12),pos=Vector3.new(-184,25.6,-5.35),color=C(177,105,255)},
+  {name="KirillNeonBlue",size=Vector3.new(18,0.16,0.12),pos=Vector3.new(-176,25.6,-23.35),color=C(77,166,255)},
+  {name="KirillNeonViolet",size=Vector3.new(15,0.16,0.12),pos=Vector3.new(-202,25.6,-22.8),color=C(177,105,255)},
  }) do
   local tube=item(spec.name,spec.size,spec.pos,spec.color,Enum.Material.SmoothPlastic)
   tube.Material=Enum.Material.Neon; tube.CanCollide=false; tube.CanTouch=false; tube.CanQuery=false
@@ -768,78 +769,98 @@ function C3.Intro()
  C3.Say("Демид","Мы им завод снесли, а крайними всё равно оказались мы. Я до сих пор не понимаю, кто здесь с кем воюет.",5)
  C3.Say("Артём","И почему НТЯН ищет нас, а не тех, кто людей переделывает? Тут явно не вся картина.",4)
  C3RE:FireAllClients("signal"); ShakeRE:FireAllClients(2); task.wait(2)
- -- Third-person exterior angle: both heroes cross the living room toward the
- -- glass window in frame; keep the entire window beat outside the characters.
- cameraPlan(C3.Pos(-124,10,0),C3.Pos(-127,9,0),C3.Pos(-174,6,0),1.2,68,64)
+ -- Third-person view from inside the living room: both heroes cross toward
+ -- the glass; the skyline and tower remain visible through the opening behind them.
+ -- Camera stays west of the actors, and its sightline crosses
+ -- the center of the actual window opening before reaching the skyline.
+ cameraPlan(C3.Pos(-204,10,-18),C3.Pos(-201,9,-15),C3.Pos(-60,0,0),1.4,64,58)
  local buddyWindowTarget=CFrame.lookAt(C3.Pos(-153,4,5),C3.Pos(960,100,0),Vector3.yAxis)
- if C3.buddy then task.spawn(function() if C3.buddy and C3.buddy.Parent then moveModel(C3.buddy,buddyWindowTarget,4,true) end end) end
+ local windowDuration=0
  for i,p in ipairs(C3.party) do
-  if C3.Root(p) then
-   local zOffset=C3.coop and (i==1 and -4 or 4) or -5
+  local root=C3.Root(p)
+  if root then
+   local zOffset=C3.coop and (i==1 and -5 or 5) or -5
    local windowPosition=C3.Pos(-153,4,zOffset)
    local windowView=CFrame.lookAt(windowPosition,C3.Pos(960,100,0),Vector3.yAxis)
-   tweenCharTo(p.Character,windowView,1.5,true)
+   local distance=((windowPosition-root.Position)*Vector3.new(1,0,1)).Magnitude
+   windowDuration=math.max(windowDuration,distance/12)
+   task.spawn(function() tweenCharTo(p.Character,windowView,1.5,true,12,false,false) end)
   end
  end
+ if C3.buddy then
+  task.spawn(function() moveModel(C3.buddy,buddyWindowTarget,4,true) end)
+  windowDuration=math.max(windowDuration,4)
+ end
+ task.wait(windowDuration+0.12)
  if C3.buddy then task.wait(0.45) end
  -- Keep the window beat third-person: show both heroes in silhouette while the
  -- camera looks past them toward the distant tower instead of snapping to POV.
- cameraPlan(C3.Pos(-175,12,-22),C3.Pos(-177,11,-19),C3.Pos(960,103,0),1.4,30,28)
+ cameraPlan(C3.Pos(-204,9,-17),C3.Pos(-201,9,-14),C3.Pos(-50,2,0),1.4,58,50)
  C3.Say(C3.party[1]:GetAttribute("Hero")=="Artem" and "Артём" or "Демид","Эммм, что это было?",3)
  C3.Say("Демид","Чекни в окно.",3)
  focusStreaming(C3.Pos(960,103,0)); prepareView(C3.Pos(960,103,0))
  C3RE:FireAllClients("binocular",true)
- cameraPlan(C3.Pos(-175,12,-22),C3.Pos(-177,11,-19),C3.Pos(960,103,0),1.6,30,26); task.wait(3)
+ cameraPlan(C3.Pos(-204,9,-17),C3.Pos(-201,9,-14),C3.Pos(-50,2,0),1.6,58,50); task.wait(3)
  C3.Say("Артём","Сигнал идёт оттуда. Смотри на охрану наверху.",3)
  C3.Say("Демид","Значит, эту штуку нужно выключить. Сейчас, пока она весь город не накрыла.",4)
  C3RE:FireAllClients("binocular",false)
  -- Pull back to a clean two-person third-person window shot after the binocular close-up.
- cameraPlan(C3.Pos(-140,10,-15),C3.Pos(-143,9,-13),C3.Pos(-156,7,0),1.1,60,55)
+ cameraPlan(C3.Pos(-204,10,-18),C3.Pos(-201,9,-15),C3.Pos(-60,0,0),1.1,60,56)
  C3.Say("Артём","Стой. Кирилл же наверху, в комнате!",3)
- focusStreaming(C3.Pos(-190,18,10)); prepareView(C3.Pos(-190,18,10))
- if C3.buddy then
-  -- In Solo the chosen hero and their absent partner are both shown climbing
-  -- the west stair wing; the partner later remains beside Kirill.
-  CutsceneRE:FireAllClients("follow",C3.party[1].Character,Vector3.new(18,10,-12),Vector3.new(0,2.5,0))
-  local mainRoute={
-   C3.Pos(-153,4,0),C3.Pos(-170,4,0),C3.Pos(-175,4,0),C3.Pos(-186,4,0),
-   C3.Pos(-204,4,0),C3.Pos(-204,4,-20),C3.Pos(-222,4,-20),C3.Pos(-222,18,18),
-   C3.Pos(-212,18,18),C3.Pos(-184,18,6),C3.Pos(-171,18,4),C3.Pos(-171,18,4),
-  }
-  local buddyRoute={
-   C3.Pos(-153,4,9),C3.Pos(-165,4,9),C3.Pos(-165,4,5),C3.Pos(-171,4,5),
-   C3.Pos(-186,4,9),C3.Pos(-204,4,9),C3.Pos(-204,4,-20),C3.Pos(-219,4,-20),
-   C3.Pos(-219,18,18),C3.Pos(-212,18,21),C3.Pos(-184,18,10),C3.Pos(-167,18,8),
-  }
-  local function directed(position,nextPosition)
-   local target=nextPosition or C3.kirill.Head.Position
-   return CFrame.lookAt(position,Vector3.new(target.X,position.Y,target.Z),Vector3.yAxis)
-  end
-  for waypoint=1,#mainRoute do
-   local mainTarget=directed(mainRoute[waypoint],mainRoute[waypoint+1])
-   local buddyTarget=directed(buddyRoute[waypoint],buddyRoute[waypoint+1])
-   local distance=(C3.buddy:GetPivot().Position-buddyRoute[waypoint]).Magnitude
-   local buddyDuration=math.max(distance/18,0.2)
-   local mainRoot=C3.Root(C3.party[1])
-   local mainDistance=mainRoot and ((mainTarget.Position-mainRoot.Position)*Vector3.new(1,0,1)).Magnitude or 0
-   local mainDuration=math.max(mainDistance/18,0.12)
-   task.spawn(function()
-    if C3.buddy and C3.buddy.Parent then moveModel(C3.buddy,buddyTarget,buddyDuration,true) end
-   end)
-   local ignoreSteps=waypoint==8
-   for _,p in ipairs(C3.party) do
-    if C3.Root(p) then tweenCharTo(p.Character,mainTarget,1.2,true,18,ignoreSteps) end
-   end
-   if buddyDuration>mainDuration then task.wait(buddyDuration-mainDuration) end
-  end
- else
-  FadeRE:FireAllClients(true,""); task.wait(0.7)
-  C3.MoveParty(C3.Pos(-171,19,4),C3.kirill.Head.Position)
+ focusStreaming(C3.Pos(-184,18,-14)); prepareView(C3.Pos(-184,18,-14))
+ -- Keep the camera third-person and behind the heroes while they climb the
+ -- real stair wing, cross the landing, and queue at Kirill's bedroom doorway.
+ CutsceneRE:FireAllClients("followRig",C3.party[1].Character,Vector3.new(0,8,13),Vector3.new(0,2,0))
+ local mainRoute={
+  C3.Pos(-153,4,-5),C3.Pos(-170,4,-5),C3.Pos(-175,4,-5),C3.Pos(-186,4,-5),
+  C3.Pos(-204,4,-5),C3.Pos(-204,4,-20),C3.Pos(-222,4,-20),C3.Pos(-222,18,18),
+  C3.Pos(-212,18,18),C3.Pos(-205,18,0),C3.Pos(-160,18,2),C3.Pos(-160,18,0),
+ }
+ local buddyRoute={
+  C3.Pos(-153,4,5),C3.Pos(-165,4,9),C3.Pos(-165,4,5),C3.Pos(-171,4,5),
+  C3.Pos(-186,4,9),C3.Pos(-204,4,9),C3.Pos(-204,4,-20),C3.Pos(-219,4,-20),
+  C3.Pos(-219,18,18),C3.Pos(-205,18,4),C3.Pos(-160,18,4),C3.Pos(-160,18,0),
+ }
+ local function directed(position,nextPosition)
+  local target=nextPosition or C3.kirill.Head.Position
+  return CFrame.lookAt(position,Vector3.new(target.X,position.Y,target.Z),Vector3.yAxis)
  end
- focusStreaming(C3.Pos(-190,18,10)); prepareView(C3.Pos(-190,18,10))
- TweenService:Create(C3.kirillDoor,TweenInfo.new(0.7),{CFrame=C3.doorOpen}):Play(); task.wait(0.8)
- local kirillRevealFocus=C3.kirill.Head.Position+Vector3.new(4,-1,-4)
- cameraPlan(C3.Pos(-205,25,-2),C3.Pos(-202,24,0),kirillRevealFocus,1.2,64,58)
+ local function walkRoutes(routeA,routeB)
+  for waypoint=1,#routeA do
+   local longest=0
+   local ignoreSteps=waypoint==8 or waypoint==9
+   for index,p in ipairs(C3.party) do
+    local route=index==1 and routeA or routeB
+    local root=C3.Root(p)
+    if root then
+     local target=directed(route[waypoint],route[waypoint+1])
+     local duration=math.max(((target.Position-root.Position)*Vector3.new(1,0,1)).Magnitude/12,0.15)
+     longest=math.max(longest,duration)
+     task.spawn(function() tweenCharTo(p.Character,target,1.2,true,12,ignoreSteps,false) end)
+    end
+   end
+   if C3.buddy and C3.buddy.Parent then
+    local target=directed(routeB[waypoint],routeB[waypoint+1])
+    local duration=math.max(((target.Position-C3.buddy:GetPivot().Position)*Vector3.new(1,0,1)).Magnitude/12,0.15)
+    longest=math.max(longest,duration)
+    task.spawn(function() if C3.buddy and C3.buddy.Parent then moveModel(C3.buddy,target,duration,true) end end)
+   end
+   task.wait(longest+0.08)
+  end
+ end
+ walkRoutes(mainRoute,buddyRoute)
+ cameraPlan(C3.Pos(-193,12,20),C3.Pos(-190,11,18),C3.Pos(-160,18,0),1.1,62,56)
+ TweenService:Create(C3.kirillDoor,TweenInfo.new(0.75,Enum.EasingStyle.Sine),{CFrame=C3.doorOpen}):Play(); task.wait(0.85)
+ -- The doorway is now visibly open. Both heroes cross the threshold and take
+ -- positions inside the bedroom, close enough to protect Kirill.
+ cameraPlan(C3.Pos(-204,24,-22),C3.Pos(-200,23,-21),C3.Pos(-183,18,-14),1.2,64,58)
+ walkRoutes(
+  {C3.Pos(-160,18,-10),C3.Pos(-190,18,-10),C3.Pos(-193,18,-12)},
+  {C3.Pos(-160,18,-10),C3.Pos(-178,18,-10),C3.Pos(-178,18,-13)}
+ )
+ focusStreaming(C3.Pos(-184,18,-14)); prepareView(C3.Pos(-184,18,-14))
+ local kirillRevealFocus=C3.kirill.Head.Position+Vector3.new(2,0,2)
+ cameraPlan(C3.Pos(-204,24,-22),C3.Pos(-200,23,-21),kirillRevealFocus,1.2,64,58)
  CutsceneRE:FireAllClients("reveal")
  C3.Say("Кирилл","Тянки... тянки...",3)
  for motor,cf in pairs(C3.kirillPose) do if motor.Parent then motor.C0=cf end end
@@ -850,8 +871,11 @@ function C3.Intro()
   eye.CFrame=C3.kirill.Head.CFrame*CFrame.new(side*0.4,0,-0.55); light(eye,C(255,35,35),4,0.4)
  end
  C3.Say(ANDROID_NAME,"Устранить Артёма и Демида.",3)
- moveModel(C3.kirill,C3.kirill:GetPivot()*CFrame.Angles(0,math.pi,0),0.8)
- moveModel(C3.kirill,C3.kirill:GetPivot()+Vector3.new(0,0,-6),2.5,true)
+ local kirillPivot=C3.kirill:GetPivot()
+ local heroRoot=C3.Root(C3.party[1])
+ local threatPosition=heroRoot and heroRoot.Position or C3.Pos(-190,18,-12)
+ moveModel(C3.kirill,CFrame.lookAt(kirillPivot.Position,Vector3.new(threatPosition.X,kirillPivot.Position.Y,threatPosition.Z),Vector3.yAxis),0.8)
+ moveModel(C3.kirill,C3.kirill:GetPivot()+Vector3.new(0,0,4),2.5,true)
  C3.Say(C3.party[1]:GetAttribute("Hero")=="Artem" and "Артём" or "Демид","Ладно, только без летального исхода, мы не будем его бить, ок? Просто уходим!",5)
  TweenService:Create(C3.kirillDoor,TweenInfo.new(0.65),{CFrame=C3.doorClosed}):Play(); task.wait(0.7)
  if C3.coop then
@@ -861,7 +885,7 @@ function C3.Intro()
   C3.Say(C3.party[1]:GetAttribute("Hero")=="Artem" and "Демид" or "Артём","Ахх, чёт у меня нет никакого желания прямо сейчас выходить в это пекло. Я лучше останусь присмотреть за Кириллом, чтобы тут всё окончательно не пошло наперекосяк!",8)
   if C3.buddy and C3.buddy.Parent then
    C3.buddy:SetAttribute("StayingWithKirill",true)
-   moveModel(C3.buddy,CFrame.lookAt(C3.Pos(-178,18,11),C3.kirill.Head.Position,Vector3.yAxis),1.1,true)
+   moveModel(C3.buddy,CFrame.lookAt(C3.Pos(-178,18,-13),C3.kirill.Head.Position,Vector3.yAxis),0.8,true)
   end
  end
  FadeRE:FireAllClients(true,""); task.wait(0.7)
