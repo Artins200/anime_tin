@@ -3412,10 +3412,10 @@ function C3.ApplyLighting()
  C3.lightingSaved={}
  for _,key in ipairs({"Ambient","OutdoorAmbient","Brightness","ClockTime","ExposureCompensation","FogStart","FogEnd","EnvironmentDiffuseScale","EnvironmentSpecularScale"}) do C3.lightingSaved[key]=Lighting[key] end
  C3.effectsSaved={density=atm.Density,haze=atm.Haze,color=atm.Color,contrast=cc.Contrast,saturation=cc.Saturation,tint=cc.TintColor,brightness=cc.Brightness,bloom=bloom.Intensity}
- Lighting.Ambient=C(42,53,76); Lighting.OutdoorAmbient=C(28,39,61); Lighting.Brightness=1.25; Lighting.ClockTime=22.15; Lighting.ExposureCompensation=-0.08
- Lighting.FogStart=420; Lighting.FogEnd=4200; Lighting.EnvironmentDiffuseScale=0.32; Lighting.EnvironmentSpecularScale=0.38
- atm.Density=0.11; atm.Haze=0.72; atm.Color=C(94,119,157)
- cc.Contrast=0.08; cc.Saturation=-0.12; cc.TintColor=C(207,218,242); cc.Brightness=-0.025; bloom.Intensity=0.12
+ Lighting.Ambient=C(60,70,90); Lighting.OutdoorAmbient=C(44,56,75); Lighting.Brightness=1.65; Lighting.ClockTime=22.15; Lighting.ExposureCompensation=-0.01
+ Lighting.FogStart=500; Lighting.FogEnd=5000; Lighting.EnvironmentDiffuseScale=0.42; Lighting.EnvironmentSpecularScale=0.44
+ atm.Density=0.09; atm.Haze=0.5; atm.Color=C(104,128,163)
+ cc.Contrast=0.06; cc.Saturation=-0.08; cc.TintColor=C(219,226,244); cc.Brightness=0.015; bloom.Intensity=0.16
 end
 function C3.RestoreLighting()
  if not C3.lightingSaved then return end
@@ -3924,14 +3924,6 @@ function C3.Build()
  local function streetPart(name,size,x,y,z,color,material,parent)
   return C3.Part(parent or C3.backdrop,name,size,C3.Pos(x,y,z),color,material)
  end
- local function sign(parent,name,text,at,color)
-  local plate=C3.Part(parent,name,Vector3.new(7,3,0.35),at,color,Enum.Material.Metal)
-  plate.CFrame*=CFrame.Angles(0,math.pi/2,0)
-  plate.CanCollide=false
-  local gui=Instance.new("SurfaceGui"); gui.Face=Enum.NormalId.Front; gui.SizingMode=Enum.SurfaceGuiSizingMode.PixelsPerStud; gui.PixelsPerStud=35; gui.Parent=plate
-  local label=Instance.new("TextLabel"); label.Size=UDim2.fromScale(1,1); label.BackgroundTransparency=1; label.Text=text; label.TextColor3=C(238,241,236); label.TextStrokeTransparency=0.6; label.Font=Enum.Font.GothamBold; label.TextScaled=true; label.Parent=gui
-  return plate
- end
  local function buildSedan(x,z,paint,heading)
   local model=Instance.new("Model"); model.Name="CitySedan"; model.Parent=C3.backdrop
   local basis=CFrame.new(C3.Pos(x,0,z))*CFrame.Angles(0,math.rad(heading or 0),0)
@@ -3965,59 +3957,73 @@ function C3.Build()
  -- Continuous segmented road and kerbs; every physical part stays below 256 studs.
  for segment=0,4 do
   local center=-14+segment*202
-  streetPart("MainStreetAsphalt",Vector3.new(202.5,1,84),center,-0.55,0,C(43,48,57),Enum.Material.Asphalt)
+  streetPart("MainStreetAsphalt",Vector3.new(202.5,1,112),center,-0.55,0,C(43,48,57),Enum.Material.Asphalt)
   for _,side in ipairs({-1,1}) do
-   streetPart("RaisedCurb",Vector3.new(202.5,0.8,2),center,0,side*43,C(157,158,154),Enum.Material.Concrete)
-   streetPart("ContinuousSidewalk",Vector3.new(202.5,0.5,11),center,0.05,side*49,C(111,116,121),Enum.Material.Concrete)
-   streetPart("StreetEdgeKerb",Vector3.new(202.5,2.4,1),center,1.2,side*104,C(55,63,76),Enum.Material.Concrete)
+   streetPart("RaisedCurb",Vector3.new(202.5,0.8,2),center,0,side*56,C(157,158,154),Enum.Material.Concrete)
+   streetPart("ContinuousSidewalk",Vector3.new(202.5,0.5,12),center,0.05,side*62,C(111,116,121),Enum.Material.Concrete)
+   streetPart("StreetEdgeKerb",Vector3.new(202.5,3,1),center,1.5,side*69,C(55,63,76),Enum.Material.Concrete)
   end
  end
  for _,side in ipairs({-1,1}) do
-  for n=0,19 do
-   local x=-100+n*50
+  for n=0,31 do
+   local x=-100+n*32
    streetPart("LaneDash",Vector3.new(16,0.04,0.35),x,0.02,0,C(220,195,126),Enum.Material.SmoothPlastic)
-   local pole=streetPart("StreetLampPole",Vector3.new(0.45,11,0.45),x,5.5,side*43,C(48,57,70),Enum.Material.Metal)
-   local arm=streetPart("StreetLampArm",Vector3.new(4,0.3,0.3),x+side*1.5,10.7,side*43,C(48,57,70),Enum.Material.Metal)
-   local head=streetPart("LEDStreetLampHead",Vector3.new(3.6,0.35,1.15),x+side*3.5,10.35,side*42,C(72,83,98),Enum.Material.Metal)
+   local pole=streetPart("StreetLampPole",Vector3.new(0.45,11,0.45),x,6.5,side*57,C(48,57,70),Enum.Material.Metal)
+   local arm=streetPart("StreetLampArm",Vector3.new(4,0.3,0.3),x+side*1.5,12.7,side*57,C(48,57,70),Enum.Material.Metal)
+   local head=streetPart("LEDStreetLampHead",Vector3.new(3.6,0.35,1.15),x+side*3.5,12.35,side*56,C(72,83,98),Enum.Material.Metal)
    head.CFrame*=CFrame.Angles(0,math.rad(side*8),0)
-   local lens=streetPart("LEDStreetLampLens",Vector3.new(2.8,0.08,0.8),x+side*3.5,10.12,side*42,C(255,228,174),Enum.Material.Neon); lens.CanCollide=false
-   C3.Lamp(C3.backdrop,C3.Pos(x+side*3.5,9.98,side*42),29,1.45,"WarmStreetLamp")
+   local lens=streetPart("LEDStreetLampLens",Vector3.new(2.8,0.08,0.8),x+side*3.5,12.12,side*56,C(255,228,174),Enum.Material.Neon); lens.CanCollide=false
+   C3.Lamp(C3.backdrop,C3.Pos(x+side*3.5,11.98,side*56),48,3.1,"WarmStreetLamp")
   end
  end
 
  -- Close-packed street fronts. Wide connected façades replace isolated slabs and gaps.
- for block=1,10 do
-  local x=-35+(block-1)*95
-  local height=38+(block*17)%34
+ for block=1,19 do
+  local x=-361+(block-1)*89
+  local height=86+(block*29)%54
   for _,side in ipairs({-1,1}) do
-   local z=side*82
+   local z=side*98
    local facadeColor=block%3==0 and C(59,76,91) or block%3==1 and C(79,75,72) or C(68,81,91)
-   streetPart("BlockFacade",Vector3.new(97,height,24),x,height/2,z,facadeColor,Enum.Material.Concrete)
-   streetPart("RoofCornice",Vector3.new(99,0.8,25),x,height+0.4,z,C(39,48,61),Enum.Material.Metal)
-   streetPart("StorefrontBase",Vector3.new(82,7,0.3),x,3.7,z-side*12.2,C(33,48,59),Enum.Material.Glass)
-   for floor=1,math.floor((height-10)/13) do
-    streetPart("LitWindowBand",Vector3.new(78,3.3,0.18),x,10+floor*12,z-side*12.25,block%4==0 and C(206,173,111) or C(100,150,168),Enum.Material.Glass)
+   streetPart("BlockFacade",Vector3.new(97,height,28),x,height/2,z,facadeColor,Enum.Material.Concrete)
+   streetPart("RoofCornice",Vector3.new(99,1.2,29),x,height+0.4,z,C(39,48,61),Enum.Material.Metal)
+   streetPart("StorefrontBase",Vector3.new(82,9,0.3),x,4.7,z-side*14.2,C(33,48,59),Enum.Material.Glass)
+   for floor=1,math.floor((height-14)/15) do
+    streetPart("LitWindowBand",Vector3.new(78,4.2,0.18),x,11+floor*14,z-side*14.25,block%4==0 and C(206,173,111) or C(100,150,168),Enum.Material.Glass)
    end
   end
  end
 
  -- Two orderly rear rows and a continuous urban ground plane close the horizon without prop clutter.
- local outerGround=C3.Part(C3.backdrop,"OuterCityGround",Vector3.new(1100,0.8,540),C3.Pos(440,-0.3,0),C(47,55,62),Enum.Material.Concrete); outerGround.CanCollide=false
+ local groundX={{-410,90},{90,590},{590,1090},{1090,1290}}
+ local groundZ={{-625,-125},{-125,375},{375,625}}
+ for _,xb in ipairs(groundX) do for _,zb in ipairs(groundZ) do
+  local outerGround=C3.Part(C3.backdrop,"OuterCityGround",Vector3.new(xb[2]-xb[1],1,zb[2]-zb[1]),C3.Pos((xb[1]+xb[2])*0.5,-0.55,(zb[1]+zb[2])*0.5),C(47,55,62),Enum.Material.Concrete)
+  outerGround.CanCollide=true; outerGround.CanTouch=false
+ end end
+ -- Quiet, tall perimeter barriers sit behind the skyline so there is no reachable map edge or fall into void.
+ for _,xEdge in ipairs({-409,1289}) do for _,zb in ipairs(groundZ) do
+  local wall=C3.Part(C3.backdrop,"CitySafetyPerimeter",Vector3.new(2,360,zb[2]-zb[1]),C3.Pos(xEdge,179.5,(zb[1]+zb[2])*0.5),C(37,48,64),Enum.Material.Concrete)
+  wall.Transparency=1; wall.CanCollide=true; wall.CanTouch=false; wall.CanQuery=false
+ end end
+ for _,zEdge in ipairs({-624,624}) do for _,xb in ipairs(groundX) do
+  local endWall=C3.Part(C3.backdrop,"CitySafetyPerimeter",Vector3.new(xb[2]-xb[1],360,2),C3.Pos((xb[1]+xb[2])*0.5,179.5,zEdge),C(37,48,64),Enum.Material.Concrete)
+  endWall.Transparency=1; endWall.CanCollide=true; endWall.CanTouch=false; endWall.CanQuery=false
+ end end
  for row=1,2 do
-  local sideDepth=row==1 and 144 or 222
+  local sideDepth=row==1 and 164 or 274
   local stride=row==1 and 112 or 132
   local width=row==1 and 116 or 136
   local firstX=row==1 and -90 or -120
   local index=0
   for x=firstX,970,stride do
    index+=1
-   local h= row==1 and (55+(index*19)%36) or (82+(index*23)%58)
+   local h= row==1 and (88+(index*23)%62) or (140+(index*37)%100)
    for _,side in ipairs({-1,1}) do
     local z=side*sideDepth
-    local shell=C3.Part(C3.backdrop,row==1 and "MidgroundBuilding" or "FarNeighborhoodBuilding",Vector3.new(width,h,30),C3.Pos(x,h/2,z),row==1 and C(51+index%3*5,63,78) or C(39+index%3*5,50,67),Enum.Material.Concrete)
+    local shell=C3.Part(C3.backdrop,row==1 and "MidgroundBuilding" or "FarNeighborhoodBuilding",Vector3.new(width,h,row==1 and 34 or 46),C3.Pos(x,h/2,z),row==1 and C(51+index%3*5,63,78) or C(39+index%3*5,50,67),Enum.Material.Concrete)
     shell.CanCollide=false
     for floor=1,math.floor(h/15) do
-     local band=C3.Part(C3.backdrop,"BackgroundWindowBand",Vector3.new(width-12,2.1,0.16),C3.Pos(x,floor*15,z-side*15.1),floor%4==0 and C(203,168,107) or C(83,128,151),Enum.Material.Glass)
+     local band=C3.Part(C3.backdrop,"BackgroundWindowBand",Vector3.new(width-12,2.1,0.16),C3.Pos(x,floor*15,z-side*(row==1 and 17.1 or 23.1)),floor%4==0 and C(203,168,107) or C(83,128,151),Enum.Material.Glass)
      band.CanCollide=false; band.CanTouch=false; band.CanQuery=false
     end
    end
@@ -4026,23 +4032,36 @@ function C3.Build()
  -- A restrained line of trees sits in the setback between the foreground blocks and rear streets.
  for _,side in ipairs({-1,1}) do
   for n=0,19 do
-   local x=-92+n*52; local z=side*112
+   local x=-92+n*52; local z=side*136
    local trunk=C3.Part(C3.backdrop,"BoulevardTreeTrunk",Vector3.new(1.1,7,1.1),C3.Pos(x,3.5,z),C(92,72,56),Enum.Material.Wood); trunk.CanCollide=false
-   local crown=C3.Part(C3.backdrop,"BoulevardTreeCanopy",Vector3.new(7.5,8,7.5),C3.Pos(x,10,z),n%3==0 and C(49,90,75) or C(58,105,83),Enum.Material.Grass)
+   local crown=C3.Part(C3.backdrop,"BoulevardTreeCanopy",Vector3.new(10,12,10),C3.Pos(x,14,z),n%3==0 and C(49,90,75) or C(58,105,83),Enum.Material.Grass)
    crown.Shape=Enum.PartType.Ball; crown.CanCollide=false; crown.CanTouch=false; crown.CanQuery=false
+  end
+ end
+ -- Wrap the distant skyline around both street ends and both sides: looking back still reads as a city.
+ for _,side in ipairs({-1,1}) do
+  for index=0,10 do
+   local x=-255+index*130
+   local height=190+(index*43)%120
+   local skyline=C3.Part(C3.backdrop,"HorizonHighrise",Vector3.new(150,height,64),C3.Pos(x,height/2,side*520),C(37+index%4*5,49+index%3*5,69+index%2*6),Enum.Material.Concrete)
+   skyline.CanCollide=false; skyline.CanTouch=false; skyline.CanQuery=false
+   for floor=1,math.floor(height/18) do
+    local band=C3.Part(C3.backdrop,"HorizonWindowBand",Vector3.new(132,1.7,0.16),C3.Pos(x,floor*18,side*487),floor%4==0 and C(220,178,111) or C(90,135,159),Enum.Material.Glass)
+    band.CanCollide=false; band.CanTouch=false; band.CanQuery=false
+   end
+  end
+  for index=0,9 do
+   local z=-500+index*112
+   local height=200+(index*47)%125
+   local skyline=C3.Part(C3.backdrop,"HorizonEndcap",Vector3.new(64,height,122),C3.Pos(side==-1 and -340 or 1220,height/2,z),C(40+index%3*5,50,68+index%2*5),Enum.Material.Concrete)
+   skyline.CanCollide=false; skyline.CanTouch=false; skyline.CanQuery=false
   end
  end
 
  local districtX={80,255,430,605,780}
- local districtName={"ЖИЛОЙ РАЙОН","ТОРГОВАЯ УЛИЦА","ТРАНСПОРТНЫЙ УЗЕЛ","КВАРТАЛ НТЯН","ПЛОЩАДЬ БАШНИ"}
  local districtColor={C(83,153,130),C(205,157,86),C(101,154,190),C(115,111,184),C(196,93,88)}
  for i,x in ipairs(districtX) do
   local color=districtColor[i]
-  for _,side in ipairs({-1,1}) do
-   streetPart("DistrictGateFrame",Vector3.new(1,10,1),x-65,5,side*34,color,Enum.Material.Metal)
-  end
-  streetPart("DistrictGateHeader",Vector3.new(2,2,70),x-65,10.5,0,C(37,47,62),Enum.Material.Metal)
-  sign(C3.backdrop,"DistrictTitle",districtName[i],C3.Pos(x-65,7.4,0),color)
   -- Combat cover is waist high and offset so every encounter has at least two paths.
   streetPart("StreetCover",Vector3.new(14,3,5),x-24,1.5,-20,C(63,77,91),Enum.Material.Metal)
   streetPart("StreetCover",Vector3.new(14,3,5),x+24,1.5,20,C(63,77,91),Enum.Material.Metal)
@@ -4052,14 +4071,14 @@ function C3.Build()
   buildSedan(x-8,i%2==0 and 25 or -27,({C(55,88,117),C(102,83,68),C(73,103,91),C(114,64,65),C(79,87,103)})[i],i%2==0 and 4 or -7)
   local z={index=i,center=C3.Pos(x,4,0),start=C3.Pos(x-62,4,0),exit=C3.Pos(x+67,4,0),wave=0,rounds=i==3 and 3 or 2,cleared=false,objective=false,covers={}}
   C3.zones[i]=z -- Register the five street stages before the tower's stages 6-10.
-  z.gate=streetPart("DistrictGate",Vector3.new(1,12,82),x+78,6,0,C(57,78,99),Enum.Material.Metal)
+  z.gate=streetPart("DistrictGate",Vector3.new(1.5,16,174),x+78,8,0,C(57,78,99),Enum.Material.Metal)
   z.gateClosed=z.gate.CFrame
   z.covers={C3.Pos(x-17,4,-20),C3.Pos(x+31,4,20)}
   z.panel=streetPart("SignalRelay",Vector3.new(2.5,3.4,2),x+37,1.8,17,color,Enum.Material.Metal)
   local screen=streetPart("RelayScreen",Vector3.new(0.2,1.6,1.8),x+35.7,2.7,17,C(68,217,175),Enum.Material.Neon); screen.CanCollide=false
   C3.Prompt(z.panel,"Отключить ретранслятор",function(p) C3.CompleteObjective(p,z) end)
   local doorZ=43
-  z.spawnDoor=streetPart("DeploymentDoor",Vector3.new(18,12,1),x,6,doorZ,C(51,65,84),Enum.Material.Metal)
+  z.spawnDoor=streetPart("DeploymentDoor",Vector3.new(21.2,12,1),x,6,doorZ,C(51,65,84),Enum.Material.Metal)
   z.spawnClosed=z.spawnDoor.CFrame; z.spawnPos=C3.Pos(x,4,doorZ+6)
   streetPart("DeploymentBayFloor",Vector3.new(22,0.8,21),x,-0.2,doorZ+10,C(52,61,73),Enum.Material.Concrete)
   streetPart("DeploymentBayRoof",Vector3.new(22,0.8,21),x,14,doorZ+10,C(39,47,60),Enum.Material.Metal)
@@ -4073,8 +4092,8 @@ function C3.Build()
  -- A restrained glass office frontage anchors the corporate district; the other blocks stay clean and readable.
  for _,side in ipairs({-1,1}) do
   for _,x in ipairs({570,640}) do
-   local t=streetPart("NTyanOffice",Vector3.new(34,60,26),x,30,side*82,C(68,100,120),Enum.Material.Glass); t.Transparency=0.12; t.CanCollide=false
-   streetPart("OfficeRoofBeacon",Vector3.new(1.4,2,1.4),x,61,side*82,C(208,60,70),Enum.Material.Neon)
+   local t=streetPart("NTyanOffice",Vector3.new(34,60,26),x,30,side*119,C(68,100,120),Enum.Material.Glass); t.Transparency=0.12; t.CanCollide=false
+   streetPart("OfficeRoofBeacon",Vector3.new(1.4,2,1.4),x,61,side*119,C(208,60,70),Enum.Material.Neon)
   end
  end
 
@@ -4153,10 +4172,17 @@ function C3.Build()
   local function slab(sx,sz,cx,cz)
    towerPart("TowerFloor",Vector3.new(sx,0.8,sz),960+cx,y,cz,theme.floor,Enum.Material.Metal)
   end
-  -- Keep the stairwell open on the first four floors; cap it with a full
-  -- crown deck so the terminal and recovered modules sit on solid ground.
+  -- A narrow, walled stair corridor is the only shaft opening; every surrounding combat deck is solid.
   if stage<10 then
-   slab(26,82,-31,0); slab(26,82,31,0); slab(36,31,0,-25.5); slab(36,31,0,25.5)
+   slab(82,31,0,-25.5); slab(82,31,0,25.5)
+   towerPart("TowerStairLanding",Vector3.new(17,0.8,20.8),927.5,y,0,C(103,121,137),Enum.Material.Metal)
+   towerPart("TowerStairLanding",Vector3.new(17,0.8,20.8),992.5,y,0,C(103,121,137),Enum.Material.Metal)
+   for _,side in ipairs({-1,1}) do
+    for _,segment in ipairs({{x=926.5,length=15},{x=960,length=44},{x=993.5,length=15}}) do
+     local partition=towerPart("StairwellPartition",Vector3.new(segment.length,24,0.7),segment.x,y+12,side*10,C(91,121,139),Enum.Material.Glass)
+     partition.Transparency=0.38
+    end
+   end
   else
    slab(82,82,0,0)
   end
@@ -4176,7 +4202,7 @@ function C3.Build()
   z.start=stage==6 and C3.Pos(930,y+4,0) or C3.Pos(984,y+4,0)
   z.exit=stage<10 and C3.Pos(984,y+28,0) or C3.Pos(960,y+4,0)
   if stage<10 then
-   z.gate=towerPart("TowerStairGate",Vector3.new(1,14,14),984,y+27,0,C(49,66,83),Enum.Material.Metal)
+   z.gate=towerPart("TowerStairGate",Vector3.new(1.5,16,20.2),984,y+27,0,C(49,66,83),Enum.Material.Metal)
    z.gateClosed=z.gate.CFrame
   end
   z.spawnDoor=towerPart("DeploymentDoor",Vector3.new(18,12,1),960,y+6,41,C(51,65,84),Enum.Material.Metal)
@@ -4190,14 +4216,7 @@ function C3.Build()
   if stage<10 then
    for step=1,20 do
     local x=936+(step-0.5)*2.4; local rise=(step-0.5)*1.2
-    towerPart("TowerStair",Vector3.new(2.65,0.65,13),x,y+rise,0,C(138,155,170),Enum.Material.Metal)
-    if step%5==0 then for _,side in ipairs({-1,1}) do towerPart("StairPost",Vector3.new(0.45,3,0.45),x,y+rise+1.7,side*7,C(179,190,195),Enum.Material.Metal) end end
-   end
-   for _,side in ipairs({-1,1}) do
-    local rail=C3.Beam(C3.map,"StairHandrail",C3.Pos(935,y+3,side*7),C3.Pos(984,y+27,side*7),0.4,C(180,192,199)); rail.Parent=C3.structure
-   end
-   for _,side in ipairs({-1,1}) do
-    towerPart("StairwellPartition",Vector3.new(58,15,0.5),960,y+12,side*10,C(108,157,171),Enum.Material.Glass).Transparency=0.55
+    towerPart("TowerStair",Vector3.new(2.65,0.65,18.5),x,y+rise,0,C(138,155,170),Enum.Material.Metal)
    end
   end
   -- Deck-specific machinery sits against walls, leaving a wide combat loop.
@@ -4208,12 +4227,8 @@ function C3.Build()
   for _,side in ipairs({-1,1}) do
    local cover=towerPart("TowerCombatCover",Vector3.new(10,3,4),960+side*28,y+1.9,-20,C(52,68,84),Enum.Material.Metal)
    table.insert(z.covers,cover.Position+Vector3.new(side*7,2,0))
-   C3.Lamp(C3.map,C3.Pos(960+side*23,y+18,0),34,1.8,"TowerDeckLamp")
+   C3.Lamp(C3.map,C3.Pos(960+side*23,y+18,0),48,3.0,"TowerDeckLamp")
   end
-  -- Large high-contrast floor plaque is legible before the first shot.
-  local plaque=towerPart("TowerFloorPlaque",Vector3.new(0.3,5,18),919.2,y+13,0,theme.accent,Enum.Material.Neon); plaque.CanCollide=false
-  local gui=Instance.new("SurfaceGui"); gui.Face=Enum.NormalId.Right; gui.PixelsPerStud=25; gui.Parent=plaque
-  local text=Instance.new("TextLabel"); text.Size=UDim2.fromScale(1,1); text.BackgroundTransparency=1; text.Text=theme.name; text.TextColor3=C(245,242,230); text.TextScaled=true; text.Font=Enum.Font.GothamBold; text.Parent=gui
   z.panel=towerPart("ObjectiveConsole",Vector3.new(2.4,3.2,2),930,y+1.8,-25,theme.accent,Enum.Material.Metal)
   local panelLight=towerPart("ConsoleScreen",Vector3.new(0.2,1.6,1.6),928.7,y+2.7,-25,C(78,223,179),Enum.Material.Neon); panelLight.CanCollide=false
   C3.Prompt(z.panel,stage==10 and "Главный терминал" or "Изолировать реле",function(p)

@@ -18,10 +18,14 @@ assert 'if plr:GetAttribute("Chapter")==3 then if c3Attack' in server
 for feature in ('silv3r_candy','TransformationCapsule','SuspendedClone','FactoryLeftWall','FactoryRightWall','FactoryRearWall','TowerStair','StairwellPartition','KirillRoomDoor','InvulnerableTowerShield','HardwareBreaker','ModuleCase'):
     assert feature in world
 assert 'Эммм, что это было?' in chapter and 'Чекни в окно.' in chapter
-assert 'Lighting.ClockTime=22.15' in chapter and 'Lighting.Brightness=1.25' in chapter and 'bloom.Intensity=0.12' in chapter
+assert 'Lighting.ClockTime=22.15' in chapter and 'Lighting.Brightness=1.65' in chapter and 'bloom.Intensity=0.16' in chapter
 assert 'LEDStreetLampHead' in world and 'WarmStreetLamp' in world and 'NTyanArmoredTransport' in chapter
 assert 'function buildSedan' in world and 'SedanTire' in world and 'WreckedCar' not in world
 assert 'FarNeighborhoodBuilding' in world and 'BoulevardTreeCanopy' in world and 'StreetEdgeKerb' in world
+assert 'HorizonHighrise' in world and 'HorizonEndcap' in world and 'CitySafetyPerimeter' in world
+assert 'outerGround.CanCollide=true' in world and 'Vector3.new(1.5,16,174)' in world
+assert 'StairwellPartition' in world and 'slab(82,31,0,-25.5); slab(82,31,0,25.5)' in world
+assert 'Vector3.new(2.65,0.65,18.5)' in world and 'DistrictTitle' not in world and 'DistrictGateHeader' not in world
 assert 'PrepareCapturedCivilian' in chapter and 'hum:SetStateEnabled(Enum.HumanoidStateType.Dead,true)' in chapter
 assert 'e.hum:TakeDamage(damage)' in chapter and 'ragdoll(m,not civilian)' in chapter
 assert 'SubduedAlive' not in chapter and 'NonlethalProtection' not in chapter and 'nonlethal' not in ui
@@ -79,7 +83,7 @@ assert 'C3_CollisionAndGameplay' in world and 'TowerStairGate' in world
 assert 'local z={index=i,center=C3.Pos(x,4,0),start=C3.Pos(x-62,4,0)' in world
 assert 'C3.zones[i]=z' in world and 'C3.zones[stage]=z' in world
 assert 'Landmark geometry is a non-colliding visual shell' in world
-assert 'MainStreetAsphalt' in world and 'DistrictTitle' in world and 'NTyanOffice' in world
+assert 'MainStreetAsphalt' in world and 'DistrictTitle' not in world and 'NTyanOffice' in world
 assert 'C3.Send(force)' in chapter and 'now-(C3.lastStateSent or 0)<1' in chapter
 assert 'local signature=("%d:%d:%d:%d:%d:%d:%d:%d")' in chapter
 assert 'C3.map:Destroy()' in chapter and 'C3.lastStateSignature=nil' in chapter
@@ -118,7 +122,7 @@ local Vector3={new=function(x,y,z) return setmetatable({X=x or 0,Y=y or 0,Z=z or
 Vector3.zero=Vector3.new(0,0,0)
 local function typeof(v) return getmetatable(v)==vec and "Vector3" or type(v) end
 local cf={}; cf.__mul=function(a,b) return a end
-local CFrame={new=function(...) return setmetatable({Position=Vector3.new(...)},cf) end,lookAt=function(pos) return setmetatable({Position=pos},cf) end}
+local CFrame={new=function(...) return setmetatable({Position=Vector3.new(...)},cf) end,lookAt=function(pos) return setmetatable({Position=pos},cf) end,Angles=function() return setmetatable({Position=Vector3.zero},cf) end}
 local function C(...) return {...} end
 local packets={}
 local handler
@@ -270,16 +274,17 @@ end
 world_checks=r'''
 C3.Build()
 assert(#C3.zones==10)
-local stairs,road,approach,gates,airlocks={},nil,nil,0,0
+local stairs,roads,approach,gates,airlocks={}, {},nil,0,0
 for _,p in ipairs(generated) do
  if p.Name=="TowerStair" then table.insert(stairs,p) end
- if p.Name=="MainStreetAsphalt" then road=p end
+ if p.Name=="MainStreetAsphalt" then table.insert(roads,p) end
  if p.Name=="TowerApproach" then approach=p end
- if p.Name=="DistrictGate" then assert(p.Size.Z==82); gates+=1 end
- if p.Name=="TowerStairGate" then airlocks+=1 end
+ if p.Name=="DistrictGate" then assert(p.Size.Z==174); gates+=1 end
+ if p.Name=="TowerStairGate" then assert(p.Size.Z>=20.2); airlocks+=1 end
  if p.Name=="DeploymentDoor" then assert(p.Size.Y>=10) end
 end
 assert(#stairs==80 and gates==5 and airlocks==4)
+for _,p in ipairs(stairs) do assert(p.Size.Z==18.5,"stair tread must fully support the protected stair lane") end
 for level=0,3 do
  local row={}
  for _,p in ipairs(stairs) do if p.Position.Y>level*24 and p.Position.Y<(level+1)*24 then table.insert(row,p) end end
@@ -290,8 +295,12 @@ for level=0,3 do
   assert(math.abs(row[i].Position.X-row[i-1].Position.X-2.4)<0.001,"stair tread gap")
  end
 end
-assert(road and math.abs(road.Position.X-390)<0.001 and road.Size.X==1010)
-assert(approach and approach.Position.X-approach.Size.X/2<=road.Position.X+road.Size.X/2,"road-to-tower approach gap")
+assert(#roads==5,"continuous five-segment street expected")
+table.sort(roads,function(a,b) return a.Position.X<b.Position.X end)
+for i=2,#roads do
+ assert(roads[i].Position.X-roads[i-1].Position.X<= (roads[i].Size.X+roads[i-1].Size.X)/2,"street segment gap")
+end
+assert(approach and approach.Position.X-approach.Size.X/2<=roads[#roads].Position.X+roads[#roads].Size.X/2,"road-to-tower approach gap")
 for stage=6,9 do
  local z=C3.zones[stage]
  assert(math.abs(z.exit.Y-z.start.Y-24)<0.001,"tower gate exit must meet next floor")
@@ -299,14 +308,36 @@ for stage=6,9 do
 end
 assert(math.abs(C3.zones[6].start.X-930)<0.01,"tower entry must meet the plaza")
 assert(math.abs(C3.zones[7].start.Y-C3.zones[6].exit.Y)<0.01,"floor 7 start must meet floor 6 exit")
-local towerInteriorFloors=0
-for _,p in ipairs(generated) do if p.Name=="TowerFloor" then towerInteriorFloors+=1 end end
-assert(towerInteriorFloors==17,"four open stair decks and a solid crown must total 17 safe floor pieces")
-print("PASS: rebuilt city route and plaza meet; tower has 80 continuous treads, open stairwell slots, four progression gates and separate visual shell")
+local towerInteriorFloors,towerLandings=0,0
+for _,p in ipairs(generated) do
+ if p.Name=="TowerFloor" then towerInteriorFloors+=1 end
+ if p.Name=="TowerStairLanding" then towerLandings+=1 end
+end
+assert(towerInteriorFloors==9 and towerLandings==8,"four protected stair corridors need solid side floors and both end landings")
+local facades,groundTiles,perimeterWalls,stairWalls={},0,0,0
+for _,p in ipairs(generated) do
+ if p.Name=="BlockFacade" then table.insert(facades,p) end
+ if p.Name=="OuterCityGround" then groundTiles+=1 end
+ if p.Name=="CitySafetyPerimeter" then perimeterWalls+=1 end
+ if p.Name=="StairwellPartition" then stairWalls+=1 end
+end
+assert(#facades==38 and groundTiles==12 and perimeterWalls==14 and stairWalls==24,"sealed city perimeter and protected stairwell parts missing")
+table.sort(facades,function(a,b) return a.Position.X<b.Position.X end)
+assert(facades[1].Position.X-facades[1].Size.X/2<=-409 and facades[#facades].Position.X+facades[#facades].Size.X/2>=1289,"street wall does not reach the city safety perimeter")
+for i=2,19 do assert(facades[i].Position.X-facades[i].Size.X/2<=facades[i-1].Position.X+facades[i-1].Size.X/2,"walk-around gap between street facades") end
+for stage=1,5 do
+ local gate=C3.zones[stage].gate; local joinedSides={}
+ for _,facade in ipairs(facades) do
+  local offsetZ=facade.Position.Z-C3.origin.Z; local sideZ=math.abs(offsetZ)
+  if math.abs(facade.Position.X-gate.Position.X)<=facade.Size.X/2 and sideZ==98 and gate.Size.Z/2>sideZ-facade.Size.Z/2 then joinedSides[offsetZ>0 and 1 or -1]=true end
+ end
+ assert(joinedSides[1] and joinedSides[-1],"street gate must overlap both side buildings; side bypass remains")
+end
+print("PASS: street, approach and full-width gates are continuous; city has collision-safe ground and wrapped skyline; tower stair corridors are enclosed over solid floor wings; every gate joins building walls")
 '''
 geometry_path=Path('.tools/chapter3-geometry-test.luau')
 geometry_path.parent.mkdir(exist_ok=True)
-geometry_path.write_text(prelude+'\n'+circuits+'\n'+chapter+'\n'+geometry+'\n'+world+'\n'+world_checks)
+geometry_path.write_text(prelude+'\n'+circuits+'\n'+chapter+'\n'+geometry+'\n'+world+'\nC3.BuildHome=function() end\n'+world_checks)
 luau=Path('.tools/luau/build/release/luau')
 if not luau.is_file():
     print('SKIP: executable geometry/policy checks need .tools/luau/build/release/luau; static integration checks passed')
