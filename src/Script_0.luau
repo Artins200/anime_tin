@@ -3691,6 +3691,24 @@ function C3.BuildVillain()
  monitor("NetworkStatusWallLeft",Vector3.new(34,18,0.5),o+Vector3.new(-48,22,244),"CITY GRID / LIVE FEED",C(122,191,184),Vector3.new(0,0,-1))
  monitor("NetworkStatusWallRight",Vector3.new(34,18,0.5),o+Vector3.new(48,22,244),"SUBJECTS / SIGNAL",C(202,144,93),Vector3.new(0,0,-1))
 
+ -- Pod specimens use coordinated anime palettes, layered hair, clean facial
+ -- highlights and tailored uniform details so they read as characters, not grey dummies.
+ local cloneStyles={
+  {hair=C(98,73,151),eye=C(104,207,238),shirt=C(220,217,207),skirt=C(54,63,91),legs=C(53,61,76),accent=C(218,181,103)},
+  {hair=C(178,83,116),eye=C(112,201,163),shirt=C(192,143,151),skirt=C(91,48,70),legs=C(63,49,65),accent=C(228,199,159)},
+  {hair=C(64,109,151),eye=C(174,149,230),shirt=C(178,198,205),skirt=C(48,76,96),legs=C(44,60,78),accent=C(136,207,213)},
+  {hair=C(185,137,73),eye=C(106,177,222),shirt=C(226,209,174),skirt=C(111,76,54),legs=C(65,55,47),accent=C(236,190,95)},
+  {hair=C(77,146,131),eye=C(215,153,190),shirt=C(191,206,192),skirt=C(55,91,79),legs=C(46,70,63),accent=C(221,166,185)},
+  {hair=C(151,86,174),eye=C(116,207,217),shirt=C(212,190,220),skirt=C(76,57,100),legs=C(59,49,83),accent=C(223,194,116)},
+ }
+ local function podDetail(parent,base,name,size,offset,color,shape)
+  local detail=Instance.new("Part"); detail.Name=name; detail.Size=size; detail.Color=color
+  detail.Material=Enum.Material.SmoothPlastic; detail.Anchored=true
+  detail.CanCollide=false; detail.CanTouch=false; detail.CanQuery=false
+  if shape then detail.Shape=shape end
+  detail.CFrame=base.CFrame*offset; detail.Parent=parent
+  return detail
+ end
  -- Four restrained conveyor lines, industrial frames, and upright, complete
  -- R6 clone rigs inside clear glass vats; no floating cubes or arbitrary tilt.
  for row=1,4 do
@@ -3709,12 +3727,35 @@ function C3.BuildVillain()
    for _,side in ipairs({-1,1}) do
     local brace=C3.Part(m,"CapsuleFrame",Vector3.new(0.35,8.4,0.35),o+Vector3.new(x+side*3.35,5,z),trim,Enum.Material.Metal); brace.CanCollide=false
    end
-   local cloneCfg=table.clone(Types.Pistol); cloneCfg.Name="Заготовка клона"; cloneCfg.Gun=false; cloneCfg.Male=false
-   cloneCfg.Skin=C(177+(col%3)*5,158+(row%2)*5,148); cloneCfg.Hair=C(74,80,82); cloneCfg.Eye=C(92,111,113)
-   cloneCfg.Shirt=C(97,105,108); cloneCfg.Skirt=C(66,73,77); cloneCfg.Legs=C(58,63,66); cloneCfg.Accent=C(112,126,127)
-   local clone=buildRig(cloneCfg,CFrame.new(o+Vector3.new(x,3.15,z))); clone.Name="SuspendedClone"; clone.Parent=m; anchorAll(clone)
+   local style=cloneStyles[(row*2+col-2)%#cloneStyles+1]
+   local cloneCfg=table.clone(Types.Pistol); cloneCfg.Name="Спящая тянка"; cloneCfg.Gun=false; cloneCfg.Male=false
+   cloneCfg.Skin=C(205+(col%3)*4,174+(row%2)*5,158+(col%2)*4)
+   cloneCfg.Hair=style.hair; cloneCfg.Eye=style.eye; cloneCfg.Shirt=style.shirt
+   cloneCfg.Skirt=style.skirt; cloneCfg.Legs=style.legs; cloneCfg.Accent=style.accent
+   local clone,hum,_,joints=buildRig(cloneCfg,CFrame.new(o+Vector3.new(x,3.15,z))); clone.Name="SuspendedClone"; clone.Parent=m; anchorAll(clone)
    for _,piece in ipairs(clone:GetDescendants()) do if piece:IsA("BasePart") then piece.CanCollide=false; piece.CanTouch=false; piece.CanQuery=false end end
-   local hum=clone:FindFirstChildOfClass("Humanoid"); if hum then hum.DisplayDistanceType=Enum.HumanoidDisplayDistanceType.None; hum.HealthDisplayType=Enum.HumanoidHealthDisplayType.AlwaysOff end
+   if hum then hum.DisplayDistanceType=Enum.HumanoidDisplayDistanceType.None; hum.HealthDisplayType=Enum.HumanoidHealthDisplayType.AlwaysOff end
+   local head=clone:FindFirstChild("Head"); local torso=clone:FindFirstChild("Torso")
+   if head and torso then
+    podDetail(clone,head,"SilkHeadband",Vector3.new(1.55,0.12,0.1),CFrame.new(0,0.48,-0.22),style.accent)
+    podDetail(clone,head,"SoftFringeLeft",Vector3.new(0.38,0.28,0.18),CFrame.new(-0.3,0.36,-0.48),style.hair)
+    podDetail(clone,head,"SoftFringeRight",Vector3.new(0.38,0.28,0.18),CFrame.new(0.3,0.36,-0.48),style.hair)
+    podDetail(clone,head,"LongHairLeft",Vector3.new(0.42,1.35,0.42),CFrame.new(-0.76,-0.52,0.32),style.hair)
+    podDetail(clone,head,"LongHairRight",Vector3.new(0.42,1.35,0.42),CFrame.new(0.76,-0.52,0.32),style.hair)
+    podDetail(clone,head,"HairPinLeft",Vector3.new(0.28,0.28,0.16),CFrame.new(-0.8,0.38,-0.25),style.accent,Enum.PartType.Ball)
+    podDetail(clone,head,"HairPinRight",Vector3.new(0.28,0.28,0.16),CFrame.new(0.8,0.38,-0.25),style.accent,Enum.PartType.Ball)
+    podDetail(clone,head,"EyeGlintLeft",Vector3.new(0.09,0.11,0.035),CFrame.new(-0.4,0.13,-0.575),C(245,241,225),Enum.PartType.Ball)
+    podDetail(clone,head,"EyeGlintRight",Vector3.new(0.09,0.11,0.035),CFrame.new(0.4,0.13,-0.575),C(245,241,225),Enum.PartType.Ball)
+    podDetail(clone,head,"SoftMouth",Vector3.new(0.2,0.045,0.035),CFrame.new(0,-0.29,-0.535),C(150,91,98))
+    podDetail(clone,torso,"TailoredCollar",Vector3.new(0.9,0.18,0.08),CFrame.new(0,0.78,-0.53),style.accent)
+    podDetail(clone,torso,"UniformBrooch",Vector3.new(0.28,0.32,0.1),CFrame.new(0,0.38,-0.55),style.accent,Enum.PartType.Ball)
+    podDetail(clone,torso,"UniformWaistTrim",Vector3.new(1.7,0.11,0.08),CFrame.new(0,-0.68,-0.53),style.accent)
+    podDetail(clone,torso,"SkirtHem",Vector3.new(2.25,0.1,1.42),CFrame.new(0,-1.18,0),style.accent)
+   end
+   if joints and joints.LS and joints.RS then
+    joints.LS.C0*=CFrame.Angles(0,0,math.rad(-7)); joints.RS.C0*=CFrame.Angles(0,0,math.rad(7))
+    for _=1,3 do for _,motor in ipairs(clone:GetDescendants()) do if motor:IsA("Motor6D") and motor.Part0 and motor.Part1 then motor.Part1.CFrame=motor.Part0.CFrame*motor.C0*motor.C1:Inverse() end end end
+   end
    local statusColor=col%3==0 and C(195,83,66) or C(93,167,160)
    local status=C3.Part(m,"ClonePodStatus",Vector3.new(1.25,0.32,0.14),o+Vector3.new(x,8.2,z-3.18),statusColor,Enum.Material.SmoothPlastic)
    status.Material=Enum.Material.Neon; status.CanCollide=false; status.CanTouch=false; status.CanQuery=false
@@ -4179,8 +4220,9 @@ function C3.Intro()
    local windowPosition=C3.Pos(-153,4,zOffset)
    local windowView=CFrame.lookAt(windowPosition,C3.Pos(960,100,0),Vector3.yAxis)
    local distance=((windowPosition-root.Position)*Vector3.new(1,0,1)).Magnitude
+   local character=p.Character; local windowTarget=windowView
    windowDuration=math.max(windowDuration,distance/12)
-   task.spawn(function() tweenCharTo(p.Character,windowView,1.5,true,12,false,false) end)
+   task.spawn(function() tweenCharTo(character,windowTarget,1.5,true,12,false,false) end)
   end
  end
  if C3.buddy then
@@ -4189,34 +4231,43 @@ function C3.Intro()
  end
  task.wait(windowDuration+0.12)
  if C3.buddy then task.wait(0.45) end
- -- Keep the window beat third-person: show both heroes in silhouette while the
- -- camera looks past them toward the distant tower instead of snapping to POV.
- cameraPlan(C3.Pos(-204,9,-17),C3.Pos(-201,9,-14),C3.Pos(-50,2,0),1.4,58,50)
+ -- First stage over the heroes' shoulders: we see both backs, the open glass,
+ -- city street and tower in one readable composition.
+ cameraPlan(C3.Pos(-178,9,0),C3.Pos(-175,8,0),C3.Pos(-50,3,0),1.1,68,60)
  C3.Say(C3.party[1]:GetAttribute("Hero")=="Artem" and "Артём" or "Демид","Эммм, что это было?",3)
  C3.Say("Демид","Чекни в окно.",3)
- focusStreaming(C3.Pos(960,103,0)); prepareView(C3.Pos(960,103,0))
+ -- Then a true eye-level shot from each hero, aimed at the mast's center rather
+ -- than a distant camera position; the transparent reticle will not darken it.
+ focusStreaming(C3.Pos(960,150,0)); prepareView(C3.Pos(960,150,0))
  C3RE:FireAllClients("binocular",true)
- cameraPlan(C3.Pos(-204,9,-17),C3.Pos(-201,9,-14),C3.Pos(-50,2,0),1.6,58,50); task.wait(3)
+ CutsceneRE:FireAllClients("pov",C3.Pos(960,150,0),54); task.wait(0.6)
  C3.Say("Артём","Сигнал идёт оттуда. Смотри на охрану наверху.",3)
  C3.Say("Демид","Значит, эту штуку нужно выключить. Сейчас, пока она весь город не накрыла.",4)
  C3RE:FireAllClients("binocular",false)
- -- Pull back to a clean two-person third-person window shot after the binocular close-up.
- cameraPlan(C3.Pos(-204,10,-18),C3.Pos(-201,9,-15),C3.Pos(-60,0,0),1.1,60,56)
+ -- Return behind both heroes before the upstairs rush to Kirill.
+ cameraPlan(C3.Pos(-178,9,0),C3.Pos(-175,8,0),C3.Pos(-50,3,0),0.9,60,58)
  C3.Say("Артём","Стой. Кирилл же наверху, в комнате!",3)
  focusStreaming(C3.Pos(-184,18,-14)); prepareView(C3.Pos(-184,18,-14))
  -- Keep the camera third-person and behind the heroes while they climb the
  -- real stair wing, cross the landing, and queue at Kirill's bedroom doorway.
  CutsceneRE:FireAllClients("followRig",C3.party[1].Character,Vector3.new(0,8,13),Vector3.new(0,2,0))
  local mainRoute={
-  C3.Pos(-153,4,-5),C3.Pos(-170,4,-5),C3.Pos(-175,4,-5),C3.Pos(-186,4,-5),
-  C3.Pos(-204,4,-5),C3.Pos(-204,4,-20),C3.Pos(-222,4,-20),C3.Pos(-222,18,18),
-  C3.Pos(-212,18,18),C3.Pos(-205,18,0),C3.Pos(-160,18,2),C3.Pos(-160,18,0),
+  C3.Pos(-153,4,-5),C3.Pos(-170,4,-5),C3.Pos(-186,4,-5),C3.Pos(-204,4,-5),
+  C3.Pos(-204,4,-20),C3.Pos(-216,4,-20),C3.Pos(-222,4,-20),
  }
  local buddyRoute={
-  C3.Pos(-153,4,5),C3.Pos(-165,4,9),C3.Pos(-165,4,5),C3.Pos(-171,4,5),
-  C3.Pos(-186,4,9),C3.Pos(-204,4,9),C3.Pos(-204,4,-20),C3.Pos(-219,4,-20),
-  C3.Pos(-219,18,18),C3.Pos(-205,18,4),C3.Pos(-160,18,4),C3.Pos(-160,18,0),
+  C3.Pos(-153,4,5),C3.Pos(-165,4,9),C3.Pos(-171,4,5),C3.Pos(-186,4,9),
+  C3.Pos(-204,4,9),C3.Pos(-204,4,-20),C3.Pos(-219,4,-20),
  }
+ -- Follow every real tread in sequence. A single diagonal tween made the
+ -- companion slide through the stairwell instead of looking like he climbed it.
+ for stair=1,15 do
+  local z=-20+stair*2.5; local y=stair+3
+  table.insert(mainRoute,C3.Pos(-222,y,z))
+  table.insert(buddyRoute,C3.Pos(-219,y,z))
+ end
+ for _,point in ipairs({C3.Pos(-212,18,18),C3.Pos(-205,18,0),C3.Pos(-160,18,2),C3.Pos(-160,18,0)}) do table.insert(mainRoute,point) end
+ for _,point in ipairs({C3.Pos(-209,18,21),C3.Pos(-205,18,4),C3.Pos(-160,18,4),C3.Pos(-160,18,0)}) do table.insert(buddyRoute,point) end
  local function directed(position,nextPosition)
   local target=nextPosition or C3.kirill.Head.Position
   return CFrame.lookAt(position,Vector3.new(target.X,position.Y,target.Z),Vector3.yAxis)
@@ -4224,22 +4275,25 @@ function C3.Intro()
  local function walkRoutes(routeA,routeB)
   for waypoint=1,#routeA do
    local longest=0
-   local ignoreSteps=waypoint==8 or waypoint==9
+   local onStairs=waypoint>=8 and waypoint<=22
+   local pace=onStairs and 9 or 12
    for index,p in ipairs(C3.party) do
     local route=index==1 and routeA or routeB
     local root=C3.Root(p)
     if root then
      local target=directed(route[waypoint],route[waypoint+1])
-     local duration=math.max(((target.Position-root.Position)*Vector3.new(1,0,1)).Magnitude/12,0.15)
+     local duration=math.max(((target.Position-root.Position)*Vector3.new(1,0,1)).Magnitude/pace,0.15)
+     local character=p.Character; local moveTarget=target; local movePace=pace; local skipSteps=onStairs
      longest=math.max(longest,duration)
-     task.spawn(function() tweenCharTo(p.Character,target,1.2,true,12,ignoreSteps,false) end)
+     task.spawn(function() tweenCharTo(character,moveTarget,1.2,true,movePace,skipSteps,false) end)
     end
    end
    if C3.buddy and C3.buddy.Parent then
     local target=directed(routeB[waypoint],routeB[waypoint+1])
-    local duration=math.max(((target.Position-C3.buddy:GetPivot().Position)*Vector3.new(1,0,1)).Magnitude/12,0.15)
+    local duration=math.max(((target.Position-C3.buddy:GetPivot().Position)*Vector3.new(1,0,1)).Magnitude/pace,0.15)
+    local buddy=C3.buddy; local moveTarget=target; local moveDuration=duration
     longest=math.max(longest,duration)
-    task.spawn(function() if C3.buddy and C3.buddy.Parent then moveModel(C3.buddy,target,duration,true) end end)
+    task.spawn(function() if buddy and buddy.Parent then moveModel(buddy,moveTarget,moveDuration,true) end end)
    end
    task.wait(longest+0.08)
   end
