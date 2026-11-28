@@ -19,6 +19,8 @@ local StateRE, HitRE, EndRE, ShakeRE = newRemote("State"), newRemote("Hit"), new
 local KickRE, FocusRE, DoorStateRE = newRemote("Kick"), newRemote("Focus"), newRemote("DoorState")
 local CutsceneRE, MusicRE, CreditsRE = newRemote("Cutscene"), newRemote("Music"), newRemote("Credits")
 local LobbyRE=newRemote("Lobby")
+local DebugRE=newRemote("DebugTools")
+local DebugAccessRF=Instance.new("RemoteFunction"); DebugAccessRF.Name="DebugAccess"; DebugAccessRF.Parent=Remotes
 local sessionSize, sessionStarted, pushLobbyState=1,false,nil
 local returnToMenu
 local c2Attack,c3Attack
@@ -3564,63 +3566,98 @@ function C3.Beam(parent,name,a,b,width,color)
  p.CFrame=CFrame.lookAt((a+b)*0.5,b); return p
 end
 function C3.BuildRadioMast()
- -- A full-height, tapered, four-leg lattice tower with the painted red/white
- -- maintenance sections of a real cellular mast (not a square neon shaft).
- local function radiusAt(y) return 54-44*(y/324) end
- local function corner(signX,signZ,y)
-  local radius=radiusAt(y)
-  return C3.Pos(960+signX*radius,y,signZ*radius)
+ local mast=Instance.new("Model"); mast.Name="RadioTower"; mast.Parent=C3.landmark
+ C3.towerModel=mast; C3.towerParts={}
+ local function register(part)
+  if part.SetAttribute then part:SetAttribute("TowerTarget",true) else part.TowerTarget=true end
+  table.insert(C3.towerParts,part); return part
  end
+ local function part(name,size,pos,color,material)
+  return register(C3.Part(mast,name,size,pos,color,material or Enum.Material.Metal))
+ end
+ local function beam(name,a,b,width,color)
+  local p=part(name,Vector3.new(width,width,(b-a).Magnitude),(a+b)*0.5,color,Enum.Material.Metal)
+  p.CFrame=CFrame.lookAt((a+b)*0.5,b); return p
+ end
+ local function radiusAt(y) return 54-44*(y/324) end
+ local function at(x,y,z) return C3.Pos(960+x,y,z) end
+ local function corner(sx,sz,y) local r=radiusAt(y); return at(sx*r,y,sz*r) end
+ local red=C(177,57,48); local ivory=C(192,199,198); local metal=C(157,61,51)
+ local rail=C(181,187,185); local deck=C(83,94,99); local warm=C(255,214,150)
  local corners={{-1,-1},{1,-1},{1,1},{-1,1}}
- local red=C(177,57,48); local ivory=C(192,199,198)
  for level=0,13 do
   local y0=level*24; local y1=math.min(y0+24,324)
   local color=(level<2 or level==7 or level>=12) and red or ivory
-  for i,signs in ipairs(corners) do
-   local nextSigns=corners[i%#corners+1]
-   C3.Beam(C3.landmark,"TaperedTowerLeg",corner(signs[1],signs[2],y0),corner(signs[1],signs[2],y1),2.1,color)
-   -- Perimeter tie beams and crossed X-bracing on all four faces.
-   C3.Beam(C3.landmark,"TowerHorizontalTie",corner(signs[1],signs[2],y1),corner(nextSigns[1],nextSigns[2],y1),1.0,color)
-   C3.Beam(C3.landmark,"TowerXBrace",corner(signs[1],signs[2],y0),corner(nextSigns[1],nextSigns[2],y1),0.85,color)
-   C3.Beam(C3.landmark,"TowerXBrace",corner(nextSigns[1],nextSigns[2],y0),corner(signs[1],signs[2],y1),0.85,color)
+  for index,signs in ipairs(corners) do
+   local nextSigns=corners[index%#corners+1]
+   local doorFace=level==0 and index==1
+   beam("TaperedTowerLeg",corner(signs[1],signs[2],y0),corner(signs[1],signs[2],y1),2.1,color)
+   beam("TowerHorizontalTie",corner(signs[1],signs[2],y1),corner(nextSigns[1],nextSigns[2],y1),1,color)
+   if not doorFace then
+    beam("TowerXBrace",corner(signs[1],signs[2],y0),corner(nextSigns[1],nextSigns[2],y1),0.85,color)
+    beam("TowerXBrace",corner(nextSigns[1],nextSigns[2],y0),corner(signs[1],signs[2],y1),0.85,color)
+   end
   end
  end
- -- Four stout anchor shoes and a narrow service platform under the antenna head.
  for _,sx in ipairs({-1,1}) do for _,sz in ipairs({-1,1}) do
-  C3.Part(C3.landmark,"TowerAnchorShoe",Vector3.new(4,4,4),C3.Pos(960+sx*53,2,sz*53),C(157,61,51),Enum.Material.Metal)
+  part("TowerAnchorShoe",Vector3.new(4,12,4),at(sx*53.5,-2,sz*53.5),metal)
  end end
- C3.Part(C3.landmark,"AntennaServiceDeck",Vector3.new(25,0.8,25),C3.Pos(960,300,0),C(83,94,99),Enum.Material.Metal)
- for _,sx in ipairs({-1,1}) do for _,sz in ipairs({-1,1}) do
-  C3.Part(C3.landmark,"AntennaDeckRailPost",Vector3.new(0.45,3.5,0.45),C3.Pos(960+sx*11,302,sz*11),C(181,187,185),Enum.Material.Metal)
- end end
- for _,side in ipairs({-1,1}) do
-  C3.Part(C3.landmark,"AntennaDeckRail",Vector3.new(22,0.35,0.35),C3.Pos(960,303.5,side*11),C(181,187,185),Enum.Material.Metal)
-  C3.Part(C3.landmark,"AntennaDeckRail",Vector3.new(0.35,0.35,22),C3.Pos(960+side*11,303.5,0),C(181,187,185),Enum.Material.Metal)
+ part("TowerEntryPath",Vector3.new(14,1,72),at(0,0.25,-24),C(120,120,115),Enum.Material.Concrete)
+ local ladder=Instance.new("TrussPart"); ladder.Name="TowerCoreLadder"; ladder.Size=Vector3.new(2,328,2)
+ ladder.Position=at(0,164,0); ladder.Color=rail; ladder.Material=Enum.Material.Metal; ladder.Anchored=true
+ ladder.Parent=mast; register(ladder)
+ local function floorWithHole(name,y,half,thickness,color)
+  local strip=half-4; local center=4+strip/2
+  for _,side in ipairs({-1,1}) do
+   part(name,Vector3.new(half*2,thickness,strip),at(0,y,side*center),color)
+   part(name,Vector3.new(strip,thickness,8),at(side*center,y,0),color)
+  end
  end
- C3.Part(C3.landmark,"TopWhipAntenna",Vector3.new(0.8,27,0.8),C3.Pos(960,337.5,0),C(180,186,185),Enum.Material.Metal)
- C3.Part(C3.landmark,"AntennaTopCrossbar",Vector3.new(12,0.6,0.6),C3.Pos(960,341,0),C(180,186,185),Enum.Material.Metal)
- for _,side in ipairs({-1,1}) do
-  C3.Part(C3.landmark,"TopPanelAntenna",Vector3.new(1.2,10,2),C3.Pos(960+side*6,335,0),C(198,202,199),Enum.Material.Metal)
+ local function railing(name,floorY,half)
+  local h=3.5
+  for _,sx in ipairs({-1,0,1}) do for _,sz in ipairs({-1,0,1}) do
+   if sx~=0 or sz~=0 then part(name.."Post",Vector3.new(0.45,h,0.45),at(sx*half,floorY+h/2,sz*half),rail) end
+  end end
+  for _,height in ipairs({h-0.2,1.7}) do for _,side in ipairs({-1,1}) do
+   part(name,Vector3.new(half*2,0.3,0.3),at(0,floorY+height,side*half),rail)
+   part(name,Vector3.new(0.3,0.3,half*2),at(side*half,floorY+height,0),rail)
+  end end
  end
- -- Directional panel antennas and small service microwave dishes on the mast.
+ for y=48,288,48 do
+  floorWithHole("LandingDeck",y,12,0.6,deck); railing("LandingRail",y+0.3,12)
+  local radius=radiusAt(y)
+  for _,side in ipairs({-1,1}) do
+   beam("LandingStrut",at(side*12,y-0.3,0),at(side*radius,y-0.3,0),1.2,metal)
+   beam("LandingStrut",at(0,y-0.3,side*12),at(0,y-0.3,side*radius),1.2,metal)
+   local lamp=part("LandingLamp",Vector3.new(1.2,0.6,1.2),at(side*10.5,y-0.6,0),warm,Enum.Material.SmoothPlastic)
+   light(lamp,warm,24,0.8)
+  end
+  for _,signs in ipairs(corners) do beam("LandingStrut",at(signs[1]*12,y-0.3,signs[2]*12),corner(signs[1],signs[2],y)-Vector3.new(0,0.3,0),0.8,metal) end
+ end
+ floorWithHole("AntennaServiceDeck",300,13,0.8,deck); railing("AntennaDeckRail",300.4,12)
+ floorWithHole("TowerTopPlate",324.5,radiusAt(324),1,red); railing("TopRail",325,radiusAt(324)-0.5)
+ part("TopWhipAntenna",Vector3.new(0.8,27,0.8),at(0,338.5,7),rail)
+ part("AntennaTopCrossbar",Vector3.new(12,0.6,0.6),at(0,341,7),rail)
+ for _,side in ipairs({-1,1}) do part("TopPanelAntenna",Vector3.new(1.2,10,2),at(side*6,330,0),ivory) end
  for _,y in ipairs({157,205,253,277}) do
+  local radius=radiusAt(y)
   for _,side in ipairs({-1,1}) do
-   local radius=radiusAt(y)
-   local panel=C3.Part(C3.landmark,"CellularPanelAntenna",Vector3.new(2,14,5.5),C3.Pos(960+side*(radius-5),y,0),C(190,198,199),Enum.Material.Metal)
-   panel.CanCollide=false
-   C3.Beam(C3.landmark,"AntennaMount",C3.Pos(960+side*(radius-11),y,0),panel.Position,0.8,C(104,115,117))
-   local dish=C3.Part(C3.landmark,"MicrowaveDish",Vector3.new(1.2,7,7),C3.Pos(960+side*(radius-12),y,12),C(171,180,182),Enum.Material.Metal)
-   dish.Shape=Enum.PartType.Cylinder; dish.CanCollide=false
-   C3.Beam(C3.landmark,"DishFeed",dish.Position,C3.Pos(960+side*(radius-4),y,12),0.55,C(94,106,111))
+   local panel=part("CellularPanelAntenna",Vector3.new(2,14,5.5),at(side*(radius+4),y,0),ivory); panel.CanCollide=false
+   beam("AntennaMount",at(side*radius,y,0),panel.Position,0.8,C(104,115,117))
+   for _,z in ipairs({-12,12}) do
+    local dish=part("MicrowaveDish",Vector3.new(1.2,7,7),at(side*(radius+6),y,z),C(171,180,182)); dish.Shape=Enum.PartType.Cylinder; dish.CanCollide=false
+    beam("DishFeed",dish.Position,at(side*radius,y,z),0.55,C(94,106,111))
+   end
   end
  end
- -- A few low-output red obstruction lamps remain visible while the signal runs.
  for _,y in ipairs({24,120,216,300}) do
-  for _,side in ipairs({-1,1}) do
-   local marker=C3.Part(C3.landmark,"TowerObstructionLamp",Vector3.new(0.8,1.1,0.8),C3.Pos(960+side*(radiusAt(y)+0.7),y,0),C(174,54,48),Enum.Material.SmoothPlastic)
+  local offset=radiusAt(y)+0.7
+  for _,side in ipairs({-1,1}) do for _,pos in ipairs({at(side*offset,y,0),at(0,y,side*offset)}) do
+   local marker=part("TowerObstructionLamp",Vector3.new(0.8,1.1,0.8),pos,C(174,54,48),Enum.Material.SmoothPlastic)
    table.insert(C3.redLights,marker); light(marker,C(220,66,57),18,0.28)
-  end
+  end end
  end
+ mast.WorldPivot=CFrame.new(C3.Pos(960,0,0))
 end
 function C3.CommunicationEquipment(index,floor)
  local core=C3.Part(C3.map,"SignalWaveguideCore",Vector3.new(8,16,8),C3.Pos(960,floor+8,0),C(99,120,138),Enum.Material.Metal)
@@ -4814,11 +4851,167 @@ function C3.TakeModule(p,index)
  else
   C3.HeroSay("Кирилл больше не ломится к двери... Но будто всё ещё не здесь. Нужно вернуться домой и разобраться с этими модулями.","Кирилл успокоился, но всё ещё не пришёл в себя. Заберу модули домой и выясню, что они с ним сделали.",5)
  end
- cameraPlan(C3.Pos(1080,110,-110),C3.Pos(1100,120,-130),C3.Pos(940,60,0),4,62,70); task.wait(3)
- FadeRE:FireAllClients(true,"ГЛАВА III ПРОЙДЕНА"); task.wait(1)
+ cameraPlan(C3.Pos(1080,110,-110),C3.Pos(1100,120,-130),C3.Pos(940,60,0),4,62,70); task.wait(2)
+ C3.Scene(false)
+ C3.StartTowerBattle()
+end
+
+-- Once the shield is down, the crew is moved outside and must destroy the exposed mast.
+function C3.StartTowerBattle()
+ if not C3.active or C3.towerDestroyed then return end
+ C3.Scene(true)
+ local pad=C3.Part(C3.map,"TowerExteriorCombatPad",Vector3.new(100,1,78),C3.Pos(1040,-0.5,0),C(48,55,63),Enum.Material.Concrete)
+ pad.CanCollide=true
+ C3.MoveParty(C3.Pos(1040,4,16),C3.Pos(960,130,0))
+ cameraPlan(C3.Pos(1090,54,190),C3.Pos(1080,49,175),C3.Pos(960,150,0),4,68,58)
+ C3.towerHealth=1800; C3.towerMaxHealth=1800; C3.towerBattle=true
+ C3RE:FireAllClients("towerBattle",{health=C3.towerHealth,maxHealth=C3.towerMaxHealth})
+ C3.Say("Артём","Щит погас. Башня открыта — разбейте её, пока сеть не перезапустилась.",5)
+ C3.Scene(false); C3.Send()
+end
+
+function C3.DamageTower(player,hit,weapon,charge)
+ if not C3.towerBattle or C3.towerHealth<=0 or not hit.Instance:GetAttribute("TowerTarget") or weapon=="Fists" then return false end
+ local damage=WD.Stats[weapon].Damage*(weapon=="Shotgun" and 5 or 1)
+ if weapon=="Rifle" then
+  local amount=typeof(charge)=="number" and charge==charge and math.abs(charge)<1e6 and math.clamp(charge,0,1) or 0
+  damage=45+235*amount
+ end
+ C3.towerHealth=math.max(0,C3.towerHealth-damage)
+ C3RE:FireAllClients("towerHealth",{health=C3.towerHealth,maxHealth=C3.towerMaxHealth})
+ HitRE:FireClient(player,true)
+ if C3.towerHealth<=0 then C3.towerBattle=false; task.spawn(C3.TowerDestroyed) end
+ return true
+end
+
+function C3.BuildEscapePlane()
+ if C3.escapePlane and C3.escapePlane.Parent then return C3.escapePlane end
+ local plane=Instance.new("Model"); plane.Name="EmergencyEscapePlane"; plane.Parent=C3.map; C3.escapePlane=plane
+ local center=C3.Pos(790,5,150)
+ local function piece(name,size,offset,color,material)
+  local p=C3.Part(plane,name,size,center+offset,color,material or Enum.Material.Metal); p.Anchored=true; return p
+ end
+ local fuselage=piece("EscapePlaneFuselage",Vector3.new(38,5,7),Vector3.zero,C(165,174,181),Enum.Material.Metal); plane.PrimaryPart=fuselage
+ piece("EscapePlaneNose",Vector3.new(12,4,6),Vector3.new(-23,0,0),C(166,176,182),Enum.Material.Metal)
+ piece("EscapePlaneWing",Vector3.new(13,0.8,54),Vector3.new(-2,0,0),C(122,135,145),Enum.Material.Metal)
+ piece("EscapePlaneTail",Vector3.new(8,0.7,20),Vector3.new(15,3,0),C(122,135,145),Enum.Material.Metal)
+ piece("EscapePlaneFin",Vector3.new(8,7,0.8),Vector3.new(15,5,0),C(145,153,158),Enum.Material.Metal)
+ for seat=1,4 do piece("PlanePassengerSeat",Vector3.new(2,2,2),Vector3.new(seat*5-12,-1,(seat%2==0 and 1.6 or -1.6)),C(58,69,82),Enum.Material.Fabric) end
+ local cockpit=piece("EscapePlaneCockpit",Vector3.new(8,3,5),Vector3.new(-17,3,0),C(83,141,167),Enum.Material.Glass); cockpit.Transparency=0.22
+ local board=piece("EscapePlaneBoardingStep",Vector3.new(3,1,7),Vector3.new(1,-3,5),C(82,94,106),Enum.Material.Metal)
+ C3.Prompt(board,"Сесть в самолёт",function(p)
+  if not C3.escapeDeadline or C3.boarded[p] or not table.find(C3.party,p) or not C3.Root(p) then return end
+  C3.boarded[p]=true; p:SetAttribute("BoardedEscapePlane",true)
+  local root=C3.Root(p); if root then root.Anchored=true; root.CFrame=board.CFrame*CFrame.new(0,3,-2) end
+  NotifyRE:FireClient(p,"Ты внутри. Ждём остальных.",3)
+  local all=true
+  for _,member in ipairs(C3.Living()) do if not C3.boarded[member] then all=false end end
+  if all then task.spawn(C3.FlyOut) end
+ end,0.6)
+ return plane
+end
+
+function C3.StartEscape()
+ if not C3.active or C3.escapeDeadline then return end
+ C3.Scene(true)
+ C3.MoveParty(C3.Pos(1042,4,14),C3.Pos(960,100,0))
+ C3.BuildEscapePlane()
+ C3.boarded={}; C3.escapeStarted=false; C3.escapeDeadline=os.clock()+180; C3.escapeSentSecond=-1
+ C3.Scene(false)
+ C3RE:FireAllClients("escapeStart",{seconds=180})
+ NotifyRE:FireAllClients("СВЯЗЬ ОТКЛЮЧЕНА — 03:00. Доберитесь до самолёта и садитесь всем отрядом!",8)
+ for k=1,5 do C3.Spawn(10,C3.Pos(900+(k%2)*20,4,100+k*14),false,false,k) end
+end
+
+function C3.TowerDestroyed()
+ if C3.towerDestroyed or not C3.active then return end
+ C3.towerDestroyed=true; C3.escapeStarted=true; C3.Scene(true); C3RE:FireAllClients("towerDestroyed")
+ MusicRE:FireAllClients("stop")
+ local blast=C3.Part(fxFolder,"TowerCoreBlast",Vector3.new(8,8,8),C3.Pos(960,80,0),C(255,94,55),Enum.Material.Neon)
+ blast.Shape=Enum.PartType.Ball; blast.CanCollide=false; light(blast,C(255,110,55),120,8)
+ TweenService:Create(blast,TweenInfo.new(2),{Size=Vector3.new(150,150,150),Transparency=1}):Play()
+ for _,part in ipairs(C3.towerParts or {}) do
+  if part.Parent then part.CanCollide=false; TweenService:Create(part,TweenInfo.new(3,Enum.EasingStyle.Quad,Enum.EasingDirection.In),{Transparency=1,Position=part.Position+Vector3.new(0,-math.random(5,35),0)}):Play() end
+ end
+ cameraPlan(C3.Pos(1180,210,-250),C3.Pos(1150,195,-220),C3.Pos(960,150,0),4,64,58)
+ task.wait(3.2)
+ if C3.towerModel then C3.towerModel:Destroy() end
+ C3.Scene(true)
+ local neuroCfg=table.clone(Types.Neuro); neuroCfg.Name="Нейро-тянка"
+ local neuro=buildRig(neuroCfg,CFrame.lookAt(C3.Pos(1032,4,-10),C3.Pos(1042,4,10)))
+ neuro.Parent=C3.map; C3.finalNeuro=neuro
+ cameraPlan(C3.Pos(1060,9,-25),C3.Pos(1055,8,-20),neuro.Head.Position,1.5,58,52)
+ C3.Say("Нейро-тянка","Понятно. Этот город нам больше не нужен.",4)
+ MusicRE:FireAllClients("finalSlow")
+ local shoulder=neuro:FindFirstChild("Right Shoulder",true); local armBase=shoulder and shoulder.C0
+ if shoulder and armBase then TweenService:Create(shoulder,TweenInfo.new(1.5,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,1,true),{C0=armBase*CFrame.Angles(math.rad(-110),0,0)}):Play() end
+ local chargingHand=neuro:FindFirstChild("Right Arm") or neuro.Head
+ local charge=C3.Part(fxFolder,"NeuroCharge",Vector3.new(0.5,0.5,0.5),chargingHand.Position+Vector3.new(0,-0.45,0),C(80,230,255),Enum.Material.Neon)
+ charge.Shape=Enum.PartType.Ball; charge.CanCollide=false; light(charge,C(75,210,255),24,3)
+ TweenService:Create(charge,TweenInfo.new(2),{Size=Vector3.new(5,5,5)}):Play()
+ C3.Say("Нейро-тянка","У вас три минуты. Найдите выход, пока город ещё стоит.",5)
+ task.wait(1); C3.Scene(false); C3.StartEscape()
+end
+
+function C3.FlyOut()
+ if C3.flying or not C3.active then return end
+ C3.flying=true; C3.escapeStarted=true; C3.escapeDeadline=nil; C3.Scene(true); C3RE:FireAllClients("escapeClear")
+ local plane=C3.escapePlane; if not plane or not plane.Parent then return end
+ local planeTarget=plane:GetPivot()
+ for index,p in ipairs(C3.Living()) do
+  local root=C3.Root(p); if root then root.Anchored=true; root.CFrame=planeTarget*CFrame.new(4+index*4,5,index%2==0 and 1.5 or -1.5) end
+ end
+ cameraPlan(C3.Pos(800,20,250),C3.Pos(795,19,230),C3.Pos(790,7,150),2,62,56)
+ C3.HeroPair("Демид","Какого хрена? Связь пропала!",3,"Артём","Нейро запускает заряд. Всем в самолёт — немедленно!",4,"Связь пропала. Нужно убираться отсюда — быстро!","Какого хрена? Связь пропала! Надо валить, пока город не накрыло!")
+ local takeoff=planeTarget*CFrame.new(0,0,-260)
+ task.spawn(function() moveModel(plane,takeoff,5,true) end)
+ cameraPlan(C3.Pos(1120,160,360),C3.Pos(1120,150,330),C3.Pos(420,80,150),7,64,58)
+ for index=1,5 do
+  task.delay(index*0.45,function()
+   if not C3.active then return end
+   local fire=C3.Part(fxFolder,"CityBlast",Vector3.new(12,12,12),C3.Pos(index*170,18,(index%2)*90),C(255,111,57),Enum.Material.Neon)
+   fire.Shape=Enum.PartType.Ball; fire.CanCollide=false; light(fire,C(255,90,40),90,5)
+   TweenService:Create(fire,TweenInfo.new(2.4),{Size=Vector3.new(190,190,190),Transparency=1}):Play(); Debris:AddItem(fire,3)
+  end)
+ end
+ if C3.backdrop then
+  for _,object in ipairs(C3.backdrop:GetDescendants()) do
+   if object:IsA("BasePart") and object.Name~="MainStreetAsphalt" then
+    object.CanCollide=false; object.CanQuery=false
+    TweenService:Create(object,TweenInfo.new(4),{Transparency=math.max(object.Transparency,0.72),Color=C(61,53,57)}):Play()
+   end
+  end
+ end
+ C3.Say("Нейро-тянка","Прощайте. Этот город больше не нужен.",4)
+ task.wait(6)
+ -- The plane is hit by the blast; open parachutes and drift into a safe city block.
+ for i,p in ipairs(C3.Living()) do
+  local root=C3.Root(p)
+  if root then
+   local canopy=C3.Part(C3.map,"EmergencyParachute",Vector3.new(12,2,12),root.Position+Vector3.new(0,24,0),C(190,62,54),Enum.Material.Fabric)
+   canopy.Shape=Enum.PartType.Ball; canopy.CanCollide=false
+   for _,side in ipairs({-1,1}) do C3.Beam(C3.map,"ParachuteLine",root.Position+Vector3.new(side*0.5,1,0),canopy.Position,0.1,C(205,205,198)) end
+   local landing=C3.Pos(250,8,185)+Vector3.new((i-1)*7,0,0)
+   TweenService:Create(root,TweenInfo.new(5,Enum.EasingStyle.Sine,Enum.EasingDirection.Out),{CFrame=CFrame.new(landing)}):Play()
+   TweenService:Create(canopy,TweenInfo.new(5,Enum.EasingStyle.Sine,Enum.EasingDirection.Out),{Position=landing+Vector3.new(0,14,0)}):Play()
+   Debris:AddItem(canopy,6)
+  end
+ end
+ task.wait(5.5); C3.MoveParty(C3.Pos(250,4,185),C3.Pos(255,4,200)); C3.Scene(false)
  C3RE:FireAllClients("credits",true); task.wait(35); C3RE:FireAllClients("credits",false)
+ C3.Scene(true); cameraPlan(C3.Pos(250,8,175),C3.Pos(251,8,177),C3.Pos(250,6,185),2,55,52)
+ if C3.coop then
+  C3.Say("Кирилл","Какого хрена? По новостям говорят, что Артём и Демид управляли башней. Их обвиняют в разрушении города и гибели тысяч людей.",9)
+  C3.Say("Демид","Связь отключилась ещё до взрыва. Они переписали всю историю.",5)
+  C3.Say("Артём","Найдём доказательства. Они не смогут скрыть, кто запустил заряд.",5)
+ else
+  C3.HeroSay("Кирилл, НТЯН снова обвиняет нас. Говорят, что мы управляли башней и уничтожили город.","Кирилл, по новостям НТЯН обвиняет нас: будто мы контролировали башню и погубили тысячи людей.",7)
+  C3.Say("Кирилл","Связь оборвалась до взрыва. Они всё подстроили.",5)
+ end
+ FadeRE:FireAllClients(true,"ПРОДОЛЖЕНИЕ СЛЕДУЕТ"); task.wait(2)
  C3.finished=true; C3.Stop(); returnToMenu()
 end
+
 function C3.RestorePlayer(p)
  if C3.recovering[p] then return end; C3.recovering[p]=true
  p:LoadCharacter()
@@ -4850,6 +5043,88 @@ function C3.RespawnCheckpoint()
  C3.MoveParty(C3.checkpointPos,C3.zones[C3.stage].center)
  C3.Scene(false); CutsceneRE:FireAllClients("reveal"); C3.Activate(C3.stage)
 end
+function C3.BuildPortalFactory()
+ if C3.portalFactory and C3.portalFactory.Parent then return C3.portalFactory end
+ local factory=Instance.new("Model"); factory.Name="PortalLaboratoryFactory"; factory.Parent=C3.map; C3.portalFactory=factory
+ local function piece(name,size,x,y,z,color,material)
+  return C3.Part(factory,name,size,C3.Pos(x,y,2200+z),color,material or Enum.Material.Metal)
+ end
+ piece("FactoryCombatFloor",Vector3.new(150,2,130),0,-1,0,C(54,61,70),Enum.Material.Concrete)
+ piece("FactoryCeiling",Vector3.new(150,2,130),0,26,0,C(39,47,58),Enum.Material.Metal)
+ for _,side in ipairs({-1,1}) do
+  piece("FactorySideWall",Vector3.new(2,28,130),side*75,13,0,C(49,62,75))
+  piece("LaboratoryGlassWall",Vector3.new(2,19,42),side*42,9.5,-25,C(63,119,145),Enum.Material.Glass).Transparency=0.25
+ end
+ piece("FactoryRearWall",Vector3.new(150,28,2),0,13,65,C(49,62,75))
+ piece("LaboratoryFrontWallLeft",Vector3.new(44,28,2),-53,13,-65,C(49,62,75))
+ piece("LaboratoryFrontWallRight",Vector3.new(44,28,2),53,13,-65,C(49,62,75))
+ piece("LaboratoryHeader",Vector3.new(62,5,2),0,24,-65,C(49,62,75))
+ for index=1,8 do
+  local x=-48+(index-1)*13.5
+  local pod=piece("CloneLaboratoryPod",Vector3.new(7,15,8),x,7.5,-40,index%2==0 and C(72,154,174) or C(146,88,123),Enum.Material.Glass)
+  pod.Transparency=0.28
+  piece("ClonePodBase",Vector3.new(8,1,9),x,0.5,-40,C(43,55,67))
+  local status=piece("ClonePodStatus",Vector3.new(0.3,3,0.3),x+3.7,8,-36,C(87,224,184),Enum.Material.Neon); status.CanCollide=false
+ end
+ for index=1,5 do
+  local x=-48+(index-1)*24
+  piece("FactoryConveyor",Vector3.new(13,2,62),x,1,12,C(45,50,57),Enum.Material.Metal)
+  for crate=1,3 do piece("FactoryStorageCrate",Vector3.new(7,6,7),x,5,-3+crate*15,C(107,83,68),Enum.Material.WoodPlanks) end
+ end
+ for _,side in ipairs({-1,1}) do
+  for _,z in ipairs({-48,0,48}) do C3.Lamp(factory,C3.Pos(side*55,24,2200+z),44,1.1,"FactoryLabLamp") end
+ end
+ local portal=C3.Part(factory,"FactoryReturnPortal",Vector3.new(10,12,1),C3.Pos(0,6,2258),C(70,220,235),Enum.Material.Neon)
+ portal.Transparency=0.22; portal.CanCollide=false; portal.CanTouch=false; portal.CanQuery=false
+ return factory
+end
+
+function C3.SpawnFactoryWave()
+ C3.factoryWave=C3.factoryWave+1; C3.factoryDeploying=true
+ local count=4+C3.factoryWave*2
+ for k=1,count do
+  local x=-48+((k*37)%96); local z=-15+((k*29)%70)
+  C3.Spawn(5,C3.Pos(x,4,2200+z),false,C3.factoryWave==3 and k==count,k)
+ end
+ task.delay(1,function() C3.factoryDeploying=false end)
+ NotifyRE:FireAllClients(("Завод • волна %d/3 — угрозы приближаются"):format(C3.factoryWave),4)
+end
+
+function C3.BeginFactoryPortal(player,portal)
+ local z=C3.zones[5]
+ if C3.inFactory or not C3.Ready(z) or C3.factoryPortalUsed then return end
+ C3.factoryPortalUsed=true; C3.inFactory=true; C3.Scene(true)
+ C3RE:FireAllClients("portal",true)
+ cameraPlan(C3.Pos(820,12,40),C3.Pos(830,11,35),portal.Position,1.5,60,54)
+ C3.Say(C3.HeroName(),"Портал ведёт в их лабораторию. Заходим вместе — ищем главный узел завода.",4)
+ FadeRE:FireAllClients(true,"ЛАБОРАТОРИЯ • ЗАВОД НТЯН"); task.wait(1)
+ C3.BuildPortalFactory(); C3.ClearMobs(); C3.factoryWave=0; C3.factoryCleared=false
+ C3.MoveParty(C3.Pos(-58,4,2140),C3.Pos(0,4,2200)); focusStreaming(C3.Pos(0,12,2200)); prepareView(C3.Pos(0,12,2200))
+ C3.Scene(false); FadeRE:FireAllClients(false,""); CutsceneRE:FireAllClients("reveal")
+ C3.SpawnFactoryWave()
+end
+
+function C3.ReturnFromFactory(player)
+ if not C3.inFactory or not C3.factoryCleared then return end
+ C3.inFactory=false; C3.Scene(true); C3RE:FireAllClients("portal",false)
+ FadeRE:FireAllClients(true,"ВЫХОД К БАШНЕ"); task.wait(0.7)
+ C3.ClearMobs(); C3.MoveParty(C3.Pos(870,4,-4),C3.Pos(960,4,0)); task.wait(0.5)
+ C3.Scene(false); FadeRE:FireAllClients(false,""); CutsceneRE:FireAllClients("reveal")
+ C3.Activate(6)
+end
+
+function C3.FactoryTick()
+ if not C3.factoryDeploying and not C3.factoryCleared and C3.Count(5)==0 then
+  if C3.factoryWave<3 then C3.SpawnFactoryWave()
+  else
+   C3.factoryCleared=true
+   NotifyRE:FireAllClients("Лаборатория и завод зачищены. Активируйте портал у выхода и возвращайтесь к башне.",6)
+   local exit=C3.portalFactory and C3.portalFactory:FindFirstChild("FactoryReturnPortal")
+   if exit and not exit:FindFirstChildOfClass("ProximityPrompt") then C3.Prompt(exit,"Активировать портал",function(p) C3.ReturnFromFactory(p) end,0.7) end
+  end
+ end
+end
+
 function C3.Tick(dt)
  if introActive then return end
  local alive=C3.Living()
@@ -4859,7 +5134,7 @@ function C3.Tick(dt)
  local z=C3.zones[C3.stage]
  for _,p in ipairs(alive) do
   local r,h=C3.Root(p); local state=C3.sprint[p]
-  if r.Position.Y< -12 or r.Position.Y>150 or math.abs(r.Position.Z-C3.origin.Z)>65 then p.Character:PivotTo(CFrame.new(C3.checkpointPos)) end
+  if not C3.inFactory and not C3.towerBattle and not C3.escapeDeadline and (r.Position.Y< -12 or r.Position.Y>380 or math.abs(r.Position.Z-C3.origin.Z)>2600) then p.Character:PivotTo(CFrame.new(C3.checkpointPos)) end
   if state then
    local grabbed=os.clock()<(p:GetAttribute("C3GrabbedUntil") or 0)
    local enabled=not (C3.hacker==p) and not grabbed
@@ -4871,6 +5146,22 @@ function C3.Tick(dt)
    p:SetAttribute("SprintStamina",state.energy); p:SetAttribute("IsSprinting",run)
   end
  end
+ if C3.inFactory then C3.FactoryTick(); C3.Send(); return end
+ if C3.escapeStarted then return end
+ if C3.towerBattle then return end
+ if C3.escapeDeadline then
+  local seconds=math.max(0,math.ceil(C3.escapeDeadline-os.clock()))
+  if seconds~=C3.escapeSentSecond then C3.escapeSentSecond=seconds; C3RE:FireAllClients("escapeTick",seconds) end
+  if seconds<=0 then
+   C3.escapeDeadline=nil; C3.escapeStarted=true
+   task.spawn(function()
+    C3.Scene(true); C3.Say("Нейро-тянка","Время вышло. Город останется моим.",5)
+    FadeRE:FireAllClients(true,"ЭВАКУАЦИЯ ПРОВАЛЕНА"); task.wait(3)
+    C3.finished=true; C3.Stop(); returnToMenu()
+   end)
+  end
+  return
+ end
  if C3.collecting then return end
  if not z.deploying and C3.Count(C3.stage)==0 and not z.cleared then
   if z.wave<z.rounds then C3.Wave(z) else
@@ -4879,7 +5170,17 @@ function C3.Tick(dt)
    NotifyRE:FireAllClients(z.index==10 and "Охрана уничтожена. Главный терминал доступен." or "Район зачищен. Используйте панель рядом со шлюзом.",4)
   end
  end
- if C3.Ready(z) and C3.stage<10 then
+ if C3.Ready(z) and C3.stage==5 and not C3.cityPortal then
+  local portal=Instance.new("Model"); portal.Name="FactoryPortal"; portal.Parent=C3.map; C3.cityPortal=portal
+  local base=z.exit
+  local center=C3.Part(portal,"PortalField",Vector3.new(8,11,0.8),base+Vector3.new(0,5.5,0),C(64,211,230),Enum.Material.Neon)
+  center.Transparency=0.22; center.CanCollide=false; center.CanTouch=false
+  for _,side in ipairs({-1,1}) do C3.Part(portal,"PortalFrame",Vector3.new(1,13,1),base+Vector3.new(side*5,6.5,0),C(52,92,111),Enum.Material.Metal) end
+  C3.Part(portal,"PortalHeader",Vector3.new(11,1,1),base+Vector3.new(0,13,0),C(52,92,111),Enum.Material.Metal)
+  C3.Prompt(center,"Активировать портал",function(p) C3.BeginFactoryPortal(p,center) end,0.8)
+  NotifyRE:FireAllClients("Портал к лаборатории открыт. Подойдите и активируйте его.",5)
+ end
+ if C3.Ready(z) and C3.stage<10 and C3.stage~=5 then
   local together=true
   for _,p in ipairs(alive) do local r=C3.Root(p); if (r.Position-z.exit).Magnitude>18 then together=false end end
   if together then C3.Activate(C3.stage+1) end
@@ -4889,7 +5190,7 @@ function C3.Tick(dt)
 end
 function C3.Start(party)
  assert(ServerStorage:FindFirstChild("silv3r_candy"),"Missing original Kirill model")
- C3.active=true; C3.finished=false; C3.serial+=1; C3.party=table.clone(party); C3.coop=#party>1; C3.mobs={}; C3.connections={}; C3.lastStateSignature=nil; C3.lastStateSent=nil; C3.sprint={}; C3.relays=0; C3.key=false; C3.shieldSeen=false; C3.hackPhase=1; C3.hackSerial=0; C3.shots={}; C3.recovering={}; C3.towerOff=false; C3.reinforcementSeen=false; C3.gameplayStarted=false; C3.recoveryAttempts=0; C3.modules={}; C3.collecting=false; C3.confirmUntil=nil; C3.confirmPlayer=nil; C3.hacker=nil; C3.challenge=nil; C3.stage=1
+ C3.active=true; C3.finished=false; C3.serial+=1; C3.party=table.clone(party); C3.coop=#party>1; C3.mobs={}; C3.connections={}; C3.lastStateSignature=nil; C3.lastStateSent=nil; C3.sprint={}; C3.relays=0; C3.key=false; C3.shieldSeen=false; C3.hackPhase=1; C3.hackSerial=0; C3.shots={}; C3.recovering={}; C3.towerOff=false; C3.reinforcementSeen=false; C3.gameplayStarted=false; C3.recoveryAttempts=0; C3.modules={}; C3.collecting=false; C3.confirmUntil=nil; C3.confirmPlayer=nil; C3.hacker=nil; C3.challenge=nil; C3.towerBattle=false; C3.towerDestroyed=false; C3.escapeStarted=false; C3.escapeDeadline=nil; C3.boarded={}; C3.inFactory=false; C3.factoryWave=0; C3.factoryDeploying=false; C3.factoryCleared=false; C3.factoryPortalUsed=false; C3.cityPortal=nil; C3.stage=1
  C2.originals={}; Players.RespawnTime=999999
  local physics=game:GetService("PhysicsService"); pcall(function() physics:RegisterCollisionGroup("C2Enemy") end); physics:CollisionGroupSetCollidable("C2Enemy","C2Enemy",false)
  clearLevel(); newFolders(); C3.ApplyLighting(); C3.Build()
@@ -4937,10 +5238,11 @@ c3Attack=function(p,name,origin,direction,charge)
  C3.shots=C3.shots or {}; if os.clock()-(C3.shots[p] or 0)<w.Cooldown*0.9 then return end; C3.shots[p]=os.clock()
  local rp=RaycastParams.new(); rp.FilterType=Enum.RaycastFilterType.Exclude; rp.FilterDescendantsInstances={p.Character,fxFolder,C3.shield}
  local hit=workspace:Raycast(origin,direction.Unit*w.Range,rp); if not hit then return end
- -- Kirill and the tower never enter the damage registry. Shield is not an HP pool.
+ if name~="Fists" then tracer(origin,hit.Position,w.Color) end
+ if C3.DamageTower(p,hit,name,charge) then return end
+ -- Kirill remains protected; the radio mast has its own exposed HP phase.
  local model=hit.Instance:FindFirstAncestorOfClass("Model"); local e=model and C3.mobs[model]
  if not e or e.down or e.hum.Health<=0 then return end
- if name~="Fists" then tracer(origin,hit.Position,w.Color) end
  local damage=name=="Fists" and (p:GetAttribute("Hero")=="Artem" and 25 or 48) or w.Damage*(name=="Shotgun" and 5 or 1)
  if name=="Rifle" then local c=typeof(charge)=="number" and charge==charge and math.clamp(charge,0,1) or 0; damage=45+235*c end
  if hit.Instance.Name=="Head" then damage*=1.5 end
@@ -4993,6 +5295,45 @@ local function beginLocalMatch(party)
   else runScene(playIntro) end
  end)
 end
+
+local function isDebugUser(player)
+ if RunService:IsStudio() then return true end
+ if game.CreatorType==Enum.CreatorType.User then return player.UserId==game.CreatorId end
+ if game.CreatorType==Enum.CreatorType.Group then
+  local ok,rank=pcall(function() return player:GetRankInGroup(game.CreatorId) end)
+  return ok and rank>=255
+ end
+ return false
+end
+DebugAccessRF.OnServerInvoke=function(player) return isDebugUser(player) end
+DebugRE.OnServerEvent:Connect(function(player,action,value)
+ if not isDebugUser(player) then return end
+ if action=="start" then
+  if sessionStarted then DebugRE:FireClient(player,"error","Сессия уже запущена."); return end
+  player:SetAttribute("SelectedChapter",3); player:SetAttribute("HeroChosen",true)
+  if player:GetAttribute("Hero")~="Artem" and player:GetAttribute("Hero")~="Demid" then player:SetAttribute("Hero","Artem") end
+  beginLocalMatch({player}); return
+ end
+ if not C3.active then DebugRE:FireClient(player,"error","Сначала запустите главу III через меню F6."); return end
+ if action=="stage" then
+  local stage=tonumber(value)
+  if not stage or stage%1~=0 or stage<1 or stage>10 then return end
+  C3.ClearMobs(); C3.CloseHack(); C3.collecting=false; C3.towerBattle=false; C3.escapeStarted=false; C3.escapeDeadline=nil
+  C3.MoveParty(C3.zones[stage].start,C3.zones[stage].center); C3.Activate(stage); return
+ end
+ if action=="shieldOff" then C3.Protected(C3.Finale); return end
+ if action=="tower" then
+  C3.towerOff=true
+  for _,piece in ipairs(C3.shieldParts or {}) do if piece.Parent then piece.Transparency=1; piece.CanQuery=false end end
+  C3.StartTowerBattle(); return
+ end
+ if action=="destroyTower" then
+  C3.towerBattle=true; C3.towerHealth=0; C3.TowerDestroyed(); return
+ end
+ if action=="escape" then C3.StartEscape(); return end
+ if action=="flight" then if not C3.escapePlane then C3.StartEscape() end; C3.FlyOut(); return end
+end)
+
 local function launch(player,party,owner)
  if sessionStarted or launching[owner] then return end
  if #party<1 or #party>4 then return end

@@ -10,63 +10,98 @@ function C3.Beam(parent,name,a,b,width,color)
  p.CFrame=CFrame.lookAt((a+b)*0.5,b); return p
 end
 function C3.BuildRadioMast()
- -- A full-height, tapered, four-leg lattice tower with the painted red/white
- -- maintenance sections of a real cellular mast (not a square neon shaft).
- local function radiusAt(y) return 54-44*(y/324) end
- local function corner(signX,signZ,y)
-  local radius=radiusAt(y)
-  return C3.Pos(960+signX*radius,y,signZ*radius)
+ local mast=Instance.new("Model"); mast.Name="RadioTower"; mast.Parent=C3.landmark
+ C3.towerModel=mast; C3.towerParts={}
+ local function register(part)
+  if part.SetAttribute then part:SetAttribute("TowerTarget",true) else part.TowerTarget=true end
+  table.insert(C3.towerParts,part); return part
  end
+ local function part(name,size,pos,color,material)
+  return register(C3.Part(mast,name,size,pos,color,material or Enum.Material.Metal))
+ end
+ local function beam(name,a,b,width,color)
+  local p=part(name,Vector3.new(width,width,(b-a).Magnitude),(a+b)*0.5,color,Enum.Material.Metal)
+  p.CFrame=CFrame.lookAt((a+b)*0.5,b); return p
+ end
+ local function radiusAt(y) return 54-44*(y/324) end
+ local function at(x,y,z) return C3.Pos(960+x,y,z) end
+ local function corner(sx,sz,y) local r=radiusAt(y); return at(sx*r,y,sz*r) end
+ local red=C(177,57,48); local ivory=C(192,199,198); local metal=C(157,61,51)
+ local rail=C(181,187,185); local deck=C(83,94,99); local warm=C(255,214,150)
  local corners={{-1,-1},{1,-1},{1,1},{-1,1}}
- local red=C(177,57,48); local ivory=C(192,199,198)
  for level=0,13 do
   local y0=level*24; local y1=math.min(y0+24,324)
   local color=(level<2 or level==7 or level>=12) and red or ivory
-  for i,signs in ipairs(corners) do
-   local nextSigns=corners[i%#corners+1]
-   C3.Beam(C3.landmark,"TaperedTowerLeg",corner(signs[1],signs[2],y0),corner(signs[1],signs[2],y1),2.1,color)
-   -- Perimeter tie beams and crossed X-bracing on all four faces.
-   C3.Beam(C3.landmark,"TowerHorizontalTie",corner(signs[1],signs[2],y1),corner(nextSigns[1],nextSigns[2],y1),1.0,color)
-   C3.Beam(C3.landmark,"TowerXBrace",corner(signs[1],signs[2],y0),corner(nextSigns[1],nextSigns[2],y1),0.85,color)
-   C3.Beam(C3.landmark,"TowerXBrace",corner(nextSigns[1],nextSigns[2],y0),corner(signs[1],signs[2],y1),0.85,color)
+  for index,signs in ipairs(corners) do
+   local nextSigns=corners[index%#corners+1]
+   local doorFace=level==0 and index==1
+   beam("TaperedTowerLeg",corner(signs[1],signs[2],y0),corner(signs[1],signs[2],y1),2.1,color)
+   beam("TowerHorizontalTie",corner(signs[1],signs[2],y1),corner(nextSigns[1],nextSigns[2],y1),1,color)
+   if not doorFace then
+    beam("TowerXBrace",corner(signs[1],signs[2],y0),corner(nextSigns[1],nextSigns[2],y1),0.85,color)
+    beam("TowerXBrace",corner(nextSigns[1],nextSigns[2],y0),corner(signs[1],signs[2],y1),0.85,color)
+   end
   end
  end
- -- Four stout anchor shoes and a narrow service platform under the antenna head.
  for _,sx in ipairs({-1,1}) do for _,sz in ipairs({-1,1}) do
-  C3.Part(C3.landmark,"TowerAnchorShoe",Vector3.new(4,4,4),C3.Pos(960+sx*53,2,sz*53),C(157,61,51),Enum.Material.Metal)
+  part("TowerAnchorShoe",Vector3.new(4,12,4),at(sx*53.5,-2,sz*53.5),metal)
  end end
- C3.Part(C3.landmark,"AntennaServiceDeck",Vector3.new(25,0.8,25),C3.Pos(960,300,0),C(83,94,99),Enum.Material.Metal)
- for _,sx in ipairs({-1,1}) do for _,sz in ipairs({-1,1}) do
-  C3.Part(C3.landmark,"AntennaDeckRailPost",Vector3.new(0.45,3.5,0.45),C3.Pos(960+sx*11,302,sz*11),C(181,187,185),Enum.Material.Metal)
- end end
- for _,side in ipairs({-1,1}) do
-  C3.Part(C3.landmark,"AntennaDeckRail",Vector3.new(22,0.35,0.35),C3.Pos(960,303.5,side*11),C(181,187,185),Enum.Material.Metal)
-  C3.Part(C3.landmark,"AntennaDeckRail",Vector3.new(0.35,0.35,22),C3.Pos(960+side*11,303.5,0),C(181,187,185),Enum.Material.Metal)
+ part("TowerEntryPath",Vector3.new(14,1,72),at(0,0.25,-24),C(120,120,115),Enum.Material.Concrete)
+ local ladder=Instance.new("TrussPart"); ladder.Name="TowerCoreLadder"; ladder.Size=Vector3.new(2,328,2)
+ ladder.Position=at(0,164,0); ladder.Color=rail; ladder.Material=Enum.Material.Metal; ladder.Anchored=true
+ ladder.Parent=mast; register(ladder)
+ local function floorWithHole(name,y,half,thickness,color)
+  local strip=half-4; local center=4+strip/2
+  for _,side in ipairs({-1,1}) do
+   part(name,Vector3.new(half*2,thickness,strip),at(0,y,side*center),color)
+   part(name,Vector3.new(strip,thickness,8),at(side*center,y,0),color)
+  end
  end
- C3.Part(C3.landmark,"TopWhipAntenna",Vector3.new(0.8,27,0.8),C3.Pos(960,337.5,0),C(180,186,185),Enum.Material.Metal)
- C3.Part(C3.landmark,"AntennaTopCrossbar",Vector3.new(12,0.6,0.6),C3.Pos(960,341,0),C(180,186,185),Enum.Material.Metal)
- for _,side in ipairs({-1,1}) do
-  C3.Part(C3.landmark,"TopPanelAntenna",Vector3.new(1.2,10,2),C3.Pos(960+side*6,335,0),C(198,202,199),Enum.Material.Metal)
+ local function railing(name,floorY,half)
+  local h=3.5
+  for _,sx in ipairs({-1,0,1}) do for _,sz in ipairs({-1,0,1}) do
+   if sx~=0 or sz~=0 then part(name.."Post",Vector3.new(0.45,h,0.45),at(sx*half,floorY+h/2,sz*half),rail) end
+  end end
+  for _,height in ipairs({h-0.2,1.7}) do for _,side in ipairs({-1,1}) do
+   part(name,Vector3.new(half*2,0.3,0.3),at(0,floorY+height,side*half),rail)
+   part(name,Vector3.new(0.3,0.3,half*2),at(side*half,floorY+height,0),rail)
+  end end
  end
- -- Directional panel antennas and small service microwave dishes on the mast.
+ for y=48,288,48 do
+  floorWithHole("LandingDeck",y,12,0.6,deck); railing("LandingRail",y+0.3,12)
+  local radius=radiusAt(y)
+  for _,side in ipairs({-1,1}) do
+   beam("LandingStrut",at(side*12,y-0.3,0),at(side*radius,y-0.3,0),1.2,metal)
+   beam("LandingStrut",at(0,y-0.3,side*12),at(0,y-0.3,side*radius),1.2,metal)
+   local lamp=part("LandingLamp",Vector3.new(1.2,0.6,1.2),at(side*10.5,y-0.6,0),warm,Enum.Material.SmoothPlastic)
+   light(lamp,warm,24,0.8)
+  end
+  for _,signs in ipairs(corners) do beam("LandingStrut",at(signs[1]*12,y-0.3,signs[2]*12),corner(signs[1],signs[2],y)-Vector3.new(0,0.3,0),0.8,metal) end
+ end
+ floorWithHole("AntennaServiceDeck",300,13,0.8,deck); railing("AntennaDeckRail",300.4,12)
+ floorWithHole("TowerTopPlate",324.5,radiusAt(324),1,red); railing("TopRail",325,radiusAt(324)-0.5)
+ part("TopWhipAntenna",Vector3.new(0.8,27,0.8),at(0,338.5,7),rail)
+ part("AntennaTopCrossbar",Vector3.new(12,0.6,0.6),at(0,341,7),rail)
+ for _,side in ipairs({-1,1}) do part("TopPanelAntenna",Vector3.new(1.2,10,2),at(side*6,330,0),ivory) end
  for _,y in ipairs({157,205,253,277}) do
+  local radius=radiusAt(y)
   for _,side in ipairs({-1,1}) do
-   local radius=radiusAt(y)
-   local panel=C3.Part(C3.landmark,"CellularPanelAntenna",Vector3.new(2,14,5.5),C3.Pos(960+side*(radius-5),y,0),C(190,198,199),Enum.Material.Metal)
-   panel.CanCollide=false
-   C3.Beam(C3.landmark,"AntennaMount",C3.Pos(960+side*(radius-11),y,0),panel.Position,0.8,C(104,115,117))
-   local dish=C3.Part(C3.landmark,"MicrowaveDish",Vector3.new(1.2,7,7),C3.Pos(960+side*(radius-12),y,12),C(171,180,182),Enum.Material.Metal)
-   dish.Shape=Enum.PartType.Cylinder; dish.CanCollide=false
-   C3.Beam(C3.landmark,"DishFeed",dish.Position,C3.Pos(960+side*(radius-4),y,12),0.55,C(94,106,111))
+   local panel=part("CellularPanelAntenna",Vector3.new(2,14,5.5),at(side*(radius+4),y,0),ivory); panel.CanCollide=false
+   beam("AntennaMount",at(side*radius,y,0),panel.Position,0.8,C(104,115,117))
+   for _,z in ipairs({-12,12}) do
+    local dish=part("MicrowaveDish",Vector3.new(1.2,7,7),at(side*(radius+6),y,z),C(171,180,182)); dish.Shape=Enum.PartType.Cylinder; dish.CanCollide=false
+    beam("DishFeed",dish.Position,at(side*radius,y,z),0.55,C(94,106,111))
+   end
   end
  end
- -- A few low-output red obstruction lamps remain visible while the signal runs.
  for _,y in ipairs({24,120,216,300}) do
-  for _,side in ipairs({-1,1}) do
-   local marker=C3.Part(C3.landmark,"TowerObstructionLamp",Vector3.new(0.8,1.1,0.8),C3.Pos(960+side*(radiusAt(y)+0.7),y,0),C(174,54,48),Enum.Material.SmoothPlastic)
+  local offset=radiusAt(y)+0.7
+  for _,side in ipairs({-1,1}) do for _,pos in ipairs({at(side*offset,y,0),at(0,y,side*offset)}) do
+   local marker=part("TowerObstructionLamp",Vector3.new(0.8,1.1,0.8),pos,C(174,54,48),Enum.Material.SmoothPlastic)
    table.insert(C3.redLights,marker); light(marker,C(220,66,57),18,0.28)
-  end
+  end end
  end
+ mast.WorldPivot=CFrame.new(C3.Pos(960,0,0))
 end
 function C3.CommunicationEquipment(index,floor)
  local core=C3.Part(C3.map,"SignalWaveguideCore",Vector3.new(8,16,8),C3.Pos(960,floor+8,0),C(99,120,138),Enum.Material.Metal)

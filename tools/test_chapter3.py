@@ -111,9 +111,25 @@ assert 'C3.relayCounted' not in chapter and 'z.relayCounted=true' in chapter
 assert 'C3.shield.CanQuery=false' in chapter
 assert 'C3.finished=true; C3.Stop(); returnToMenu()' in chapter
 assert 'task.wait(35)' in chapter and chapter.index('C3.modules[index]=true')<chapter.index('C3RE:FireAllClients("credits",true)')
-for removed in ('debugJump','DebugAllowed','debugPanel','Enum.KeyCode.F6'):
-    assert removed not in server+client
-print('PASS: chapter III menu, launch/teleport, combat dispatch, all embedded sources, story/geometry contracts and no cheat menu')
+assert 'Enum.KeyCode.F6' in client and 'Chapter3DebugMenu' in client
+assert 'DebugAccessRF.OnServerInvoke=function(player) return isDebugUser(player) end' in server
+assert 'if not isDebugUser(player) then return end' in server
+assert 'if game.CreatorType==Enum.CreatorType.User then return player.UserId==game.CreatorId end' in server
+assert 'player:GetRankInGroup(game.CreatorId)' in server and 'rank>=255' in server
+assert 'C3.towerParts={}' in world and 'part:SetAttribute("TowerTarget",true)' in world
+assert 'TowerCoreLadder' in world and 'LandingDeck' in world and 'TowerTopPlate' in world
+assert 'function C3.DamageTower(player,hit,weapon,charge)' in chapter
+assert 'C3.DamageTower(p,hit,name,charge)' in server
+assert 'function C3.StartEscape()' in chapter and 'os.clock()+180' in chapter
+assert 'function C3.BeginFactoryPortal(player,portal)' in chapter and 'function C3.FactoryTick()' in chapter
+assert 'CloneLaboratoryPod' in chapter and 'SpawnFactoryWave()' in chapter and 'Активировать портал' in chapter
+assert 'EscapePlaneBoardingStep' in chapter and 'EmergencyParachute' in chapter
+assert 'НТЯН обвиняет нас' in chapter and 'запускает заряд' in chapter
+assert 'towerBattle' in ui and 'escapeTick' in ui
+standalone_tower=Path('tower_generation.lua').read_text()
+assert 'TowerCoreLadder' in standalone_tower and 'LandingDeck' in standalone_tower
+assert 'return createRadioTower' in standalone_tower and 'C3.' not in standalone_tower
+print('PASS: chapter III menu, combat, owner-gated F6 test menu, tower access/HP, three-minute escape, flight/parachute/post-credit scene and standalone tower snippet')
 
 # Reuse the exact proven circuit helpers from chapter II, not a duplicate solver.
 c2=Path('src/Chapter2.luau').read_text()
@@ -283,12 +299,21 @@ C3.Prompt=function() return {} end
 C3.Part=function(parent,name,size,pos)
  assert(math.max(size.X,size.Y,size.Z)<=512,"oversized Roblox part: "..name)
  local p={Name=name,Size=size,Position=pos,CFrame=CFrame.new(pos.X,pos.Y,pos.Z),Parent=parent,CanCollide=true,CanQuery=true,CanTouch=true}
+ function p:SetAttribute(key,value) self[key]=value end
  table.insert(generated,p); return p
 end
 '''
 world_checks=r'''
 C3.Build()
 assert(#C3.zones==10)
+assert(C3.towerModel and C3.towerModel.Name=="RadioTower" and #C3.towerParts>300,"mast generator must return a destructible, fully-built tower model")
+local towerLadder,landings=0,0
+for _,part in ipairs(C3.towerParts) do
+ if part.Name=="TowerCoreLadder" then towerLadder+=1 end
+ if part.Name=="LandingDeck" then landings+=1 end
+ assert(part.TowerTarget==true,"every generated mast piece must be damageable")
+end
+assert(towerLadder==1 and landings==24,"radio tower access ladder and six perforated landings are required")
 local stairs,roads,approach,gates,airlocks,doors={}, {},nil,0,0,0
 for _,p in ipairs(generated) do
  if p.Name=="TowerStair" then table.insert(stairs,p) end

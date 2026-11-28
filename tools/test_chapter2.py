@@ -191,7 +191,7 @@ assert 'C2.bossButton' in campaign and 'C(255,20,25),Enum.Material.Neon' in camp
 assert campaign.index('Ладно, мне с этим как всегда разобраться.') < campaign.index('Хех, скоро здесь всё взорвётся.')
 assert 'epoch~=C2.deployEpoch' in campaign
 assert chapter.index('MusicRE:FireAllClients("final")',chapter.index('c2Finish=function')) < chapter.index('C2RE:FireAllClients("chapterCredits",true)')
-print('PASS: first-person rendezvous, moving exterior car with anchored riders, red button insert, credits music and no cheat menu')
+print('PASS: first-person rendezvous, moving exterior car with anchored riders, red button insert and credits music')
 
 assert 'Vector3.new(2500' not in campaign
 assert 'city.ModelStreamingMode=Enum.ModelStreamingMode.Persistent' in campaign
@@ -204,7 +204,11 @@ assert 'MechanicalFaceplate' not in campaign and 'BallisticChest' not in campaig
 assert car.index('task.wait(1.2)') < car.index('local start=os.clock()')
 print('PASS: segmented road, prebuilt enclosed pickup/courtyard, persistent city skyline, unobscured anime face and settled departure camera')
 
-for forbidden in ('DebugJump','DebugAllowed','debugJump','debugPanel','Chapter2Debug','Enum.KeyCode.F6','debugBusy'):
-    for path in Path('src').glob('*.luau'):
-        assert forbidden not in path.read_text(), (path, forbidden)
-print('PASS: no cheat UI, F6 binding, permission flag or server skip handler in any shipped source')
+server_source=Path('src/Script_0.luau').read_text()
+client_source=Path('src/LocalScript_0.luau').read_text()
+assert 'Enum.KeyCode.F6' in client_source and 'Chapter3DebugMenu' in client_source
+assert 'DebugAccessRF.OnServerInvoke=function(player) return isDebugUser(player) end' in server_source
+assert 'if not isDebugUser(player) then return end' in server_source
+assert 'if game.CreatorType==Enum.CreatorType.User then return player.UserId==game.CreatorId end' in server_source
+assert 'player:GetRankInGroup(game.CreatorId)' in server_source and 'rank>=255' in server_source
+print('PASS: F6 test menu is available in Studio and server-authorized only for the game creator')

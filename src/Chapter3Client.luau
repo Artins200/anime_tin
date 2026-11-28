@@ -1,11 +1,36 @@
 -- Chapter III HUD, binocular overlay and authoritative three-phase terminal UI.
 do
  local remote=Remotes:WaitForChild("Chapter3")
+ local debugRemote=Remotes:WaitForChild("DebugTools")
+ local debugAccess=Remotes:WaitForChild("DebugAccess")
  local state; local challenge
  local hud=new("ScreenGui",{Name="Chapter3HUD",ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=45,Enabled=false},plr.PlayerGui)
  local objective=new("TextLabel",{Size=UDim2.new(0.7,0,0,55),Position=UDim2.new(0.15,0,0,125),BackgroundColor3=Color3.fromRGB(17,26,42),BackgroundTransparency=0.15,TextColor3=Color3.fromRGB(220,230,240),TextSize=17,TextWrapped=true,Font=Enum.Font.GothamBold},hud)
  local stamina=new("Frame",{Size=UDim2.fromOffset(180,9),Position=UDim2.new(0,30,1,-108),BackgroundColor3=Color3.fromRGB(30,40,55)},hud)
  local fill=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(85,185,175),BorderSizePixel=0},stamina)
+ local towerPanel=new("Frame",{Size=UDim2.new(0,420,0,64),Position=UDim2.new(0.5,-210,1,-92),BackgroundColor3=Color3.fromRGB(17,24,34),BackgroundTransparency=0.12,Visible=false},hud)
+ local towerTitle=new("TextLabel",{Size=UDim2.new(1,0,0,26),BackgroundTransparency=1,Text="РАДИОБАШНЯ НЕЙРО",TextColor3=Color3.fromRGB(235,225,215),TextSize=16,Font=Enum.Font.GothamBold},towerPanel)
+ local towerBack=new("Frame",{Size=UDim2.new(1,-24,0,18),Position=UDim2.new(0,12,0,34),BackgroundColor3=Color3.fromRGB(56,35,42),BorderSizePixel=0},towerPanel)
+ local towerFill=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(205,63,65),BorderSizePixel=0},towerBack)
+ local escapeClock=new("TextLabel",{Size=UDim2.fromOffset(310,58),Position=UDim2.new(0.5,-155,0,110),BackgroundColor3=Color3.fromRGB(70,21,27),BackgroundTransparency=0.12,TextColor3=Color3.fromRGB(255,231,217),TextSize=34,Font=Enum.Font.GothamBlack,Text="03:00",Visible=false},hud)
+ local debugGui=new("ScreenGui",{Name="Chapter3DebugMenu",ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=100,Enabled=false},plr.PlayerGui)
+ local debugPanel=new("Frame",{Size=UDim2.fromOffset(420,540),Position=UDim2.new(0.5,-210,0.5,-270),BackgroundColor3=Color3.fromRGB(14,20,30),BackgroundTransparency=0.04},debugGui)
+ new("TextLabel",{Size=UDim2.new(1,-20,0,42),Position=UDim2.fromOffset(10,8),BackgroundTransparency=1,Text="F6 • DEBUG / CHAPTER III",TextColor3=Color3.fromRGB(180,220,210),TextSize=20,Font=Enum.Font.GothamBold},debugPanel)
+ local debugStatus=new("TextLabel",{Size=UDim2.new(1,-20,0,34),Position=UDim2.fromOffset(10,48),BackgroundTransparency=1,Text="Только Studio или владелец игры",TextColor3=Color3.fromRGB(223,190,150),TextSize=14,TextWrapped=true},debugPanel)
+ local debugList=new("ScrollingFrame",{Size=UDim2.new(1,-20,1,-94),Position=UDim2.fromOffset(10,86),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=6,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y},debugPanel)
+ new("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},debugList)
+ local function debugButton(label,action,value)
+  local b=new("TextButton",{Size=UDim2.new(1,-8,0,38),BackgroundColor3=Color3.fromRGB(34,54,67),TextColor3=Color3.fromRGB(230,238,235),TextSize=15,Font=Enum.Font.Gotham,Text=label,AutoButtonColor=true},debugList)
+  b.Activated:Connect(function() debugRemote:FireServer(action,value) end)
+  return b
+ end
+ debugButton("Запустить главу III сейчас","start")
+ for _,stage in ipairs({1,5,6,10}) do debugButton("Перейти на этап "..stage,"stage",stage) end
+ debugButton("Отключить защиту (финальный терминал)","shieldOff")
+ debugButton("Сразу к башне снаружи","tower")
+ debugButton("Уничтожить башню → сцена Нейро","destroyTower")
+ debugButton("Запустить трёхминутный побег","escape")
+ debugButton("Тестировать вылет, взрыв и титры","flight")
  local scope=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Visible=false},hud)
  -- A quiet, transparent reticle keeps the street bright; no opaque mask or zoom label.
  local scopeColor=Color3.fromRGB(190,222,205)
@@ -84,13 +109,26 @@ do
   end
   if action=="collect" then objective.Text="СИГНАЛ ОТКЛЮЧЕН\nЗаберите контроллер и память из кейса"; return end
   if action=="signalOff" then close(false); scope.Visible=false; return end
+  if action=="towerBattle" then towerPanel.Visible=true; towerFill.Size=UDim2.fromScale(1,1); return end
+  if action=="towerHealth" then
+   local ratio=math.clamp((data.health or 0)/math.max(data.maxHealth or 1,1),0,1)
+   towerPanel.Visible=true; towerFill.Size=UDim2.fromScale(ratio,1); towerTitle.Text=("РАДИОБАШНЯ НЕЙРО • %d%%"):format(math.floor(ratio*100+0.5)); return
+  end
+  if action=="towerDestroyed" then towerPanel.Visible=false; towerTitle.Text="РАДИОБАШНЯ УНИЧТОЖЕНА"; return end
+  if action=="escapeStart" then escapeClock.Visible=true; escapeClock.Text="03:00"; return end
+  if action=="escapeTick" then
+   local seconds=math.max(0,tonumber(data) or 0)
+   escapeClock.Visible=true; escapeClock.Text=string.format("%02d:%02d",math.floor(seconds/60),seconds%60)
+   escapeClock.TextColor3=seconds<=30 and Color3.fromRGB(255,90,70) or Color3.fromRGB(255,231,217); return
+  end
+  if action=="escapeClear" then escapeClock.Visible=false; towerPanel.Visible=false; return end
   if action=="credits" then
    hud.Enabled=not data
    showCredits(data)
    if data and creditsText then creditsText.Text="Уничтожь Тянку 3\n\nГЛАВА III\nБашня Нейро-Сингулярности\n\nСигнал остановлен\nМодули сохранены\n\nНо Кириллу всё ещё нужна помощь\n\nПродолжение следует\n\nСпасибо за игру" end
    return
   end
-  if action=="clear" then close(false); hud.Enabled=false; state=nil; scope.Visible=false; return end
+  if action=="clear" then close(false); hud.Enabled=false; state=nil; scope.Visible=false; towerPanel.Visible=false; escapeClock.Visible=false; return end
  end)
  UIS.InputBegan:Connect(function(input,processed)
   if plr:GetAttribute("Chapter")~=3 then return end
@@ -100,6 +138,23 @@ do
  end)
  UIS.InputEnded:Connect(function(input) if input.KeyCode==Enum.KeyCode.LeftShift or input.KeyCode==Enum.KeyCode.RightShift then remote:FireServer("sprint",false) end end)
  UIS.WindowFocusReleased:Connect(function() remote:FireServer("sprint",false) end)
+ debugRemote.OnClientEvent:Connect(function(action,message)
+  if action=="error" then debugStatus.Text=tostring(message); debugStatus.TextColor3=Color3.fromRGB(255,130,120) end
+ end)
+ UIS.InputBegan:Connect(function(input,processed)
+  if input.KeyCode~=Enum.KeyCode.F6 then return end
+  debugGui.Enabled=not debugGui.Enabled
+  if debugGui.Enabled then
+   local ok,allowed=pcall(function() return debugAccess:InvokeServer() end)
+   if ok and allowed then
+    debugStatus.Text="Доступ разрешён • кнопки управляются сервером"
+    debugStatus.TextColor3=Color3.fromRGB(150,225,175)
+   else
+    debugStatus.Text="Нет доступа. Меню работает только в Studio или у владельца игры."
+    debugStatus.TextColor3=Color3.fromRGB(255,130,120)
+   end
+  end
+ end)
  RunService.RenderStepped:Connect(function(dt)
   if plr:GetAttribute("Chapter")~=3 then return end
   local hum=plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
