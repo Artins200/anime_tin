@@ -241,3 +241,24 @@ assert re.findall(r'\{name="([^"]+)",text="([^"]+)"\}',block)==expected
 literal=client.split('if action=="dialogue" then',1)[1].split('if action=="reveal"',1)[0]
 assert 'sub.Text=frame.text' in literal and 'conversationalSubtitle' not in literal
 print('PASS: factory-only boss destroyed, clean base return, literal six-line secret scene, optional supplied rigs, reusable main menu reset')
+
+# Campaign fixes: no early factory reveal, isolated archive participants, real role perks and SFX.
+for story_id in ('[1]={name="ОДИНОЧНЫЙ СЛЕД"', '[2]={name="ДВОЙНОЙ СИГНАЛ"', '[3]={name="ТРЕТИЙ КАНАЛ"', '[4]={name="ПРОТОКОЛ СВИДЕТЕЛЬ"'):
+ assert story_id in server
+stories=server.split('local STORIES={',1)[1].split('\n}',1)[0]
+assert 'Конечный адрес пока скрыт' in stories
+assert 'Конечный адрес пока зашифрован' in stories
+assert 'завод' not in stories.split('[1]=',1)[1].split('[2]=',1)[0]
+assert 'мафиози работал на завод' not in stories
+assert 'local function isSessionMember(player)' in server
+archive=server.split('local function unlockDoor()',1)[1].split('------------------------------------------------------------------ ЛЕС',1)[0]
+assert 'isSessionMember(player)' in archive
+assert 'not isSessionMember(player)' in archive
+assert 'PowerOff = "rbxasset://sounds/electronicpingshort.wav"' in server
+assert 'Punch = "rbxasset://sounds/swordslash.wav"' in server
+assert 'playSound(SOUNDS.Punch, e.Hrp, 0.35)' in server
+assert 'local damageScale = role == "Штурм" and 1.15 or 1' in server
+assert 'local rangeScale = role == "Разведка" and 1.2 or 1' in server
+assert 'local cooldownScale = role == "Связь" and 0.85 or 1' in server
+assert 'local knockScale = role == "Свидетель" and 1.25 or 1' in server
+print('PASS: chapter I spoiler gating, session-only archive collection, implemented role perks and non-empty combat audio')

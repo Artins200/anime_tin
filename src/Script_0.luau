@@ -24,10 +24,10 @@ local returnToMenu
 local c2Attack,c3Attack
 local buildConversionFactory
 local STORIES={
- [1]={name="ОДИНОЧНЫЙ СЛЕД",brief="На этот раз идешь один. Найди их архив и попробуй выяснить, куда увозят людей.",plan="В доме спрятан маршрут перевозок. Забери данные, затем двигайся к лаборатории.",office="В архиве есть адрес закрытого цеха. Мафиози наверняка знает, кому его отдали.",ending="Последний агент не вышел на связь. Запись с его камеры пережила его."},
- [2]={name="ДВОЙНОЙ СИГНАЛ",brief="Работаете вдвоем. Один проверяет маршрут, второй ищет следы пропавших людей. Держитесь рядом.",plan="Держитесь вместе. Один прикрывает дом, второй проверяет архив. Данные нужны обоим.",office="Смотри, записи совпадают. На обоих приказах о перевозке стоит одна подпись.",ending="Оба канала погасли. Но общая запись группы уже ушла в штаб."},
- [3]={name="ТРЕТИЙ КАНАЛ",brief="Вас трое. Один идет первым, второй ищет данные, третий держит связь. Нужно узнать, что происходит с пленниками.",plan="Штурмовик ведёт, разведчик читает маршрут, связист сохраняет копию. Проходите точки вместе.",office="Удалось перехватить их связь. Похоже, мафиози работал на завод, а не только на картель.",ending="Три сигнала исчезли. Резервный канал успел передать координаты завода."},
- [4]={name="ПРОТОКОЛ СВИДЕТЕЛЬ",brief="Вас четверо. Прикрывайте друг друга и сохраняйте все, что найдете. Нам нужны доказательства того, что делает картель.",plan="Соберите четыре части архива в одной операции. Свидетель отправляет доказательства за пределы сети.",office="Теперь у нас весь архив. Мафиози отправлял пленников прямо на завод.",ending="Отряд погиб. Протокол «Свидетель» опубликовал запись: тайна завода раскрыта."},
+ [1]={name="ОДИНОЧНЫЙ СЛЕД",brief="На этот раз идешь один. Найди их архив и попробуй выяснить, куда увозят людей.",plan="В доме спрятан маршрут перевозок. Забери данные, затем двигайся к лаборатории.",office="В архиве есть маршрут перевозок. Конечный адрес пока скрыт за шифром.",ending="Последний агент не вышел на связь. Запись с его камеры пережила его."},
+ [2]={name="ДВОЙНОЙ СИГНАЛ",brief="Работаете вдвоем. Один проверяет маршрут, второй ищет следы пропавших людей. Держитесь рядом.",plan="Держитесь вместе. Один прикрывает дом, второй проверяет архив. Данные нужны обоим.",office="Копия сохранена. В записях есть связь между приказами о перевозке, но конечный адрес пока скрыт.",ending="Оба канала погасли. Но общая запись группы уже ушла в штаб."},
+ [3]={name="ТРЕТИЙ КАНАЛ",brief="Вас трое. Один идет первым, второй ищет данные, третий держит связь. Нужно узнать, что происходит с пленниками.",plan="Штурмовик ведёт, разведчик читает маршрут, связист сохраняет копию. Проходите точки вместе.",office="Перехват подтверждает: перевозки координируются изнутри картеля. Конечный адрес пока зашифрован.",ending="Три сигнала исчезли. Резервный канал успел передать координаты завода."},
+ [4]={name="ПРОТОКОЛ СВИДЕТЕЛЬ",brief="Вас четверо. Прикрывайте друг друга и сохраняйте все, что найдете. Нам нужны доказательства того, что делает картель.",plan="Соберите четыре части архива в одной операции. Свидетель отправляет доказательства за пределы сети.",office="Часть архива получена и отправлена. Полная цепочка поставок станет видна только после сбора всех доказательств.",ending="Отряд погиб. Протокол «Свидетель» опубликовал запись: тайна завода раскрыта."},
 }
 local function story() return STORIES[math.clamp(sessionSize,1,4)] end
 local SceneReadyRE=newRemote("SceneReady")
@@ -62,10 +62,18 @@ local function prepareView(position)
 end
 
 ------------------------------------------------------------------ ЗВУКИ
-local SOUNDS = {PowerOff = "", DoorBreak = "", Shot = "", Punch = ""}
-local function playSound(id, parent)
-	if id == "" then return end
-	local s = Instance.new("Sound"); s.SoundId = id; s.Parent = parent or workspace; s:Play(); Debris:AddItem(s, 6)
+-- Built-in Roblox sounds avoid private/uploaded asset permissions.
+local SOUNDS = {
+	PowerOff = "rbxasset://sounds/electronicpingshort.wav",
+	DoorBreak = "rbxasset://sounds/impact_explosion_03.mp3",
+	Shot = "rbxasset://sounds/impact_explosion_03.mp3",
+	Punch = "rbxasset://sounds/swordslash.wav",
+}
+local function playSound(id, parent, volume)
+	if type(id) ~= "string" or id == "" then return end
+	local s = Instance.new("Sound")
+	s.SoundId = id; s.Volume = volume or 0.45; s.RollOffMaxDistance = 90
+	s.Parent = parent or workspace; s:Play(); Debris:AddItem(s, 6)
 end
 
 ------------------------------------------------------------------ СОСТОЯНИЕ
@@ -82,6 +90,7 @@ local activeLevelInfo
 local introActive = false
 local breachDoor, entranceUsed = nil, false
 local evidenceNeeded,evidenceCollected,combatCleared=false,{},false
+local sessionRoster
 
 ------------------------------------------------------------------ ГРАФОН
 pcall(function()
@@ -378,6 +387,7 @@ local function enemyShoot(e, tc)
 end
 local function swing(e)
 	e.Busy = true
+	playSound(SOUNDS.Punch, e.Hrp, 0.35)
 	local rs = e.J.RS
 	TweenService:Create(rs, TweenInfo.new(0.12), {C0 = e.Base.RS * CFrame.Angles(0, 0, math.rad(150))}):Play()
 	task.delay(0.14, function()
@@ -540,10 +550,14 @@ local function prepareEntrance()
  NotifyRE:FireAllClients("Подойди к двери и нажми E, чтобы выбить ее ногой. Задний выход откроется после зачистки.",7)
 end
 
+local function isSessionMember(player)
+ return not sessionRoster or table.find(sessionRoster,player.UserId)~=nil
+end
+
 local function unlockDoor()
  if evidenceNeeded then
   for _,player in ipairs(Players:GetPlayers()) do
-   if not evidenceCollected[player.UserId] then
+   if isSessionMember(player) and not evidenceCollected[player.UserId] then
     NotifyRE:FireAllClients("Здесь чисто. Теперь каждому нужно забрать свою часть архива у входа.",5)
     return
    end
@@ -571,7 +585,7 @@ local function buildEvidenceTerminal(info,n)
  prompt.HoldDuration=1; prompt.MaxActivationDistance=10; prompt.RequiresLineOfSight=true; prompt.Parent=terminal
  local token=levelToken
  prompt.Triggered:Connect(function(player)
-  if token~=levelToken or introActive or evidenceCollected[player.UserId] then return end
+  if token~=levelToken or introActive or not isSessionMember(player) or evidenceCollected[player.UserId] then return end
   local root=player.Character and player.Character:FindFirstChild("HumanoidRootPart")
   if not root or (root.Position-terminal.Position).Magnitude>12 then return end
   evidenceCollected[player.UserId]=true
@@ -1921,19 +1935,25 @@ AttackRE.OnServerEvent:Connect(function(plr, wname, origin, dir, charge)
 	local head = char and char:FindFirstChild("Head")
 	if not hum or hum.Health <= 0 or not head then return end
 	local now = os.clock()
-	if lastAttack[plr] and now - lastAttack[plr] < w.Cooldown * 0.85 then return end
+	local role = plr:GetAttribute("SquadRole")
+	local damageScale = role == "Штурм" and 1.15 or 1
+	local rangeScale = role == "Разведка" and 1.2 or 1
+	local cooldownScale = role == "Связь" and 0.85 or 1
+	local knockScale = role == "Свидетель" and 1.25 or 1
+	if lastAttack[plr] and now - lastAttack[plr] < w.Cooldown * 0.85 * cooldownScale then return end
 	lastAttack[plr] = now
 	if (origin - head.Position).Magnitude > 12 then origin = head.Position end
 	dir = dir.Unit
+	local weaponRange = w.Range * rangeScale
 
 	if wname == "Rifle" and w.Charge then
 		local c = math.clamp(tonumber(charge) or 0, 0, 1)
-		local dmg = w.MinDamage + (w.MaxDamage - w.MinDamage) * c
+		local dmg = (w.MinDamage + (w.MaxDamage - w.MinDamage) * c) * damageScale
 		local rp = RaycastParams.new()
 		rp.FilterType = Enum.RaycastFilterType.Exclude
 		rp.FilterDescendantsInstances = {char, fxFolder}
-		local res = workspace:Raycast(origin, dir * w.Range, rp)
-		local hitPos = res and res.Position or origin + dir * w.Range
+		local res = workspace:Raycast(origin, dir * weaponRange, rp)
+		local hitPos = res and res.Position or origin + dir * weaponRange
 		local beam = Instance.new("Part")
 		beam.Anchored = true; beam.CanCollide = false; beam.CanQuery = false
 		beam.Material = Enum.Material.Neon; beam.Color = Color3.fromRGB(255,80,200)
@@ -1947,10 +1967,10 @@ AttackRE.OnServerEvent:Connect(function(plr, wname, origin, dir, charge)
 			if e.Hrp.Parent and e.Hum.Health > 0 then
 				local toE = e.Hrp.Position - origin
 				local proj = toE:Dot(dir)
-				if proj > 0 and proj < w.Range then
+				if proj > 0 and proj < weaponRange then
 					local perp = (toE - dir * proj).Magnitude
 					if perp < 3.5 then
-						e.Model:SetAttribute("LastDir", dir); e.Model:SetAttribute("LastKnock", w.Knock * (0.5 + c))
+						e.Model:SetAttribute("LastDir", dir); e.Model:SetAttribute("LastKnock", w.Knock * knockScale * (0.5 + c))
 						e.Hum:TakeDamage(dmg)
 						hitAny = true
 						if e.Hum.Health <= 0 then killed = true end
@@ -1968,8 +1988,8 @@ AttackRE.OnServerEvent:Connect(function(plr, wname, origin, dir, charge)
 	local hitAny, killed = false, false
 	for _ = 1, w.Pellets do
 		local d = spreadDir(dir, w.Spread)
-		local res = workspace:Raycast(origin, d * w.Range, rp)
-		local hitPos = res and res.Position or origin + d * w.Range
+		local res = workspace:Raycast(origin, d * weaponRange, rp)
+		local hitPos = res and res.Position or origin + d * weaponRange
 		if wname ~= "Fists" then
 			tracer(head.Position + head.CFrame.RightVector * 1 - Vector3.new(0, 0.6, 0) + d * 2, hitPos, w.Color)
 		end
@@ -1977,14 +1997,14 @@ AttackRE.OnServerEvent:Connect(function(plr, wname, origin, dir, charge)
 			local mdl = res.Instance:FindFirstAncestorOfClass("Model")
 			local eh = mdl and mdl:FindFirstChildOfClass("Humanoid")
 			if eh and eh.Health > 0 and mdl:GetAttribute("Enemy") then
-				local dmg = w.Damage * (res.Instance.Name == "Head" and 2 or 1)
-				mdl:SetAttribute("LastDir", d); mdl:SetAttribute("LastKnock", w.Knock)
+				local dmg = w.Damage * damageScale * (res.Instance.Name == "Head" and 2 or 1)
+				mdl:SetAttribute("LastDir", d); mdl:SetAttribute("LastKnock", w.Knock * knockScale)
 				eh:TakeDamage(dmg)
 				hitAny = true
 				if eh.Health <= 0 then killed = true end
 				local body = res.Instance
 				if eh.Health > 0 and wname == "Fists" then
-					body:ApplyImpulse((d * w.Knock + Vector3.new(0, 12, 0)) * body.AssemblyMass)
+					body:ApplyImpulse((d * w.Knock * knockScale + Vector3.new(0, 12, 0)) * body.AssemblyMass)
 				end
 			end
 		end
@@ -2017,7 +2037,6 @@ end)
 local TeleportService=game:GetService("TeleportService")
 local RunService=game:GetService("RunService")
 local lobbies,membership,launching={},{},{}
-local sessionRoster
 local rosterWaitStart
 local hasFinishedSession=false
 local function snapshot()
@@ -4945,8 +4964,20 @@ local function beginLocalMatch(party)
  local oldFloor=workspace:FindFirstChild("LobbyFloor"); if oldFloor then oldFloor:Destroy() end
  sessionRoster={}
  for _,member in ipairs(party) do table.insert(sessionRoster,member.UserId) end
+ local roleBriefings={
+  ["Штурм"]="+15% урона оружием",
+  ["Разведка"]="+20% дальности оружия",
+  ["Связь"]="−15% задержки между выстрелами",
+  ["Свидетель"]="+25% отбрасывания врагов",
+ }
  for index,player in ipairs(party) do
-  player:SetAttribute("SquadRole",({"Штурм","Разведка","Связь","Свидетель"})[index])
+  local role=({"Штурм","Разведка","Связь","Свидетель"})[index]
+  player:SetAttribute("SquadRole",role)
+  if chapter==1 then
+   NotifyRE:FireClient(player,"Роль: "..role.." · "..roleBriefings[role]..".",6)
+  else
+   NotifyRE:FireClient(player,"Отрядная позиция: "..role..". В этой главе способности определяются выбранным героем.",6)
+  end
  end
  LobbyRE:FireAllClients("start",{size=sessionSize,story=story().name})
  task.spawn(function()
