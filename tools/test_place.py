@@ -27,6 +27,18 @@ assert 'track.TimePosition>=30' not in client
 assert 'vm = Instance.new' in client and 'local vm\n' in client
 assert 'model:PivotTo(origin:Lerp' in server
 assert 'if introActive then return end' in server
+forest=server.split('local function buildForest(f)',1)[1].split('local RoomCfg',1)[0]
+assert 'Vector3.new(0.2,5,7), Vector3.new(-W/2+0.65,6,0)' in forest
+assert 'Vector3.new(7,5,0.2), Vector3.new(0,6,-W/2+0.6)' not in forest
+assert 'local function makeExitDoor(cf, openingWidth, openingHeight)' in server
+assert 'local width = openingWidth or (currentLevel == 1 and 6 or 10)' in server
+assert 'local height = openingHeight or (currentLevel == 1 and 8 or 10)' in server
+place=server.split('local function placePlayer(plr, idx)',1)[1].split('local function placeAll()',1)[0]
+assert 'workspace:Raycast(target.Position+Vector3.new(0,5,0),Vector3.new(0,-32,0),params)' in place
+assert 'hit.Position.Y+3' in place
+assert 'KickRE.OnServerEvent:Connect' in server and 'AttackRE.OnServerEvent:Connect' in server
+assert 'sessionStarted=true; sessionSize=#party' in server
+print('PASS: forest exit is clear, exit doors match openings, spawns ground correctly; server interaction/combat/session handlers exist')
 print('PASS: valid chunk stream, 3 exact embedded scripts, cinematic regressions')
 intro = server.split('local function playIntro()', 1)[1].split('-- МАФИОЗИ', 1)[0]
 assert intro.count('spawnWave(1,token,info)') == 1

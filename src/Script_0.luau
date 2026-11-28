@@ -503,9 +503,9 @@ local function spawnWave(w, token, info)
 end
 
 -- ИСПРАВЛЕННАЯ ДВЕРЬ
-local function makeExitDoor(cf, roomH)
- local height = currentLevel == 1 and 8 or math.min(10, (roomH or 14) - 2)
- local width = currentLevel == 1 and 6 or 9
+local function makeExitDoor(cf, openingWidth, openingHeight)
+ local width = openingWidth or (currentLevel == 1 and 6 or 10)
+ local height = openingHeight or (currentLevel == 1 and 8 or 10)
  local base = cf * CFrame.new(0, -cf.Y, 0)
  local function piece(size, offset, color, material)
   local p = part(levelFolder, size, Vector3.zero, color, material)
@@ -611,7 +611,7 @@ local function buildForest(f)
 	local l = light(bulb, C(220,190,140), 30, 1.5); l.Shadows = true
 	part(f, Vector3.new(4,1.5,7), Vector3.new(-8,0.9,-8), C(180,120,150), Enum.Material.Fabric)
 	part(f, Vector3.new(5,2.2,3), Vector3.new(7,1.2,-7), dark, WM)
-	part(f, Vector3.new(7,5,0.2), Vector3.new(0,6,-W/2+0.6), C(180,70,140))
+	part(f, Vector3.new(0.2,5,7), Vector3.new(-W/2+0.65,6,0), C(180,70,140))
 	part(f, Vector3.new(5,3.5,0.2), Vector3.new(-8,6.5,-W/2+0.6), C(90,140,200))
 	part(f, Vector3.new(6,0.1,60), Vector3.new(0,0.05,42), C(120,115,105), Enum.Material.Cobblestone)
 	for _, z in ipairs({22, 38, 54}) do
@@ -1083,13 +1083,17 @@ local function clearLevel()
 end
 
 local function placePlayer(plr, idx)
-	local char = plr.Character
-	local hum = char and char:FindFirstChildOfClass("Humanoid")
-	if hum and hum.Health > 0 and char:FindFirstChild("HumanoidRootPart") then
-		hum.PlatformStand = false
-		char:PivotTo(currentSpawn * CFrame.new(((idx or 0) % 4 - 1.5) * 3, 0, 0))
-		hum.Health = hum.MaxHealth
-	end
+ local char=plr.Character
+ local hum=char and char:FindFirstChildOfClass("Humanoid")
+ local root=char and char:FindFirstChild("HumanoidRootPart")
+ if not hum or hum.Health<=0 or not root then return end
+ hum.PlatformStand=false
+ local target=currentSpawn*CFrame.new(((idx or 0)%4-1.5)*3,0,0)
+ local params=RaycastParams.new(); params.FilterType=Enum.RaycastFilterType.Exclude; params.FilterDescendantsInstances={char}; params.IgnoreWater=true
+ local hit=workspace:Raycast(target.Position+Vector3.new(0,5,0),Vector3.new(0,-32,0),params)
+ if hit then target=CFrame.new(target.Position.X,hit.Position.Y+3,target.Position.Z)*target.Rotation end
+ char:PivotTo(target)
+ hum.Health=hum.MaxHealth
 end
 local function placeAll()
 	for i, plr in ipairs(Players:GetPlayers()) do
@@ -1119,7 +1123,7 @@ function startLevel(n)
 	placeAll()
  sceneLock(false)
  buildEvidenceTerminal(info,n)
-	local door, ind = makeExitDoor(info.ExitDoorCF, RoomCfg[n] and RoomCfg[n].H or 14)
+	local door, ind = makeExitDoor(info.ExitDoorCF,n==1 and 6 or 10,n==1 and 8 or 10)
 	currentExitDoor = door
 	currentDoorCF = info.ExitDoorCF
 	doorUnlocked = false
@@ -1383,7 +1387,7 @@ local function playIntro()
  CutsceneRE:FireAllClients("end")
  sceneLock(false); introActive=false
  currentSpawn=info.Spawn
- currentExitDoor=makeExitDoor(info.ExitDoorCF,14)
+ currentExitDoor=makeExitDoor(info.ExitDoorCF,6,8)
  currentDoorCF=info.ExitDoorCF; doorUnlocked=false
  totalWaves=#Levels[1].Waves
  spawnWave(1,token,info)
