@@ -49,29 +49,64 @@ end
 function C3.BuildVillain()
  local m=Instance.new("Model"); m.Name="NeuroMegafactory"; m.Parent=C3.map
  local o=C3.Pos(0,0,2200)
- C3.Part(m,"ObservationFloor",Vector3.new(140,1,70),o,C(37,43,53),Enum.Material.Metal)
- C3.Part(m,"ObservationRoof",Vector3.new(140,1,70),o+Vector3.new(0,26,0),C(26,30,40))
- local screen=C3.Part(m,"RuinsBroadcast",Vector3.new(30,17,1),o+Vector3.new(-20,11,20),C(12,20,31))
+ -- A real, enclosed observation theatre: aligned floor/roof/walls keep the
+ -- opening from reading as actors and props floating in a void.
+ C3.Part(m,"ObservationFloor",Vector3.new(184,1,88),o,C(37,43,53),Enum.Material.Metal)
+ C3.Part(m,"ObservationRoof",Vector3.new(184,1,88),o+Vector3.new(0,27,0),C(24,29,39),Enum.Material.Metal)
+ for _,side in ipairs({-1,1}) do
+  C3.Part(m,"ObservationSideWall",Vector3.new(1,27,88),o+Vector3.new(side*92,13.5,0),C(36,44,58),Enum.Material.Metal)
+  C3.Part(m,"ObservationRib",Vector3.new(2,27,88),o+Vector3.new(side*84,13.5,0),C(55,65,78),Enum.Material.Metal)
+ end
+ C3.Part(m,"ObservationRearWall",Vector3.new(184,27,1),o+Vector3.new(0,13.5,-44),C(32,39,52),Enum.Material.Metal)
+ -- Panoramic reinforced glazing looks directly into the production hall.
+ for _,x in ipairs({-60,-20,20,60}) do
+  local pane=C3.Part(m,"FactoryPanoramaGlass",Vector3.new(38,22,0.35),o+Vector3.new(x,14,43),C(95,150,169),Enum.Material.Glass)
+  pane.Transparency=0.74; pane.CanCollide=false; pane.CanQuery=false
+  C3.Part(m,"PanoramaMullion",Vector3.new(1.3,24,1.2),o+Vector3.new(x+20,14,42.5),C(87,104,120),Enum.Material.Metal)
+ end
+ C3.Part(m,"PanoramaHeader",Vector3.new(184,2,2),o+Vector3.new(0,26,42),C(70,84,101),Enum.Material.Metal)
+ C3.Part(m,"PanoramaSill",Vector3.new(184,1.5,2),o+Vector3.new(0,2.5,42),C(70,84,101),Enum.Material.Metal)
+ local screen=C3.Part(m,"RuinsBroadcast",Vector3.new(30,17,1),o+Vector3.new(-28,11,17),C(12,20,31),Enum.Material.Metal)
+ local screenFrame=C3.Part(m,"RuinsBroadcastFrame",Vector3.new(32,19,1.2),o+Vector3.new(-28,11,17.3),C(78,93,110),Enum.Material.Metal)
+ screenFrame.CanCollide=false; screenFrame.CanQuery=false
  local gui=Instance.new("SurfaceGui"); gui.Face=Enum.NormalId.Front; gui.CanvasSize=Vector2.new(800,450); gui.Parent=screen
  local view=Instance.new("ViewportFrame"); view.Size=UDim2.fromScale(1,1); view.BackgroundColor3=C(20,29,43); view.Ambient=C(170,175,185); view.Parent=gui
  local world=Instance.new("WorldModel"); world.Parent=view
- for k=1,18 do local p=C3.Part(world,"MiniBaseRuin",Vector3.new(4+k%3,2+k%5,9),Vector3.new((k%5-2)*9,0,math.floor(k/5)*9),C(63,65,70)); p.CFrame*=CFrame.Angles(0,k,0.15*k) end
+ for k=1,18 do
+  local p=C3.Part(world,"MiniBaseRuin",Vector3.new(4+k%3,2+k%5,9),Vector3.new((k%5-2)*9,0,math.floor(k/5)*9),C(63,65,70))
+  p.CFrame*=CFrame.Angles(0,k,0.15*k)
+ end
  local camera=Instance.new("Camera"); camera.CFrame=CFrame.lookAt(Vector3.new(45,40,-45),Vector3.new(0,3,10)); camera.Parent=view; view.CurrentCamera=camera
- for row=0,5 do
-  C3.Part(m,"MegafactoryConveyor",Vector3.new(360,2,9),o+Vector3.new(0,-8,70+row*24),C(44,53,65),Enum.Material.Metal)
-  for k=0,23 do
-   local pos=o+Vector3.new(-170+k*15,-3,70+row*24)
-   local shell=C3.Part(m,"TransformationCapsule",Vector3.new(5,11,5),pos,C(53,99,109),Enum.Material.Glass); shell.Transparency=0.6
-   C3.Part(m,"SuspendedFigure",Vector3.new(2,4,1),pos,C(104,111,133))
-   local head=C3.Part(m,"FigureHead",Vector3.new(1.5,1.4,1.4),pos+Vector3.new(0,2.8,0),C(177,167,165)); head.Shape=Enum.PartType.Ball
+ -- Eight lit lanes with 32 suspended conversion capsules each suggest a
+ -- vast active factory without spawning hundreds of animated Humanoids.
+ for row=0,7 do
+  local z=72+row*27
+  C3.Part(m,"MegafactoryConveyor",Vector3.new(456,2,10),o+Vector3.new(0,-8,z),C(44,53,65),Enum.Material.Metal)
+  C3.Part(m,"ConveyorSupport",Vector3.new(456,10,1.5),o+Vector3.new(0,-14,z+4),C(32,41,55),Enum.Material.Metal)
+  for k=0,31 do
+   local pos=o+Vector3.new(-217+k*14,-3,z)
+   local shell=C3.Part(m,"TransformationCapsule",Vector3.new(5,11,5),pos,C(53,99,109),Enum.Material.Glass); shell.Transparency=0.58; shell.CanCollide=false
+   local figure=C3.Part(m,"SuspendedFigure",Vector3.new(2,4,1),pos,C(104,111,133)); figure.CanCollide=false
+   local head=C3.Part(m,"FigureHead",Vector3.new(1.5,1.4,1.4),pos+Vector3.new(0,2.8,0),C(177,167,165)); head.Shape=Enum.PartType.Ball; head.CanCollide=false
   end
  end
- for k=0,11 do C3.Part(m,"DistantProductionBlock",Vector3.new(95,80,100),o+Vector3.new(-400+k*80,20,350+k%2*80),C(35,46,61)) end
- for _,offset in ipairs({Vector3.new(-23,13,-2),Vector3.new(4,13,-4),Vector3.new(-15,17,17)}) do C3.Lamp(m,o+offset,42,2.5,"CinematicKeyLight") end
+ for k=0,15 do
+  local x=-560+k*74
+  C3.Part(m,"DistantProductionBlock",Vector3.new(82,110,135),o+Vector3.new(x,42,330+k%2*72),C(30,40,56),Enum.Material.Metal)
+  for band=1,5 do
+   local strip=C3.Part(m,"DistantFactoryLight",Vector3.new(1,2,92),o+Vector3.new(x+41,8+band*17,330+k%2*72),C(79,153,176),Enum.Material.Neon)
+   strip.CanCollide=false
+  end
+ end
+ for _,offset in ipairs({Vector3.new(-64,23,-20),Vector3.new(12,23,-17),Vector3.new(68,23,7)}) do C3.Lamp(m,o+offset,52,1.7,"CinematicKeyLight") end
+ for _,x in ipairs({-75,75}) do
+  local strip=C3.Part(m,"CinematicRedAccent",Vector3.new(0.35,18,0.35),o+Vector3.new(x,14,-5),C(196,52,68),Enum.Material.Neon)
+  strip.CanCollide=false; light(strip,C(219,48,61),30,0.45)
+ end
  local cfg=table.clone(Types.Neuro); cfg.Name=ANDROID_NAME
- local neuro=buildRig(cfg,CFrame.lookAt(o+Vector3.new(-15,3.5,5),screen.Position)); neuro.Parent=m; enhanceNeuroCyber(neuro); anchorAll(neuro)
+ local neuro=buildRig(cfg,CFrame.lookAt(o+Vector3.new(-8,3.5,1),screen.Position)); neuro.Parent=m; enhanceNeuroCyber(neuro); anchorAll(neuro)
  cfg=table.clone(Types.Pistol); cfg.Name="Тян C-3B1"; cfg.Male=false
- local assistant=buildRig(cfg,CFrame.lookAt(o+Vector3.new(9,3.5,2),o+Vector3.new(-15,3.5,5))); assistant.Parent=m; c2Dress(assistant,false); anchorAll(assistant)
+ local assistant=buildRig(cfg,CFrame.lookAt(o+Vector3.new(17,3.5,-4),o+Vector3.new(-8,3.5,1))); assistant.Parent=m; c2Dress(assistant,false); anchorAll(assistant)
  return m,neuro,assistant,screen
 end
 function C3.BuildHome()
@@ -216,15 +251,34 @@ function C3.Build()
    table.insert(z.covers,C3.Pos(x+side*20+7,floor+4,side*18))
   end
   z.gateClosed=z.gate.CFrame
-  z.panel=C3.Part(C3.map,"ObjectiveConsole",Vector3.new(2,3,2),C3.Pos(x+30,floor+1.8,19),C(60,115,135),Enum.Material.Metal)
-  C3.Prompt(z.panel,i==10 and "Главный терминал" or i>=6 and "Изолировать реле" or "Отключить ретранслятор",function(p) C3.CompleteObjective(p,z) end)
-  local second=C3.Part(C3.map,"HardwareBreaker",Vector3.new(2,3,2),C3.Pos(x+30,floor+1.8,-20),C(115,80,65),Enum.Material.Metal)
+  z.panel=C3.Part(C3.map,i==7 and "PowerBranchA" or "ObjectiveConsole",Vector3.new(2,3,2),C3.Pos(x+30,floor+1.8,19),C(60,115,135),Enum.Material.Metal)
+  local panelText=i==10 and "Главный терминал" or i==7 and "Отключить линию A" or i==9 and "Заблокировать ротор" or i==8 and "Отключить серверный узел" or i>=6 and "Изолировать реле" or "Отключить ретранслятор"
+  C3.Prompt(z.panel,panelText,function(p)
+   if i==7 then C3.CompleteBranch(p,z,1) else C3.CompleteObjective(p,z) end
+  end)
+  local second=C3.Part(C3.map,i==7 and "PowerBranchB" or "HardwareBreaker",Vector3.new(2,3,2),C3.Pos(x+(i==7 and -30 or 30),floor+1.8,-20),C(115,80,65),Enum.Material.Metal)
   z.breaker=second
-  C3.Prompt(second,"Подтвердить размыкатель",function(p)
+  C3.Prompt(second,i==7 and "Отключить линию B" or "Подтвердить размыкатель",function(p)
+   if i==7 then C3.CompleteBranch(p,z,2); return end
    if C3.stage~=i or not z.cleared then return end
    if p:GetAttribute("Hero")=="Artem" and #C3.Living()>1 then NotifyRE:FireClient(p,"Этот размыкатель держит Демид.",2); return end
    z.assaultReady=true; C3.confirmPlayer=p; C3.confirmUntil=os.clock()+12; NotifyRE:FireAllClients("Размыкатель готов. Подтверждайте терминал.",3)
   end)
+  if i==8 then
+   z.keycard=C3.Part(C3.map,"SessionKeycard",Vector3.new(1.5,0.25,2),C3.Pos(x-26,floor+1.2,-2),C(76,196,158),Enum.Material.Neon)
+   light(z.keycard,C(76,220,178),12,0.8)
+   C3.Prompt(z.keycard,"Извлечь ключ сеанса",function(p) C3.TakeKey(p,z) end,0.7)
+  elseif i==9 then
+   z.rotorBlade={}; z.rotorBase={}
+   for blade=1,2 do
+    local size=blade==1 and Vector3.new(20,0.8,1) or Vector3.new(1,0.8,20)
+    local rotor=C3.Part(C3.map,"AntennaRotorBlade",size,C3.Pos(960,floor+11,-39),C(183,55,67),Enum.Material.Neon)
+    rotor.CanCollide=false; rotor.CanTouch=false; rotor.CanQuery=false
+    z.rotorBlade[blade]=rotor; z.rotorBase[blade]=rotor.CFrame
+   end
+   local hub=C3.Part(C3.map,"AntennaRotorHub",Vector3.new(3,3,3),C3.Pos(960,floor+11,-39),C(70,86,100),Enum.Material.Metal)
+   hub.Shape=Enum.PartType.Ball; hub.CanCollide=false; hub.CanQuery=false
+  end
   -- Spawn vestibule is outside the playable wall, with a real opening/door.
   if i==5 then for _,side in ipairs({-1,1}) do C3.Part(C3.map,"StreetDeploymentWall",Vector3.new(70,18,1),C3.Pos(x+side*45,9,44),C(58,65,77)) end end
   local doorZ=i>=6 and 5 or 44
