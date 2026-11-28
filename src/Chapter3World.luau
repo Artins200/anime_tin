@@ -119,6 +119,66 @@ function C3.BuildVillain()
  end
  local camera=Instance.new("Camera"); camera.CFrame=CFrame.lookAt(Vector3.new(58,42,-64),Vector3.new(0,2,0)); camera.Parent=view; view.CurrentCamera=camera
 
+ -- Wall-mounted process monitors, readable from inside the bay rather than
+ -- decorative blank slabs. Their restrained UI gives the lab a real control-room rhythm.
+ local function monitor(name,size,position,heading,accent,normal,face)
+  local frame=C3.Part(m,name,size,position,C(21,30,38),Enum.Material.Metal)
+  if normal then frame.CFrame=CFrame.lookAt(position,position+normal,Vector3.yAxis) end
+  local gui=Instance.new("SurfaceGui"); gui.Face=face or Enum.NormalId.Front; gui.CanvasSize=Vector2.new(480,260); gui.LightInfluence=0.35; gui.Parent=frame
+  local bg=Instance.new("Frame"); bg.Size=UDim2.fromScale(1,1); bg.BackgroundColor3=C(12,23,31); bg.BorderSizePixel=0; bg.Parent=gui
+  local title=Instance.new("TextLabel"); title.Size=UDim2.fromScale(0.92,0.22); title.Position=UDim2.fromScale(0.04,0.04); title.BackgroundTransparency=1; title.Text=heading; title.TextColor3=accent; title.TextScaled=true; title.Font=Enum.Font.GothamBold; title.Parent=bg
+  for row=1,4 do
+   local bar=Instance.new("Frame"); bar.Size=UDim2.fromScale(0.72+(row%2)*0.12,0.045); bar.Position=UDim2.fromScale(0.08,0.32+row*0.13); bar.BackgroundColor3=row==1 and accent or C(58,83,94); bar.BorderSizePixel=0; bar.Parent=bg
+   local led=Instance.new("Frame"); led.Size=UDim2.fromScale(0.055,0.055); led.Position=UDim2.fromScale(0.86,0.31+row*0.13); led.BackgroundColor3=accent; led.BorderSizePixel=0; led.Parent=bg
+  end
+  return frame
+ end
+ for _,side in ipairs({-1,1}) do
+  for index,z in ipairs({28,82,136,190,224}) do
+   local position=o+Vector3.new(side*148.8,18+(index%2)*10,z)
+   monitor("FactoryWallProcessMonitor",Vector3.new(12,7,0.45),position,"NEURO / LINE "..string.format("%02d",index),index%2==0 and C(107,185,186) or C(200,157,92),Vector3.new(-side,0,0))
+  end
+  local cable=C3.Part(m,"WallCableTrunk",Vector3.new(1.2,1.2,250),o+Vector3.new(side*144,48,105),C(85,96,101),Enum.Material.Metal)
+  cable.CanCollide=false
+ end
+ for _,offset in ipairs({-42,0,42}) do
+  local duct=C3.Part(m,"CeilingCoolantDuct",Vector3.new(1.1,1.1,250),o+Vector3.new(offset,49,105),C(91,101,104),Enum.Material.Metal)
+  duct.Shape=Enum.PartType.Cylinder; duct.CFrame*=CFrame.Angles(0,math.rad(90),0); duct.CanCollide=false
+  for z=0,210,30 do C3.Part(m,"CoolantDuctCoupler",Vector3.new(1.7,1.7,0.8),o+Vector3.new(offset,49,z),C(128,133,128),Enum.Material.Metal) end
+ end
+ -- Dramatic command dais: five distinct stations, angled screens, keypads,
+ -- status LEDs and cable drops, all placed in front of the villain actors.
+ local commandDais=C3.Part(m,"CommandDais",Vector3.new(82,0.8,28),o+Vector3.new(-2,0.4,56),C(38,46,52),Enum.Material.Metal)
+ commandDais.CanCollide=false
+ for _,edge in ipairs({-1,1}) do
+  local stripe=C3.Part(m,"DaisSafetyStripe",Vector3.new(82,0.08,0.45),o+Vector3.new(-2,0.86,56+edge*13),C(174,132,68),Enum.Material.Metal); stripe.CanCollide=false
+ end
+ for station=1,5 do
+  local x=-32+(station-1)*16
+  C3.Part(m,"CommandStationPedestal",Vector3.new(13,2.3,7),o+Vector3.new(x,1.9,63),C(48,59,67),Enum.Material.Metal)
+  C3.Part(m,"CommandStationSurface",Vector3.new(13.5,0.35,7.5),o+Vector3.new(x,3.15,63),C(75,85,88),Enum.Material.Metal)
+  for key=1,6 do
+   local button=C3.Part(m,"ConsoleKey",Vector3.new(0.48,0.16,0.48),o+Vector3.new(x-4.2+(key-1)*1.65,3.42,64.5),key%3==0 and C(177,86,59) or C(93,135,139),Enum.Material.Metal)
+   button.CanCollide=false
+  end
+  local accent=station%2==0 and C(115,195,190) or C(216,166,96)
+  local screenHeight=station==3 and 5.8 or 4.2
+  monitor("CommandStationMonitor",Vector3.new(10,screenHeight,0.55),o+Vector3.new(x,5.7,58.9),station==3 and "NEURO CORE / CONTROL" or "CLONE ARRAY / STATUS",accent,nil,Enum.NormalId.Back)
+  local cable=C3.Part(m,"ConsoleCableDrop",Vector3.new(0.25,0.25,12),o+Vector3.new(x,1.2,69),C(25,32,37),Enum.Material.Rubber); cable.CanCollide=false
+ end
+ -- Raised gantry rails and a central robotic service carriage over the vats.
+ for _,x in ipairs({-132,132}) do C3.Part(m,"GantryRunway",Vector3.new(2.4,1.4,215),o+Vector3.new(x,33,128),C(75,85,91),Enum.Material.Metal) end
+ C3.Part(m,"GantryBridge",Vector3.new(270,1.7,3),o+Vector3.new(0,33,128),C(95,104,106),Enum.Material.Metal)
+ C3.Part(m,"GantryCarriage",Vector3.new(15,4,12),o+Vector3.new(-12,30,128),C(55,66,72),Enum.Material.Metal)
+ C3.Part(m,"GantryManipulator",Vector3.new(1.4,13,1.4),o+Vector3.new(-12,21,128),C(116,128,130),Enum.Material.Metal)
+ for _,side in ipairs({-1,1}) do
+  C3.Part(m,"ManipulatorShoulder",Vector3.new(5,1,1),o+Vector3.new(-12+side*2.5,15,128),C(102,113,116),Enum.Material.Metal)
+  C3.Part(m,"ManipulatorClaw",Vector3.new(0.6,3,0.6),o+Vector3.new(-12+side*4,13,128),C(172,153,105),Enum.Material.Metal)
+ end
+ -- The villains' operations wall extends beyond the ruin broadcast.
+ monitor("NetworkStatusWallLeft",Vector3.new(34,18,0.5),o+Vector3.new(-48,22,244),"CITY GRID / LIVE FEED",C(122,191,184),Vector3.new(0,0,-1))
+ monitor("NetworkStatusWallRight",Vector3.new(34,18,0.5),o+Vector3.new(48,22,244),"SUBJECTS / SIGNAL",C(202,144,93),Vector3.new(0,0,-1))
+
  -- Four restrained conveyor lines, industrial frames, and upright, complete
  -- R6 clone rigs inside clear glass vats; no floating cubes or arbitrary tilt.
  for row=1,4 do
@@ -143,6 +203,11 @@ function C3.BuildVillain()
    local clone=buildRig(cloneCfg,CFrame.new(o+Vector3.new(x,3.15,z))); clone.Name="SuspendedClone"; clone.Parent=m; anchorAll(clone)
    for _,piece in ipairs(clone:GetDescendants()) do if piece:IsA("BasePart") then piece.CanCollide=false; piece.CanTouch=false; piece.CanQuery=false end end
    local hum=clone:FindFirstChildOfClass("Humanoid"); if hum then hum.DisplayDistanceType=Enum.HumanoidDisplayDistanceType.None; hum.HealthDisplayType=Enum.HumanoidHealthDisplayType.AlwaysOff end
+   local statusColor=col%3==0 and C(195,83,66) or C(93,167,160)
+   local status=C3.Part(m,"ClonePodStatus",Vector3.new(1.25,0.32,0.14),o+Vector3.new(x,8.2,z-3.18),statusColor,Enum.Material.SmoothPlastic)
+   status.Material=Enum.Material.Neon; status.CanCollide=false; status.CanTouch=false; status.CanQuery=false
+   light(status,statusColor,6,0.16)
+   C3.Part(m,"ClonePodSerialPlate",Vector3.new(2,0.7,0.12),o+Vector3.new(x,2.9,z-3.25),C(61,73,78),Enum.Material.Metal).CanCollide=false
   end
  end
  -- Even ceiling fill across the production floor so the enclosure and clones
@@ -205,7 +270,44 @@ function C3.BuildHome()
  C3.kirillDoor=item("KirillRoomDoor",Vector3.new(8,12,0.5),Vector3.new(-160,21,-6),C(88,71,61),Enum.Material.Wood)
  C3.doorClosed=C3.kirillDoor.CFrame; C3.doorOpen=CFrame.new(C3.Pos(-164,21,-6))*CFrame.Angles(0,-math.pi/2,0)*CFrame.new(4,0,0)
  item("Bed",Vector3.new(7,2,12),Vector3.new(-202,16.5,15),C(67,82,107),Enum.Material.Fabric)
+ item("BedPillow",Vector3.new(5,0.8,2.6),Vector3.new(-202,17.8,19),C(174,177,173),Enum.Material.Fabric)
  item("Desk",Vector3.new(10,1,5),Vector3.new(-184,18,20),C(99,79,64),Enum.Material.Wood)
+ -- The shared lower floor has two unmistakable personal corners: Artem's
+ -- electronics bench and Demid's field-kit rack/duffel.
+ local artemDesk=item("ArtemElectronicsBench",Vector3.new(12,1,6),Vector3.new(-204,1.35,14),C(75,61,48),Enum.Material.Wood)
+ artemDesk:SetAttribute("OwnerHero","Artem")
+ item("ArtemKeyboard",Vector3.new(5,0.16,1.3),Vector3.new(-203,1.98,11.8),C(35,42,48),Enum.Material.Metal)
+ item("ArtemLaptopBase",Vector3.new(5,0.3,3.5),Vector3.new(-203,2.15,15.2),C(42,51,58),Enum.Material.Metal)
+ local artemScreen=item("ArtemHackingDisplay",Vector3.new(0.35,4.4,7.5),Vector3.new(-197.6,4.25,14),C(22,35,42),Enum.Material.Metal)
+ artemScreen.CFrame=CFrame.lookAt(artemScreen.Position,artemScreen.Position+Vector3.new(1,0,0),Vector3.yAxis)
+ local artemGui=Instance.new("SurfaceGui"); artemGui.Face=Enum.NormalId.Right; artemGui.CanvasSize=Vector2.new(440,280); artemGui.Parent=artemScreen
+ local artemBg=Instance.new("Frame"); artemBg.Size=UDim2.fromScale(1,1); artemBg.BackgroundColor3=C(12,25,32); artemBg.BorderSizePixel=0; artemBg.Parent=artemGui
+ local artemTitle=Instance.new("TextLabel"); artemTitle.Size=UDim2.fromScale(0.9,0.22); artemTitle.Position=UDim2.fromScale(0.05,0.05); artemTitle.BackgroundTransparency=1; artemTitle.Text="ARTEM / NETWORK MAP"; artemTitle.TextColor3=C(103,205,191); artemTitle.TextScaled=true; artemTitle.Font=Enum.Font.GothamBold; artemTitle.Parent=artemBg
+ for row=1,5 do
+  local trace=Instance.new("Frame"); trace.Size=UDim2.fromScale(0.14+(row%3)*0.13,0.035); trace.Position=UDim2.fromScale(0.12+(row%2)*0.35,0.32+row*0.1); trace.BackgroundColor3=row%2==0 and C(93,169,177) or C(170,141,83); trace.BorderSizePixel=0; trace.Parent=artemBg
+ end
+ local demidRack=item("DemidFieldKitRack",Vector3.new(1.2,8,10),Vector3.new(-151.5,4,-16),C(50,62,69),Enum.Material.Metal)
+ demidRack:SetAttribute("OwnerHero","Demid")
+ for level=1,3 do item("DemidRackShelf",Vector3.new(4.5,0.35,9),Vector3.new(-154.2,level*2.1,-16),C(104,112,111),Enum.Material.Metal) end
+ item("DemidFieldDuffel",Vector3.new(7,1.6,4),Vector3.new(-160,0.9,-18),C(60,77,67),Enum.Material.Fabric)
+ item("DemidShoulderRadio",Vector3.new(1.5,0.75,0.55),Vector3.new(-156.5,1.55,-16),C(49,65,70),Enum.Material.Metal)
+ item("DemidTrainingGloveLeft",Vector3.new(1.4,1.7,1.1),Vector3.new(-156,3.5,-13),C(127,54,46),Enum.Material.Fabric)
+ item("DemidTrainingGloveRight",Vector3.new(1.4,1.7,1.1),Vector3.new(-156,3.5,-18),C(127,54,46),Enum.Material.Fabric)
+ -- Kirill's room shows that it is lived in: books, charging cables, a work
+ -- monitor, first-aid supplies and a small lamp around his existing desk/bed.
+ item("KirillBookshelf",Vector3.new(6,7,2.5),Vector3.new(-208,18.5,14),C(86,67,53),Enum.Material.Wood)
+ for row=1,2 do
+  item("KirillBookshelf",Vector3.new(5.5,0.3,2.2),Vector3.new(-208,16.5+row*2.2,14),C(122,91,66),Enum.Material.Wood)
+  for book=1,4 do item("KirillBook",Vector3.new(0.55,1.45,1.6),Vector3.new(-210.1+book*0.95,16.9+row*2.2,14),book%2==0 and C(61,94,105) or C(128,71,61),Enum.Material.SmoothPlastic) end
+ end
+ local kirillMonitor=item("KirillDeskMonitor",Vector3.new(8,4.6,0.35),Vector3.new(-184,21.3,22.15),C(22,33,40),Enum.Material.Metal)
+ local kirillGui=Instance.new("SurfaceGui"); kirillGui.Face=Enum.NormalId.Front; kirillGui.CanvasSize=Vector2.new(520,300); kirillGui.Parent=kirillMonitor
+ local kirillLabel=Instance.new("TextLabel"); kirillLabel.Size=UDim2.fromScale(1,1); kirillLabel.BackgroundColor3=C(19,31,38); kirillLabel.Text="KIRILL / AUDIO LOGS"; kirillLabel.TextColor3=C(117,176,195); kirillLabel.TextScaled=true; kirillLabel.Font=Enum.Font.GothamBold; kirillLabel.Parent=kirillGui
+ item("KirillDeskChair",Vector3.new(3.2,2,3.2),Vector3.new(-184,16.2,14.8),C(61,70,75),Enum.Material.Fabric)
+ item("KirillNightstand",Vector3.new(4,2.5,4),Vector3.new(-194,16.1,14),C(91,70,53),Enum.Material.Wood)
+ item("KirillFirstAidCase",Vector3.new(2.4,1,1.7),Vector3.new(-194,17.85,14),C(170,73,67),Enum.Material.Metal)
+ item("KirillNotebook",Vector3.new(2.5,0.18,3),Vector3.new(-181,18.62,19),C(177,166,139),Enum.Material.SmoothPlastic)
+ item("KirillHeadphones",Vector3.new(2,0.55,2),Vector3.new(-186,18.9,19),C(38,45,50),Enum.Material.Metal)
  C3.kirill=secretActor(h,"silv3r_candy","Кирилл",CFrame.lookAt(C3.Pos(-184,15.2,15),C3.Pos(-184,18,22)))
  C3.kirill:SetAttribute("ProtectedCivilian",true); C3.kirillPose={}
  for _,motor in ipairs(C3.kirill:GetDescendants()) do if motor:IsA("Motor6D") then C3.kirillPose[motor]=motor.C0 end end
@@ -457,7 +559,15 @@ function C3.Build()
   local text=Instance.new("TextLabel"); text.Size=UDim2.fromScale(1,1); text.BackgroundTransparency=1; text.Text=theme.name; text.TextColor3=C(245,242,230); text.TextScaled=true; text.Font=Enum.Font.GothamBold; text.Parent=gui
   z.panel=towerPart("ObjectiveConsole",Vector3.new(2.4,3.2,2),930,y+1.8,-25,theme.accent,Enum.Material.Metal)
   local panelLight=towerPart("ConsoleScreen",Vector3.new(0.2,1.6,1.6),928.7,y+2.7,-25,C(78,223,179),Enum.Material.Neon); panelLight.CanCollide=false
-  C3.Prompt(z.panel,stage==10 and "Главный терминал" or "Изолировать реле",function(p) C3.CompleteObjective(p,z) end)
+  C3.Prompt(z.panel,stage==10 and "Главный терминал" or "Изолировать реле",function(p)
+   if stage==10 and p:GetAttribute("Hero")=="Artem" then
+    if not C3.CanHack(p) then NotifyRE:FireClient(p,"До терминала нужно отключить четыре реле и получить ключ.",3); return end
+    NotifyRE:FireAllClients("Артём обходит защиту напрямую.",3)
+    C3.CloseHack(); C3.Finale()
+    return
+   end
+   C3.CompleteObjective(p,z)
+  end,stage==10 and 1.2 or nil)
   z.breaker=towerPart("HardwareBreaker",Vector3.new(2.4,3.2,2),990,y+1.8,-25,C(203,131,69),Enum.Material.Metal)
   C3.Prompt(z.breaker,"Подтвердить размыкатель",function(p)
    if C3.stage~=stage or not z.cleared then return end

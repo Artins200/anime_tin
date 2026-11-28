@@ -23,9 +23,17 @@ assert 'CFrame.lookAt(neuroPivot.Position,assistantFocus,Vector3.yAxis)' in chap
 for feature in ('TaperedTowerLeg','TowerXBrace','TowerAnchorShoe','TopWhipAntenna','TowerSignalMarker'):
     assert feature in world
 assert 'TowerSignalFin' not in world and 'TowerBeacon",Vector3.new(3,2,3)' in world
-assert chapter.count('CutsceneRE:FireAllClients("pov"')==1
-assert 'cameraPlan(C3.Pos(-196,9,-15)' in chapter and 'cameraPlan(C3.Pos(-205,24,2)' in chapter
+assert 'CutsceneRE:FireAllClients("pov"' not in chapter
+assert 'cameraPlan(C3.Pos(-175,12,-22)' in chapter and 'toward the distant tower instead of snapping to POV' in chapter
+assert 'cameraPlan(C3.Pos(-196,9,-15)' in chapter and 'cameraPlan(C3.Pos(-124,10,0)' in chapter
+assert 'CutsceneRE:FireAllClients("follow",C3.party[1].Character' in chapter
+assert 'buddyRoute=' in chapter and 'C3.buddy:SetAttribute("StayingWithKirill",true)' in chapter
+assert 'chosenHero=="Artem" and "Demid" or "Artem"' in chapter
 assert 'KirillNeonBlue' in world and 'KirillNeonViolet' in world
+for detail in ('CommandDais','CommandStationMonitor','FactoryWallProcessMonitor','GantryBridge','ClonePodStatus','ArtemElectronicsBench','DemidFieldKitRack','KirillBookshelf','KirillDeskMonitor'):
+    assert detail in world
+assert 'if stage==10 and p:GetAttribute("Hero")=="Artem" then' in world
+assert 'C3.CanHack(p)' in world and 'stage==10 and 1.2 or nil' in world
 assert 'C3.Pos(pos.X,pos.Y,pos.Z),28,0.8,"HomeFillLamp"' in world
 assert 'light(tube,spec.color,18,0.45)' in world
 assert 'C3.Lamp(m,o+Vector3.new(x,47,z),72,1.45' in world
