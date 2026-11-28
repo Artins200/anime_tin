@@ -22,6 +22,7 @@ assert 'Lighting.ClockTime=22.15' in chapter and 'Lighting.Brightness=1.25' in c
 assert 'LEDStreetLampHead' in world and 'WarmStreetLamp' in world and 'NTyanArmoredTransport' in chapter
 assert 'NeuroFactoryCityBackdrop' in world and 'DistantLitWindow' in world and 'C3.Pos(-340,166,1880)' in chapter
 assert 'C3.sceneCollision[piece]=piece.CanCollide' in chapter and 'part.Name=="SofaSeat"' in world
+assert 'CinematicIgnoreObstacles' in chapter and 'followAuthoredRoute' in server
 assert 'local windowGuide=C3.coop and "Демид"' in chapter and 'recoverChapter(introError)' in chapter
 assert 'function C3.TowerReinforcement()' in chapter and 'Поднимайте захваченный отряд НТЯН' in chapter
 assert 'Дуговой карабин' in Path('src/ModuleScript_0.luau').read_text() and 'Enum.KeyCode.Six' in client
@@ -67,6 +68,8 @@ assert 'local entry=C3.Pos(-174,4,zOffset)' in chapter
 assert 'if lockFacing then' in server and 'root.CFrame=CFrame.lookAt(root.Position,root.Position+faceDirection,Vector3.yAxis)' in server
 assert 'SingularityLandmark' in world and 'Chapter3CityBackdrop' in world
 assert 'C3_CollisionAndGameplay' in world and 'TowerStairGate' in world
+assert 'local z={index=i,center=C3.Pos(x,4,0),start=C3.Pos(x-62,4,0)' in world
+assert 'C3.zones[i]=z' in world and 'C3.zones[stage]=z' in world
 assert 'Landmark geometry is a non-colliding visual shell' in world
 assert 'MainStreetAsphalt' in world and 'DistrictTitle' in world and 'NTyanOffice' in world
 assert 'C3.Send(force)' in chapter and 'now-(C3.lastStateSent or 0)<1' in chapter

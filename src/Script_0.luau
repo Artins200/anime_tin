@@ -942,16 +942,18 @@ local function tweenCharTo(char, target, _duration, lockFacing, speedOverride, i
  end
  local duration=math.max(distance/(speedOverride or 12),0.12) -- fixed pace, with faster authored routes when requested
  local began=os.clock(); local reached=true
+ local followAuthoredRoute=char:GetAttribute("CinematicIgnoreObstacles")==true
  char:SetAttribute("CinematicWalk",true)
  repeat
   local t=math.clamp((os.clock()-began)/duration,0,1)
   local nextPosition=start:Lerp(target.Position,t)
   local floor=workspace:Raycast(nextPosition+Vector3.new(0,4,0),Vector3.new(0,-12,0),params)
-  if not floor then reached=false; break end
-  nextPosition=Vector3.new(nextPosition.X,floor.Position.Y+clearance,nextPosition.Z)
+  if floor then
+   nextPosition=Vector3.new(nextPosition.X,floor.Position.Y+clearance,nextPosition.Z)
+  elseif not followAuthoredRoute then reached=false; break end
   local delta=(nextPosition-root.Position)*Vector3.new(1,0,1)
   local obstacle=workspace:Raycast(root.Position,delta,params)
-  if obstacle and obstacle.Normal.Y<0.5 and not ignoreStepFaces then reached=false; break end
+  if obstacle and obstacle.Normal.Y<0.5 and not ignoreStepFaces and not followAuthoredRoute then reached=false; break end
   local direction
   if lockFacing then
    direction=faceDirection
@@ -3475,7 +3477,13 @@ function C3.Send(force)
 end
 function C3.Protected(fn)
  local ok,err=xpcall(fn,debug.traceback)
- if not ok then warn("[Chapter3] "..tostring(err)); C3.Stop(); returnToMenu() end
+ if not ok then
+  warn("[Chapter3] "..tostring(err))
+  local detail=tostring(err):match("^[^\n]+") or "Unknown server error"
+  NotifyRE:FireAllClients("Сбой главы III: "..detail,12)
+  task.wait(4) -- Keep the exact server error visible before the fallback menu loads.
+  C3.Stop(); returnToMenu()
+ end
 end
 function C3.Stop()
  C3.active=false; C3.serial+=1; C3.RestoreLighting()
@@ -3492,6 +3500,7 @@ function C3.Scene(on)
  for _,player in ipairs(C3.party) do
   local character=player.Character
   if character then
+   character:SetAttribute("CinematicIgnoreObstacles",on)
    for _,piece in ipairs(character:GetDescendants()) do
     if piece:IsA("BasePart") then
      if on then
@@ -4004,6 +4013,7 @@ function C3.Build()
   local lamp=streetPart("WreckBeacon",Vector3.new(0.4,0.4,0.4),x-8,3.5,i%2==0 and 25 or -27,C(217,91,69),Enum.Material.Neon); lamp.CanCollide=false
   C3.Lamp(C3.backdrop,C3.Pos(x,9,0),35,1.3,"DistrictFill")
   local z={index=i,center=C3.Pos(x,4,0),start=C3.Pos(x-62,4,0),exit=C3.Pos(x+67,4,0),wave=0,rounds=i==3 and 3 or 2,cleared=false,objective=false,covers={}}
+  C3.zones[i]=z -- Register the five street stages before the tower's stages 6-10.
   z.gate=streetPart("DistrictGate",Vector3.new(1,12,82),x+78,6,0,C(57,78,99),Enum.Material.Metal)
   z.gateClosed=z.gate.CFrame
   z.covers={C3.Pos(x-17,4,-20),C3.Pos(x+31,4,20)}
@@ -4228,6 +4238,7 @@ function C3.Build()
   local module=C3.Part(C3.map,i==1 and "ControlModule" or "MemoryModule",Vector3.new(1.7,0.45,2),C3.case.Position+Vector3.new((i-1.5)*2.2,0.8,0),i==1 and C(80,200,174) or C(109,165,224),Enum.Material.Metal)
   C3.moduleParts[i]=module; C3.Prompt(module,i==1 and "Забрать контроллер" or "Забрать память",function(p) C3.TakeModule(p,i) end)
  end
+ for stage=1,10 do assert(C3.zones[stage],"Chapter III build missed zone "..stage) end
 end
 
 -- END CHAPTER THREE WORLD
