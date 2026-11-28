@@ -22,6 +22,17 @@ assert 'cfg.Gun=false' in chapter and 'e.suppression' in chapter
 assert 'C3.confirmPlayer==p' in chapter and 'helperRoot.Position-C3.zones[10].breaker.Position' in chapter
 assert 'C3.relayCounted' not in chapter and 'z.relayCounted=true' in chapter
 assert 'C3.shield.CanQuery=false' in chapter
+assert 'C3.CompleteBranch(p,z,1)' in chapter and 'function C3.TakeKey(p,z)' in chapter
+assert 'SessionKeycard' in world and 'AntennaRotorBlade' in world and 'PowerBranchB' in world
+assert 'C3RE:FireClient(p,"aim"' in chapter and 'action=="aim"' in ui
+assert 'C3.TaskFor(z,p)' in chapter and 'if C3.stage and C3.stage>0 then C3.ClearMobs() end' in chapter
+assert 'Lighting.ClockTime=0.35' in chapter and 'Lighting.ClockTime=14.2' not in chapter
+assert 'FactoryPanoramaGlass' in world and 'ObservationSideWall' in world and 'RuinsBroadcastFrame' in world
+assert 'for row=0,7 do' in world and 'for k=0,31 do' in world
+assert 'DistantFactoryLight' in world and 'ConveyorSupport' in world
+assert 'cameraPlan(C3.Pos(-78,24, -28)' in chapter
+assert 'Круто, мы победили!' in Path('src/Chapter2Campaign.luau').read_text()
+assert 'Дааа, мы их вынесли! Хотя... это же была всего лишь мини-база, да? Ладно, всё будет отлично, я тебя уверяю!' in Path('src/Chapter2Campaign.luau').read_text()
 assert 'C3.finished=true; C3.Stop(); returnToMenu()' in chapter
 assert 'task.wait(35)' in chapter and chapter.index('C3.modules[index]=true')<chapter.index('C3RE:FireAllClients("credits",true)')
 for removed in ('debugJump','DebugAllowed','debugPanel','Enum.KeyCode.F6'):
@@ -141,6 +152,24 @@ C3.HackInput(artem,ch.token); assert(C3.challenge==nil,"expired session accepted
 print("PASS: executed solo terminal fallback, distance loss and expiry cancellation")
 
 C3.Send=function() end
+C3.party={artem,demid}; C3.coop=true; C3.stage=7; C3.relays=0
+local twin={index=7,cleared=true,objective=false,panel={Color={}},breaker={Color={}},gate={},gateClosed=CFrame.new()}
+C3.CompleteBranch(demid,twin,1); assert(not twin.branches or not twin.branches[1],"wrong hero bypassed branch role")
+C3.CompleteBranch(artem,twin,1); assert(twin.branches[1] and not twin.objective and C3.relays==0)
+C3.CompleteBranch(artem,twin,2); assert(not twin.objective,"one player bypassed the cooperative split")
+C3.CompleteBranch(demid,twin,2); assert(twin.objective and C3.relays==1 and twin.relayCounted)
+C3.CompleteBranch(demid,twin,2); assert(C3.relays==1,"branch replay duplicated relay progress")
+local expired={index=7,cleared=true,objective=false,panel={Color={}},breaker={Color={}},gate={},gateClosed=CFrame.new()}
+C3.CompleteBranch(artem,expired,1); clock+=16; C3.CompleteBranch(demid,expired,2)
+assert(not expired.branches[1] and not expired.objective,"expired coop sync should reset both branches")
+assert(C3.TaskFor(twin,artem):find("Шлюз открыт"))
+C3.coop=false; C3.party={artem}; C3.stage=8; C3.key=false
+local keyZone={index=8,cleared=true,objective=false,panel={Color={}},breaker={},gate={},gateClosed=CFrame.new(),keycard={Transparency=0,CanQuery=true,CanTouch=true}}
+C3.CompleteObjective(artem,keyZone); assert(not keyZone.objective,"server opened without a session key")
+C3.TakeKey(artem,keyZone); assert(C3.key and keyZone.keycard.Transparency==1)
+C3.CompleteObjective(artem,keyZone); assert(keyZone.objective and C3.relays==2)
+print("PASS: executed co-op split power branches, role locks, keycard pickup and server relay gate")
+
 C3.party={artem,demid}; C3.coop=true; C3.stage=6; C3.relays=0
 local relay={index=6,cleared=true,objective=false,panel={},gate={},gateClosed=CFrame.new()}
 C3.CompleteObjective(demid,relay); assert(not relay.objective)

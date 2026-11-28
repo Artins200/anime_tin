@@ -3,7 +3,7 @@ do
  local remote=Remotes:WaitForChild("Chapter3")
  local state; local challenge
  local hud=new("ScreenGui",{Name="Chapter3HUD",ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=45,Enabled=false},plr.PlayerGui)
- local objective=new("TextLabel",{Size=UDim2.new(0.7,0,0,55),Position=UDim2.new(0.15,0,0,125),BackgroundColor3=Color3.fromRGB(17,26,42),BackgroundTransparency=0.15,TextColor3=Color3.fromRGB(220,230,240),TextSize=17,TextWrapped=true,Font=Enum.Font.GothamBold},hud)
+ local objective=new("TextLabel",{Size=UDim2.new(0.74,0,0,82),Position=UDim2.new(0.13,0,0,112),BackgroundColor3=Color3.fromRGB(17,26,42),BackgroundTransparency=0.12,TextColor3=Color3.fromRGB(220,230,240),TextSize=16,TextWrapped=true,Font=Enum.Font.GothamBold},hud)
  local stamina=new("Frame",{Size=UDim2.fromOffset(180,9),Position=UDim2.new(0,30,1,-108),BackgroundColor3=Color3.fromRGB(30,40,55)},hud)
  local fill=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(85,185,175),BorderSizePixel=0},stamina)
  local scope=new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.new(),BackgroundTransparency=0.3,Visible=false},hud)
@@ -58,16 +58,26 @@ do
  remote.OnClientEvent:Connect(function(action,data)
   if action=="state" then
    state=data; hud.Enabled=true
-   objective.Text=("III • %s\nВолна %d/%d  |  Угрозы: %d  |  Реле: %d/4"):format(data.name,data.wave,data.rounds,data.enemies,data.relays)
-   if data.cleared then objective.Text="III • "..data.name..(data.stage==10 and "\nВзломайте главный терминал" or data.objective and "\nСоберитесь у следующего шлюза" or "\nОтключите панель у шлюза") end
+   local progress=("Волна %d/%d  •  угрозы %d  •  реле %d/4"):format(data.wave,data.rounds,data.enemies,data.relays)
+   objective.Text=("III • %s\n%s\n%s"):format(data.name,data.task or "Продвигайтесь к цели",progress)
+   if data.cleared then
+    local status=data.objective and "Шлюз открыт • соберитесь у выхода" or "Зона зачищена"
+    objective.Text=("III • %s\n%s\n%s"):format(data.name,data.task or status,status)
+   end
    return
   end
   if action=="hack" then hud.Enabled=true; draw(data); return end
   if action=="hackClose" then close(false); return end
   if action=="binocular" then hud.Enabled=true; scope.Visible=data; return end
   if action=="signal" then
-   hud.Enabled=true; flash.BackgroundTransparency=0.65; TweenService:Create(flash,TweenInfo.new(0.8),{BackgroundTransparency=1}):Play()
+   hud.Enabled=true; flash.BackgroundColor3=Color3.fromRGB(210,220,225); flash.BackgroundTransparency=0.65; TweenService:Create(flash,TweenInfo.new(0.8),{BackgroundTransparency=1}):Play()
    local s=new("Sound",{SoundId="rbxasset://sounds/electronicpingshort.wav",Volume=0.18,PlaybackSpeed=1.2},SoundService); s:Play(); Debris:AddItem(s,2); return
+  end
+  if action=="aim" then
+   hud.Enabled=true; flash.BackgroundColor3=Color3.fromRGB(244,157,94); flash.BackgroundTransparency=0.9
+   TweenService:Create(flash,TweenInfo.new(0.5),{BackgroundTransparency=1}):Play()
+   task.delay(0.55,function() if flash.Parent then flash.BackgroundColor3=Color3.fromRGB(210,220,225) end end)
+   return
   end
   if action=="nonlethal" then
    hitmark.TextColor3=Color3.fromRGB(100,220,170); hitmark.TextTransparency=0
