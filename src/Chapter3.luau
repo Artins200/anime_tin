@@ -7,7 +7,7 @@ function C3.Pos(x,y,z) return C3.origin+Vector3.new(x,y,z or 0) end
 function C3.Part(parent,name,size,pos,color,mat)
  if parent==C3.map and C3.structure and C3.structure.Parent==C3.map then parent=C3.structure end
  local p=part(parent,size,pos,color,mat or Enum.Material.Concrete); p.Name=name
- if name=="TowerBeacon" or name=="SignalSpine" or name=="SignalRing" then p.Material=Enum.Material.Neon end
+ if name=="SignalSpine" then p.Material=Enum.Material.Neon end
  return p
 end
 function C3.ApplyLighting()
@@ -126,23 +126,61 @@ function C3.Beam(parent,name,a,b,width,color)
  p.CFrame=CFrame.lookAt((a+b)*0.5,b); return p
 end
 function C3.BuildRadioMast()
- for _,sx in ipairs({-1,1}) do for _,sz in ipairs({-1,1}) do
-  C3.Part(C3.landmark,"RadioMastLeg",Vector3.new(2.5,204,2.5),C3.Pos(960+sx*13,216,sz*13),C(170,181,192),Enum.Material.Metal)
- end end
- for level=0,8 do
-  local y=114+level*24
-  for _,side in ipairs({-1,1}) do
-   C3.Beam(C3.landmark,"TrussCrossBrace",C3.Pos(947,y,side*13),C3.Pos(973,y+24,side*13),1.2,C(187,196,206))
-   C3.Beam(C3.landmark,"TrussCrossBrace",C3.Pos(960+side*13,y,-13),C3.Pos(960+side*13,y+24,13),1.2,C(187,196,206))
-   local ring=C3.Part(C3.landmark,"SignalRing",Vector3.new(29,0.3,0.5),C3.Pos(960,y,side*14),C(220,70,65),Enum.Material.Neon); table.insert(C3.redLights,ring)
+ -- A full-height, tapered, four-leg lattice tower with the painted red/white
+ -- maintenance sections of a real cellular mast (not a square neon shaft).
+ local function radiusAt(y) return 54-44*(y/324) end
+ local function corner(signX,signZ,y)
+  local radius=radiusAt(y)
+  return C3.Pos(960+signX*radius,y,signZ*radius)
+ end
+ local corners={{-1,-1},{1,-1},{1,1},{-1,1}}
+ local red=C(177,57,48); local ivory=C(192,199,198)
+ for level=0,13 do
+  local y0=level*24; local y1=math.min(y0+24,324)
+  local color=(level<2 or level==7 or level>=12) and red or ivory
+  for i,signs in ipairs(corners) do
+   local nextSigns=corners[i%#corners+1]
+   C3.Beam(C3.landmark,"TaperedTowerLeg",corner(signs[1],signs[2],y0),corner(signs[1],signs[2],y1),2.1,color)
+   -- Perimeter tie beams and crossed X-bracing on all four faces.
+   C3.Beam(C3.landmark,"TowerHorizontalTie",corner(signs[1],signs[2],y1),corner(nextSigns[1],nextSigns[2],y1),1.0,color)
+   C3.Beam(C3.landmark,"TowerXBrace",corner(signs[1],signs[2],y0),corner(nextSigns[1],nextSigns[2],y1),0.85,color)
+   C3.Beam(C3.landmark,"TowerXBrace",corner(nextSigns[1],nextSigns[2],y0),corner(signs[1],signs[2],y1),0.85,color)
   end
  end
- for _,y in ipairs({157,205,253,301}) do
+ -- Four stout anchor shoes and a narrow service platform under the antenna head.
+ for _,sx in ipairs({-1,1}) do for _,sz in ipairs({-1,1}) do
+  C3.Part(C3.landmark,"TowerAnchorShoe",Vector3.new(4,4,4),C3.Pos(960+sx*53,2,sz*53),C(157,61,51),Enum.Material.Metal)
+ end end
+ C3.Part(C3.landmark,"AntennaServiceDeck",Vector3.new(25,0.8,25),C3.Pos(960,300,0),C(83,94,99),Enum.Material.Metal)
+ for _,sx in ipairs({-1,1}) do for _,sz in ipairs({-1,1}) do
+  C3.Part(C3.landmark,"AntennaDeckRailPost",Vector3.new(0.45,3.5,0.45),C3.Pos(960+sx*11,302,sz*11),C(181,187,185),Enum.Material.Metal)
+ end end
+ for _,side in ipairs({-1,1}) do
+  C3.Part(C3.landmark,"AntennaDeckRail",Vector3.new(22,0.35,0.35),C3.Pos(960,303.5,side*11),C(181,187,185),Enum.Material.Metal)
+  C3.Part(C3.landmark,"AntennaDeckRail",Vector3.new(0.35,0.35,22),C3.Pos(960+side*11,303.5,0),C(181,187,185),Enum.Material.Metal)
+ end
+ C3.Part(C3.landmark,"TopWhipAntenna",Vector3.new(0.8,27,0.8),C3.Pos(960,337.5,0),C(180,186,185),Enum.Material.Metal)
+ C3.Part(C3.landmark,"AntennaTopCrossbar",Vector3.new(12,0.6,0.6),C3.Pos(960,341,0),C(180,186,185),Enum.Material.Metal)
+ for _,side in ipairs({-1,1}) do
+  C3.Part(C3.landmark,"TopPanelAntenna",Vector3.new(1.2,10,2),C3.Pos(960+side*6,335,0),C(198,202,199),Enum.Material.Metal)
+ end
+ -- Directional panel antennas and small service microwave dishes on the mast.
+ for _,y in ipairs({157,205,253,277}) do
   for _,side in ipairs({-1,1}) do
-   C3.Part(C3.landmark,"CellularPanelAntenna",Vector3.new(3,16,7),C3.Pos(960+side*20,y,0),C(214,220,223),Enum.Material.Metal)
-   C3.Beam(C3.landmark,"AntennaMount",C3.Pos(960+side*13,y,0),C3.Pos(960+side*20,y,0),1,C(95,111,128))
-   local dish=C3.Part(C3.landmark,"MicrowaveDish",Vector3.new(2,14,14),C3.Pos(960+side*19,y,20),C(201,211,220),Enum.Material.SmoothPlastic); dish.Shape=Enum.PartType.Ball
-   C3.Beam(C3.landmark,"DishFeed",C3.Pos(960+side*19,y,20),C3.Pos(960+side*27,y,20),0.7,C(70,86,104))
+   local radius=radiusAt(y)
+   local panel=C3.Part(C3.landmark,"CellularPanelAntenna",Vector3.new(2,14,5.5),C3.Pos(960+side*(radius-5),y,0),C(190,198,199),Enum.Material.Metal)
+   panel.CanCollide=false
+   C3.Beam(C3.landmark,"AntennaMount",C3.Pos(960+side*(radius-11),y,0),panel.Position,0.8,C(104,115,117))
+   local dish=C3.Part(C3.landmark,"MicrowaveDish",Vector3.new(1.2,7,7),C3.Pos(960+side*(radius-12),y,12),C(171,180,182),Enum.Material.Metal)
+   dish.Shape=Enum.PartType.Cylinder; dish.CanCollide=false
+   C3.Beam(C3.landmark,"DishFeed",dish.Position,C3.Pos(960+side*(radius-4),y,12),0.55,C(94,106,111))
+  end
+ end
+ -- A few low-output red obstruction lamps remain visible while the signal runs.
+ for _,y in ipairs({24,120,216,300}) do
+  for _,side in ipairs({-1,1}) do
+   local marker=C3.Part(C3.landmark,"TowerObstructionLamp",Vector3.new(0.8,1.1,0.8),C3.Pos(960+side*(radiusAt(y)+0.7),y,0),C(174,54,48),Enum.Material.SmoothPlastic)
+   table.insert(C3.redLights,marker); light(marker,C(220,66,57),18,0.28)
   end
  end
 end
@@ -438,19 +476,21 @@ function C3.Build()
 
  -- Tower's outer silhouette is a landmark; the playable shell is built below.
  C3.landmark=Instance.new("Model"); C3.landmark.Name="SingularityLandmark"; C3.landmark.ModelStreamingMode=Enum.ModelStreamingMode.Persistent; C3.landmark.Parent=C3.map
- local base=C3.Part(C3.landmark,"TowerFoundation",Vector3.new(104,2,104),C3.Pos(960,-1,0),C(36,45,61),Enum.Material.Metal)
- for _,sx in ipairs({-1,1}) do for _,sz in ipairs({-1,1}) do
-  C3.Part(C3.landmark,"TowerPylon",Vector3.new(3.5,116,3.5),C3.Pos(960+sx*46,58,sz*46),C(88,104,119),Enum.Material.Metal)
- end end
+ C3.Part(C3.landmark,"TowerFoundation",Vector3.new(104,2,104),C3.Pos(960,-1,0),C(36,45,61),Enum.Material.Metal)
  for floor=0,4 do
   local y=floor*24+12
   for _,side in ipairs({-1,1}) do
-   local panel=C3.Part(C3.landmark,"TowerSignalFin",Vector3.new(1.4,22,30),C3.Pos(960+side*49,y,0),C(183,53,66),Enum.Material.Neon); panel.Transparency=0.12; table.insert(C3.redLights,panel)
+   local marker=C3.Part(C3.landmark,"TowerSignalMarker",Vector3.new(1.2,3.5,2.5),C3.Pos(960+side*52,y,0),C(153,56,49),Enum.Material.Metal)
+   table.insert(C3.redLights,marker); light(marker,C(210,63,53),16,0.22)
   end
-  local rim=C3.Part(C3.landmark,"TowerFloorRim",Vector3.new(100,1,100),C3.Pos(960,floor*24,0),C(53,64,81),Enum.Material.Metal); rim.Transparency=0.15
+  local deckY=floor*24+0.6
+  for _,side in ipairs({-1,1}) do
+   C3.Beam(C3.landmark,"TowerServiceDeckEdge",C3.Pos(910,deckY,side*50),C3.Pos(1010,deckY,side*50),0.9,C(126,138,140))
+   C3.Beam(C3.landmark,"TowerServiceDeckEdge",C3.Pos(960+side*50,deckY,-50),C3.Pos(960+side*50,deckY,50),0.9,C(126,138,140))
+  end
  end
  C3.BuildRadioMast()
- C3.beacon=C3.Part(C3.landmark,"TowerBeacon",Vector3.new(10,7,10),C3.Pos(960,324,0),C(231,55,68),Enum.Material.Neon); table.insert(C3.redLights,C3.beacon); light(C3.beacon,C(235,55,65),90,1)
+ C3.beacon=C3.Part(C3.landmark,"TowerBeacon",Vector3.new(3,2,3),C3.Pos(960,325,0),C(183,52,46),Enum.Material.SmoothPlastic); table.insert(C3.redLights,C3.beacon); light(C3.beacon,C(235,65,55),42,0.7)
  C3.shield=C3.Part(C3.landmark,"InvulnerableTowerShield",Vector3.new(155,370,155),C3.Pos(960,175,0),C(125,45,95),Enum.Material.ForceField)
  C3.shield.Shape=Enum.PartType.Ball; C3.shield.CanCollide=false; C3.shield.CanTouch=false; C3.shield.CanQuery=false; C3.shield.Transparency=0.94
 
@@ -595,7 +635,8 @@ function C3.Intro()
  C3.MoveParty(C3.Pos(-193,4,3),C3.Pos(-187,7,22)); focusStreaming(C3.Pos(-187,5,0)); prepareView(C3.Pos(-187,5,0))
  C3.buddy=secretActor(C3.map,C3.party[1]:GetAttribute("Hero")=="Artem" and "ZamestitelDiomchica" or "eurtyoeyrntiu","Напарник",CFrame.lookAt(C3.Pos(-181,0.5,-5),C3.Pos(-193,3,3)))
  if C3.coop then C3.buddy:Destroy(); C3.buddy=nil end
- CutsceneRE:FireAllClients("pov",C3.tv,65); CutsceneRE:FireAllClients("reveal")
+ cameraPlan(C3.Pos(-196,9,-15),C3.Pos(-194,8,-12),C3.Pos(-187,6,10),1.2,60,56)
+ CutsceneRE:FireAllClients("reveal")
  C3.Say("Демид","Мы им завод снесли, а крайними всё равно оказались мы. Я до сих пор не понимаю, кто здесь с кем воюет.",5)
  C3.Say("Артём","И почему НТЯН ищет нас, а не тех, кто людей переделывает? Тут явно не вся картина.",4)
  C3RE:FireAllClients("signal"); ShakeRE:FireAllClients(2); task.wait(2)
@@ -620,7 +661,8 @@ function C3.Intro()
  focusStreaming(C3.Pos(-171,19,4)); prepareView(C3.Pos(-171,19,4))
  C3.MoveParty(C3.Pos(-171,19,4),C3.kirill.Head.Position)
  TweenService:Create(C3.kirillDoor,TweenInfo.new(0.7),{CFrame=C3.doorOpen}):Play(); task.wait(0.8)
- CutsceneRE:FireAllClients("pov",C3.kirill.Head,58); CutsceneRE:FireAllClients("reveal")
+ cameraPlan(C3.Pos(-205,24,2),C3.Pos(-203,23,4),C3.kirill.Head.Position,1.2,60,56)
+ CutsceneRE:FireAllClients("reveal")
  C3.Say("Кирилл","Тянки... тянки...",3)
  for motor,cf in pairs(C3.kirillPose) do if motor.Parent then motor.C0=cf end end
  for _=1,4 do for _,m in ipairs(C3.kirill:GetDescendants()) do if m:IsA("Motor6D") and m.Part0 and m.Part1 then m.Part1.CFrame=m.Part0.CFrame*m.C0*m.C1:Inverse() end end end
@@ -719,7 +761,8 @@ function C3.Activate(index)
  currentSpawn=CFrame.lookAt(z.start,z.center)
  for _,p in ipairs(C3.Living()) do c2Grant(p,p:GetAttribute("Hero")=="Artem" and math.min(3,2+math.floor(index/7)) or math.min(5,2+math.floor(index/2))) end
  if index==5 and not C3.shieldSeen then
-  C3.shieldSeen=true; C3.Scene(true); CutsceneRE:FireAllClients("pov",C3.shield,63)
+  C3.shieldSeen=true; C3.Scene(true)
+  cameraPlan(C3.Pos(830,17,-55),C3.Pos(834,18,-50),C3.Pos(930,88,0),1.4,60,55)
   C2.ScriptedShot(C3.Pos(884,8,0),false)
   C3.Say("Демид","Да ей вообще плевать на пули!",3)
   C3.Say("Артём","Снаружи не пробить. Сервисный вход подключён к внутренней сети. Поднимаемся к управляющему терминалу и гасим её изнутри.",6)
@@ -792,7 +835,7 @@ function C3.Finale()
  for _,e in pairs(C3.mobs) do if e.civilian then e.down=true end end
  task.wait(3)
  C3.MoveParty(C3.Pos(950,100,6),C3.case.Position)
- CutsceneRE:FireAllClients("pov",C3.case,58)
+ cameraPlan(C3.Pos(980,109,20),C3.Pos(977,108,18),C3.case.Position,1.3,58,54)
  C3.Say("Демид","Есть! Смотри, свет погас!",3)
  C3.Say("Артём","Не трогай обгоревший блок. Вот эти модули целые. Заберём их: надо понять, что они сделали с Кириллом.",5)
  C3.Scene(false); C3.collecting=true; C3RE:FireAllClients("collect",true)
@@ -804,7 +847,7 @@ function C3.TakeModule(p,index)
  C3.modules[index]=true; C3.moduleParts[index].Transparency=1; C3.moduleParts[index].CanQuery=false
  if not C3.modules[1] or not C3.modules[2] then return end
  C3.collecting=false; C3.Scene(true); MusicRE:FireAllClients("finalSlow")
- CutsceneRE:FireAllClients("pov",C3.case,57)
+ cameraPlan(C3.Pos(978,112,24),C3.Pos(975,110,20),C3.case.Position,1.2,58,54)
  if C3.coop then
   C3.Say("Демид","Кирилл замер. Значит, сработало?",3)
   C3.Say("Артём","Передачу остановили. А что уже осталось у него в голове, ещё предстоит выяснить.",4)

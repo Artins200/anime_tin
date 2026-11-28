@@ -20,6 +20,11 @@ assert 'Эммм, что это было?' in chapter and 'Чекни в окн�
 assert 'Lighting.Brightness=1.65' in chapter and 'bloom.Intensity=0' in chapter
 assert 'CFrame.lookAt(slotPosition,flatLook,Vector3.yAxis)' in chapter
 assert 'CFrame.lookAt(neuroPivot.Position,assistantFocus,Vector3.yAxis)' in chapter
+for feature in ('TaperedTowerLeg','TowerXBrace','TowerAnchorShoe','TopWhipAntenna','TowerSignalMarker'):
+    assert feature in world
+assert 'TowerSignalFin' not in world and 'TowerBeacon",Vector3.new(3,2,3)' in world
+assert chapter.count('CutsceneRE:FireAllClients("pov"')==1
+assert 'cameraPlan(C3.Pos(-196,9,-15)' in chapter and 'cameraPlan(C3.Pos(-205,24,2)' in chapter
 assert 'KirillNeonBlue' in world and 'KirillNeonViolet' in world
 assert 'C3.Lamp(m,o+Vector3.new(x,47,z),72,1.45' in world
 assert 'tweenCharTo(p.Character,windowView,1.5,true)' in chapter
