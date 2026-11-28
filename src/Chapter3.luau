@@ -91,7 +91,24 @@ function C3.Stop()
  Players.RespawnTime=3; c2RestoreHeroes(); MusicRE:FireAllClients("stop")
 end
 function C3.Scene(on)
- introActive=on; canFight=not on; sceneLock(on)
+ introActive=on; canFight=not on
+ C3.sceneCollision=C3.sceneCollision or setmetatable({}, {__mode="k"})
+ for _,player in ipairs(C3.party) do
+  local character=player.Character
+  if character then
+   for _,piece in ipairs(character:GetDescendants()) do
+    if piece:IsA("BasePart") then
+     if on then
+      if C3.sceneCollision[piece]==nil then C3.sceneCollision[piece]=piece.CanCollide end
+      piece.CanCollide=false
+     elseif C3.sceneCollision[piece]~=nil then
+      piece.CanCollide=C3.sceneCollision[piece]; C3.sceneCollision[piece]=nil
+     end
+    end
+   end
+  end
+ end
+ sceneLock(on)
  CutsceneRE:FireAllClients(on and "start" or "end")
 end
 function C3.Say(name,text,time) C2.Literal(name,text,time) end
@@ -202,8 +219,27 @@ function C3.Room(parent,name,center,size)
  return room
 end
 function C3.BuildVillain()
- local m=Instance.new("Model"); m.Name="NeuroMegafactory"; m.Parent=C3.map
+ local m=Instance.new("Model"); m.Name="NeuroMegafactory"; m.Parent=C3.map; C3.factory=m
  local o=C3.Pos(0,0,2200)
+ -- Separate, distant urban skyline behind the factory establishes that the plant stands in a real city.
+ local skyline=Instance.new("Model"); skyline.Name="NeuroFactoryCityBackdrop"; skyline.Parent=C3.map
+ local asphalt=C3.Part(skyline,"FactoryDistrictRoad",Vector3.new(980,1,150),C3.Pos(0,-0.7,2200),C(37,44,55),Enum.Material.Asphalt); asphalt.CanCollide=false
+ for block=-5,5 do
+  local x=block*112
+  if math.abs(x)>190 then
+   local height=52+((block*block+block*13)%7)*13
+   for _,z in ipairs({1920,2495}) do
+    local building=C3.Part(skyline,"DistantCityTower",Vector3.new(76,height,44),C3.Pos(x,height/2,z),C(39+math.abs(block)%3*7,52,70),Enum.Material.Concrete)
+    building.CanCollide=false
+    for floor=1,math.floor(height/12) do
+     local window=C3.Part(skyline,"DistantLitWindow",Vector3.new(62,1.6,0.18),C3.Pos(x,floor*12,z-22),floor%3==0 and C(218,176,111) or C(87,133,163),Enum.Material.Glass)
+     window.CanCollide=false; window.CanTouch=false; window.CanQuery=false
+    end
+    local crown=C3.Part(skyline,"DistantRoofBeacon",Vector3.new(1.4,2.4,1.4),C3.Pos(x,height+1.2,z),C(224,66,72),Enum.Material.Neon)
+    crown.CanCollide=false; light(crown,C(244,75,72),18,0.35)
+   end
+  end
+ end
  local dark=C(43,49,57); local steel=C(75,83,91); local trim=C(108,116,120)
  -- A complete, human-scale factory bay: continuous floor, four enclosing walls,
  -- roof and visible structural ribs. The old version showed an open black void.
@@ -469,6 +505,10 @@ function C3.BuildHome()
  item("KirillHeadphones",Vector3.new(2,0.55,2),Vector3.new(-168,18.9,-16),C(38,45,50),Enum.Material.Metal)
  C3.kirill=secretActor(h,"silv3r_candy","Кирилл",CFrame.lookAt(C3.Pos(-184,15.2,-15),C3.Pos(-184,18,-8)))
  C3.kirill:SetAttribute("ProtectedCivilian",true); C3.kirillPose={}
+ -- Keep authored cutscene paths clear: the low sofa and coffee table are visible props, not blockers.
+ for _,part in ipairs(h:GetDescendants()) do
+  if part.Name=="SofaSeat" or part.Name=="SofaBack" or part.Name=="SofaArm" or part.Name=="CoffeeTable" then part.CanCollide=false end
+ end
  for _,motor in ipairs(C3.kirill:GetDescendants()) do if motor:IsA("Motor6D") then C3.kirillPose[motor]=motor.C0 end end
  C2.SitRig(C3.kirill)
  local phone=item("KirillPhone",Vector3.new(0.7,0.1,1.3),Vector3.new(-176,18.6,-18.5),C(35,65,91),Enum.Material.Glass); light(phone,C(105,150,195),6,0.4)
@@ -813,6 +853,8 @@ function C3.Intro()
  CutsceneRE:FireAllClients("reveal"); task.wait(1.1)
  local factory,neuro,assistant,screen=C3.BuildVillain()
  focusStreaming(neuro.Head.Position); prepareView(neuro.Head.Position)
+ -- A high exterior establishing shot shows the factory embedded in a lit city, never against an empty void.
+ cameraPlan(C3.Pos(-340,166,1880),C3.Pos(-310,142,1925),C3.Pos(0,26,2280),2.5,74,64); task.wait(2.5)
  -- Start wide on the production floor, then push in to the two villains at the command dais.
  cameraPlan(neuro.Head.Position+Vector3.new(-42,22,-56),neuro.Head.Position+Vector3.new(-34,16,-44),neuro.Head.Position+Vector3.new(14,9,38),2.8,72,62)
  task.wait(1.4)
@@ -885,7 +927,8 @@ function C3.Intro()
  -- city street and tower in one readable composition.
  cameraPlan(C3.Pos(-178,9,0),C3.Pos(-175,8,0),C3.Pos(-50,3,0),1.1,68,60)
  C3.Say(C3.party[1]:GetAttribute("Hero")=="Artem" and "Артём" or "Демид","Эммм, что это было?",3)
- C3.Say("Демид","Чекни в окно.",3)
+ local windowGuide=C3.coop and "Демид" or (C3.party[1]:GetAttribute("Hero")=="Artem" and "Демид" or "Артём")
+ C3.Say(windowGuide,"Чекни в окно.",3)
  -- Then a true eye-level shot from each hero, aimed at the mast's center rather
  -- than a distant camera position; the transparent reticle will not darken it.
  focusStreaming(C3.Pos(960,150,0)); prepareView(C3.Pos(960,150,0))
@@ -991,7 +1034,7 @@ function C3.Intro()
  FadeRE:FireAllClients(true,""); task.wait(0.7)
  C3.MoveParty(C3.Pos(-35,4,0),C3.Pos(100,4,0)); focusStreaming(C3.Pos(50,5,0)); prepareView(C3.Pos(50,5,0))
  C3.Scene(false); CutsceneRE:FireAllClients("reveal"); MusicRE:FireAllClients("intro")
- factory:Destroy(); C3.Activate(1)
+ factory:Destroy(); C3.factory=nil; C3.Activate(1)
 end
 function C3.ClearMobs()
  for m in pairs(C3.mobs) do if m.Parent then m:Destroy() end end; C3.mobs={}
@@ -1166,7 +1209,7 @@ function C3.Activate(index)
   C3.Say("Артём","Снаружи не пробить. Сервисный вход подключён к внутренней сети. Поднимаемся к управляющему терминалу и гасим её изнутри.",6)
   C3.Scene(false)
  end
- C3.Send(); C3.Wave(z)
+ C3.Send(); C3.Wave(z); C3.gameplayStarted=true
 end
 function C3.CompleteObjective(p,z)
  if C3.stage~=z.index or not z.cleared or z.objective then return end
@@ -1329,7 +1372,7 @@ function C3.Tick(dt)
 end
 function C3.Start(party)
  assert(ServerStorage:FindFirstChild("silv3r_candy"),"Missing original Kirill model")
- C3.active=true; C3.finished=false; C3.serial+=1; C3.party=table.clone(party); C3.coop=#party>1; C3.mobs={}; C3.connections={}; C3.lastStateSignature=nil; C3.lastStateSent=nil; C3.sprint={}; C3.relays=0; C3.key=false; C3.shieldSeen=false; C3.hackPhase=1; C3.hackSerial=0; C3.shots={}; C3.recovering={}; C3.towerOff=false; C3.reinforcementSeen=false; C3.modules={}; C3.collecting=false; C3.confirmUntil=nil; C3.confirmPlayer=nil; C3.hacker=nil; C3.challenge=nil; C3.stage=1
+ C3.active=true; C3.finished=false; C3.serial+=1; C3.party=table.clone(party); C3.coop=#party>1; C3.mobs={}; C3.connections={}; C3.lastStateSignature=nil; C3.lastStateSent=nil; C3.sprint={}; C3.relays=0; C3.key=false; C3.shieldSeen=false; C3.hackPhase=1; C3.hackSerial=0; C3.shots={}; C3.recovering={}; C3.towerOff=false; C3.reinforcementSeen=false; C3.gameplayStarted=false; C3.recoveryAttempts=0; C3.modules={}; C3.collecting=false; C3.confirmUntil=nil; C3.confirmPlayer=nil; C3.hacker=nil; C3.challenge=nil; C3.stage=1
  C2.originals={}; Players.RespawnTime=999999
  local physics=game:GetService("PhysicsService"); pcall(function() physics:RegisterCollisionGroup("C2Enemy") end); physics:CollisionGroupSetCollidable("C2Enemy","C2Enemy",false)
  clearLevel(); newFolders(); C3.ApplyLighting(); C3.Build()
@@ -1337,9 +1380,29 @@ function C3.Start(party)
   if not p.Character then p:LoadCharacter() end
   p.Character:WaitForChild("HumanoidRootPart"); p:SetAttribute("Chapter",3); c2Hero(p); c2Grant(p,2); C3.sprint[p]={held=false,energy=100}; C3.BindDeath(p)
  end
- C3.Intro()
+ local function recoverChapter(reason)
+  C3.recoveryAttempts+=1
+  warn("[Chapter3] Recovering playable chapter after scene/tick error #"..C3.recoveryAttempts..": "..tostring(reason))
+  if C3.recoveryAttempts>2 then error(reason) end
+  NotifyRE:FireAllClients("Сбой сценического перехода устранён. Глава продолжается с контрольной точки.",5)
+  C3.Scene(false); C3.CloseHack(); C3.ClearMobs()
+  if C3.factory and C3.factory.Parent then C3.factory:Destroy() end; C3.factory=nil
+  if C3.buddy and C3.buddy.Parent then C3.buddy:Destroy() end; C3.buddy=nil
+  FadeRE:FireAllClients(false,""); CutsceneRE:FireAllClients("reveal")
+  local resume=C3.gameplayStarted and (C3.checkpoint or C3.stage) or 1
+  resume=math.clamp(resume or 1,1,10)
+  C3.MoveParty(C3.zones[resume].start,C3.zones[resume].center)
+  C3.Activate(resume)
+ end
+ local introOk,introError=xpcall(C3.Intro,debug.traceback)
+ if not introOk then recoverChapter(introError)
+ elseif not C3.gameplayStarted then recoverChapter("intro ended without activating the first playable wave") end
  local last=os.clock()
- while C3.active and not C3.finished do local now=os.clock(); C3.Tick(math.min(now-last,0.5)); last=now; task.wait(0.25) end
+ while C3.active and not C3.finished do
+  local now=os.clock(); local ok,err=xpcall(function() C3.Tick(math.min(now-last,0.5)) end,debug.traceback); last=now
+  if not ok then recoverChapter(err) end
+  task.wait(0.25)
+ end
 end
 C3RE.OnServerEvent:Connect(function(p,action,token,value)
  if not C3.Valid(p) then return end

@@ -20,6 +20,9 @@ for feature in ('silv3r_candy','TransformationCapsule','SuspendedClone','Factory
 assert 'Эммм, что это было?' in chapter and 'Чекни в окно.' in chapter
 assert 'Lighting.ClockTime=22.15' in chapter and 'Lighting.Brightness=1.25' in chapter and 'bloom.Intensity=0.12' in chapter
 assert 'LEDStreetLampHead' in world and 'WarmStreetLamp' in world and 'NTyanArmoredTransport' in chapter
+assert 'NeuroFactoryCityBackdrop' in world and 'DistantLitWindow' in world and 'C3.Pos(-340,166,1880)' in chapter
+assert 'C3.sceneCollision[piece]=piece.CanCollide' in chapter and 'part.Name=="SofaSeat"' in world
+assert 'local windowGuide=C3.coop and "Демид"' in chapter and 'recoverChapter(introError)' in chapter
 assert 'function C3.TowerReinforcement()' in chapter and 'Поднимайте захваченный отряд НТЯН' in chapter
 assert 'Дуговой карабин' in Path('src/ModuleScript_0.luau').read_text() and 'Enum.KeyCode.Six' in client
 assert 'ShieldResonanceShell' in world and 'ShieldEnergyArc' in world and 'C3.shieldParts' in chapter

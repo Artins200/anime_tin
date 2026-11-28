@@ -85,8 +85,27 @@ function C3.Room(parent,name,center,size)
  return room
 end
 function C3.BuildVillain()
- local m=Instance.new("Model"); m.Name="NeuroMegafactory"; m.Parent=C3.map
+ local m=Instance.new("Model"); m.Name="NeuroMegafactory"; m.Parent=C3.map; C3.factory=m
  local o=C3.Pos(0,0,2200)
+ -- Separate, distant urban skyline behind the factory establishes that the plant stands in a real city.
+ local skyline=Instance.new("Model"); skyline.Name="NeuroFactoryCityBackdrop"; skyline.Parent=C3.map
+ local asphalt=C3.Part(skyline,"FactoryDistrictRoad",Vector3.new(980,1,150),C3.Pos(0,-0.7,2200),C(37,44,55),Enum.Material.Asphalt); asphalt.CanCollide=false
+ for block=-5,5 do
+  local x=block*112
+  if math.abs(x)>190 then
+   local height=52+((block*block+block*13)%7)*13
+   for _,z in ipairs({1920,2495}) do
+    local building=C3.Part(skyline,"DistantCityTower",Vector3.new(76,height,44),C3.Pos(x,height/2,z),C(39+math.abs(block)%3*7,52,70),Enum.Material.Concrete)
+    building.CanCollide=false
+    for floor=1,math.floor(height/12) do
+     local window=C3.Part(skyline,"DistantLitWindow",Vector3.new(62,1.6,0.18),C3.Pos(x,floor*12,z-22),floor%3==0 and C(218,176,111) or C(87,133,163),Enum.Material.Glass)
+     window.CanCollide=false; window.CanTouch=false; window.CanQuery=false
+    end
+    local crown=C3.Part(skyline,"DistantRoofBeacon",Vector3.new(1.4,2.4,1.4),C3.Pos(x,height+1.2,z),C(224,66,72),Enum.Material.Neon)
+    crown.CanCollide=false; light(crown,C(244,75,72),18,0.35)
+   end
+  end
+ end
  local dark=C(43,49,57); local steel=C(75,83,91); local trim=C(108,116,120)
  -- A complete, human-scale factory bay: continuous floor, four enclosing walls,
  -- roof and visible structural ribs. The old version showed an open black void.
@@ -352,6 +371,10 @@ function C3.BuildHome()
  item("KirillHeadphones",Vector3.new(2,0.55,2),Vector3.new(-168,18.9,-16),C(38,45,50),Enum.Material.Metal)
  C3.kirill=secretActor(h,"silv3r_candy","Кирилл",CFrame.lookAt(C3.Pos(-184,15.2,-15),C3.Pos(-184,18,-8)))
  C3.kirill:SetAttribute("ProtectedCivilian",true); C3.kirillPose={}
+ -- Keep authored cutscene paths clear: the low sofa and coffee table are visible props, not blockers.
+ for _,part in ipairs(h:GetDescendants()) do
+  if part.Name=="SofaSeat" or part.Name=="SofaBack" or part.Name=="SofaArm" or part.Name=="CoffeeTable" then part.CanCollide=false end
+ end
  for _,motor in ipairs(C3.kirill:GetDescendants()) do if motor:IsA("Motor6D") then C3.kirillPose[motor]=motor.C0 end end
  C2.SitRig(C3.kirill)
  local phone=item("KirillPhone",Vector3.new(0.7,0.1,1.3),Vector3.new(-176,18.6,-18.5),C(35,65,91),Enum.Material.Glass); light(phone,C(105,150,195),6,0.4)
