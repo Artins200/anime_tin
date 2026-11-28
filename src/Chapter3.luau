@@ -79,7 +79,12 @@ function C3.Send(force)
 end
 function C3.Protected(fn)
  local ok,err=xpcall(fn,debug.traceback)
- if not ok then warn("[Chapter3] "..tostring(err)); C3.Stop(); returnToMenu() end
+ if not ok then
+  warn("[Chapter3] "..tostring(err))
+  local detail=tostring(err):match("^[^\n]+") or "Unknown server error"
+  NotifyRE:FireAllClients("Сбой главы III: "..detail,12)
+  C3.Stop(); returnToMenu()
+ end
 end
 function C3.Stop()
  C3.active=false; C3.serial+=1; C3.RestoreLighting()
