@@ -83,6 +83,7 @@ function C3.Protected(fn)
   warn("[Chapter3] "..tostring(err))
   local detail=tostring(err):match("^[^\n]+") or "Unknown server error"
   NotifyRE:FireAllClients("Сбой главы III: "..detail,12)
+  task.wait(4) -- Keep the exact server error visible before the fallback menu loads.
   C3.Stop(); returnToMenu()
  end
 end
