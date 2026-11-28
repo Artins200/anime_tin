@@ -14,10 +14,10 @@ function C3.ApplyLighting()
  C3.lightingSaved={}
  for _,key in ipairs({"Ambient","OutdoorAmbient","Brightness","ClockTime","ExposureCompensation","FogStart","FogEnd","EnvironmentDiffuseScale","EnvironmentSpecularScale"}) do C3.lightingSaved[key]=Lighting[key] end
  C3.effectsSaved={density=atm.Density,haze=atm.Haze,color=atm.Color,contrast=cc.Contrast,saturation=cc.Saturation,tint=cc.TintColor,brightness=cc.Brightness,bloom=bloom.Intensity}
- Lighting.Ambient=C(155,164,181); Lighting.OutdoorAmbient=C(173,183,198); Lighting.Brightness=2.4; Lighting.ClockTime=14.2; Lighting.ExposureCompensation=.2
- Lighting.FogStart=500; Lighting.FogEnd=20000; Lighting.EnvironmentDiffuseScale=0.65; Lighting.EnvironmentSpecularScale=0.4
- atm.Density=0.06; atm.Haze=0.35; atm.Color=C(210,224,238)
- cc.Contrast=0.01; cc.Saturation=-0.03; cc.TintColor=C(255,255,255); cc.Brightness=0; bloom.Intensity=0.03
+ Lighting.Ambient=C(128,135,145); Lighting.OutdoorAmbient=C(145,151,160); Lighting.Brightness=1.65; Lighting.ClockTime=14.2; Lighting.ExposureCompensation=-0.12
+ Lighting.FogStart=500; Lighting.FogEnd=20000; Lighting.EnvironmentDiffuseScale=0.48; Lighting.EnvironmentSpecularScale=0.28
+ atm.Density=0.07; atm.Haze=0.42; atm.Color=C(196,204,211)
+ cc.Contrast=0.02; cc.Saturation=-0.1; cc.TintColor=C(248,247,241); cc.Brightness=-0.015; bloom.Intensity=0
 end
 function C3.RestoreLighting()
  if not C3.lightingSaved then return end
@@ -165,29 +165,78 @@ end
 function C3.BuildVillain()
  local m=Instance.new("Model"); m.Name="NeuroMegafactory"; m.Parent=C3.map
  local o=C3.Pos(0,0,2200)
- C3.Part(m,"ObservationFloor",Vector3.new(140,1,70),o,C(37,43,53),Enum.Material.Metal)
- C3.Part(m,"ObservationRoof",Vector3.new(140,1,70),o+Vector3.new(0,26,0),C(26,30,40))
- local screen=C3.Part(m,"RuinsBroadcast",Vector3.new(30,17,1),o+Vector3.new(-20,11,20),C(12,20,31))
- local gui=Instance.new("SurfaceGui"); gui.Face=Enum.NormalId.Front; gui.CanvasSize=Vector2.new(800,450); gui.Parent=screen
- local view=Instance.new("ViewportFrame"); view.Size=UDim2.fromScale(1,1); view.BackgroundColor3=C(20,29,43); view.Ambient=C(170,175,185); view.Parent=gui
+ local dark=C(43,49,57); local steel=C(75,83,91); local trim=C(108,116,120)
+ -- A complete, human-scale factory bay: continuous floor, four enclosing walls,
+ -- roof and visible structural ribs. The old version showed an open black void.
+ C3.Part(m,"FactoryFloor",Vector3.new(300,1,280),o+Vector3.new(0,-0.5,105),C(61,65,68),Enum.Material.Concrete)
+ C3.Part(m,"FactoryCeiling",Vector3.new(300,1,280),o+Vector3.new(0,52,105),C(42,47,52),Enum.Material.Metal)
+ C3.Part(m,"FactoryLeftWall",Vector3.new(1,52,280),o+Vector3.new(-150,26,105),dark,Enum.Material.Concrete)
+ C3.Part(m,"FactoryRightWall",Vector3.new(1,52,280),o+Vector3.new(150,26,105),dark,Enum.Material.Concrete)
+ C3.Part(m,"FactoryRearWall",Vector3.new(300,52,1),o+Vector3.new(0,26,245),dark,Enum.Material.Concrete)
+ C3.Part(m,"FactoryFrontLeft",Vector3.new(132,52,1),o+Vector3.new(-84,26,-35),dark,Enum.Material.Concrete)
+ C3.Part(m,"FactoryFrontRight",Vector3.new(132,52,1),o+Vector3.new(84,26,-35),dark,Enum.Material.Concrete)
+ C3.Part(m,"FactoryEntryLintel",Vector3.new(36,8,1),o+Vector3.new(0,48,-35),steel,Enum.Material.Metal)
+ for x=-120,120,40 do
+  C3.Part(m,"FactoryRib",Vector3.new(1.4,50,1.4),o+Vector3.new(x,25,110),trim,Enum.Material.Metal)
+  C3.Part(m,"CeilingBeam",Vector3.new(2,1.2,280),o+Vector3.new(x,50.5,105),steel,Enum.Material.Metal)
+ end
+ for z=0,220,44 do
+  C3.Part(m,"SideSupportLeft",Vector3.new(3,50,2),o+Vector3.new(-146,25,z),steel,Enum.Material.Metal)
+  C3.Part(m,"SideSupportRight",Vector3.new(3,50,2),o+Vector3.new(146,25,z),steel,Enum.Material.Metal)
+ end
+ -- Large wall display with an actual miniature of the ruined chapter-II base.
+ local screen=C3.Part(m,"RuinsBroadcast",Vector3.new(48,25,0.8),o+Vector3.new(0,22,238),C(17,22,27),Enum.Material.SmoothPlastic)
+ local gui=Instance.new("SurfaceGui"); gui.Face=Enum.NormalId.Front; gui.CanvasSize=Vector2.new(1000,520); gui.LightInfluence=0.45; gui.Parent=screen
+ local view=Instance.new("ViewportFrame"); view.Size=UDim2.fromScale(1,1); view.BackgroundColor3=C(25,30,34); view.Ambient=C(145,148,145); view.LightColor=C(190,185,165); view.Parent=gui
  local world=Instance.new("WorldModel"); world.Parent=view
- for k=1,18 do local p=C3.Part(world,"MiniBaseRuin",Vector3.new(4+k%3,2+k%5,9),Vector3.new((k%5-2)*9,0,math.floor(k/5)*9),C(63,65,70)); p.CFrame*=CFrame.Angles(0,k,0.15*k) end
- local camera=Instance.new("Camera"); camera.CFrame=CFrame.lookAt(Vector3.new(45,40,-45),Vector3.new(0,3,10)); camera.Parent=view; view.CurrentCamera=camera
- for row=0,5 do
-  C3.Part(m,"MegafactoryConveyor",Vector3.new(360,2,9),o+Vector3.new(0,-8,70+row*24),C(44,53,65),Enum.Material.Metal)
-  for k=0,23 do
-   local pos=o+Vector3.new(-170+k*15,-3,70+row*24)
-   local shell=C3.Part(m,"TransformationCapsule",Vector3.new(5,11,5),pos,C(53,99,109),Enum.Material.Glass); shell.Transparency=0.6
-   C3.Part(m,"SuspendedFigure",Vector3.new(2,4,1),pos,C(104,111,133))
-   local head=C3.Part(m,"FigureHead",Vector3.new(1.5,1.4,1.4),pos+Vector3.new(0,2.8,0),C(177,167,165)); head.Shape=Enum.PartType.Ball
+ local ground=Instance.new("Part"); ground.Anchored=true; ground.Size=Vector3.new(100,1,100); ground.Position=Vector3.new(0,-1,0); ground.Color=C(48,51,53); ground.Material=Enum.Material.Concrete; ground.Parent=world
+ for k=1,18 do
+  local x=(k%5-2)*15; local z=math.floor(k/5)*14-18
+  local ruin=Instance.new("Part"); ruin.Anchored=true; ruin.Size=Vector3.new(8+(k%3)*2,3+(k%4)*2,7); ruin.Position=Vector3.new(x,1,z); ruin.Color=C(67,68,65); ruin.Material=Enum.Material.Concrete; ruin.CFrame*=CFrame.Angles(0,k*0.21,0); ruin.Parent=world
+  local beam=Instance.new("Part"); beam.Anchored=true; beam.Size=Vector3.new(1,8,1); beam.Position=Vector3.new(x+3,3,z-2); beam.Color=C(89,82,72); beam.Material=Enum.Material.Metal; beam.CFrame*=CFrame.Angles(0,0,math.rad(k%2==0 and 12 or -12)); beam.Parent=world
+ end
+ local camera=Instance.new("Camera"); camera.CFrame=CFrame.lookAt(Vector3.new(58,42,-64),Vector3.new(0,2,0)); camera.Parent=view; view.CurrentCamera=camera
+
+ -- Four restrained conveyor lines, industrial frames, and upright, complete
+ -- R6 clone rigs inside clear glass vats; no floating cubes or arbitrary tilt.
+ for row=1,4 do
+  local z=116+(row-1)*27
+  C3.Part(m,"ConveyorBed",Vector3.new(270,0.65,9),o+Vector3.new(0,0.55,z),C(54,61,66),Enum.Material.Metal)
+  C3.Part(m,"ConveyorRail",Vector3.new(270,1.1,0.45),o+Vector3.new(0,1.2,z-4.7),trim,Enum.Material.Metal)
+  C3.Part(m,"ConveyorRail",Vector3.new(270,1.1,0.45),o+Vector3.new(0,1.2,z+4.7),trim,Enum.Material.Metal)
+  for col=1,8 do
+   local x=-112+(col-1)*32; local center=o+Vector3.new(x,5.3,z)
+   local shell=C3.Part(m,"TransformationCapsule",Vector3.new(9,6.2,6.2),center,C(104,116,119),Enum.Material.Glass)
+   shell.Shape=Enum.PartType.Cylinder; shell.CFrame*=CFrame.Angles(0,0,math.rad(90)); shell.Transparency=0.76; shell.CanCollide=false; shell.CanTouch=false; shell.CanQuery=false
+   for _,capY in ipairs({0,8.8}) do
+    local cap=C3.Part(m,"CapsuleRoundedEnd",Vector3.new(6.2,2,6.2),o+Vector3.new(x,capY,z),C(104,116,119),Enum.Material.Glass)
+    cap.Shape=Enum.PartType.Ball; cap.Transparency=0.8; cap.CanCollide=false; cap.CanTouch=false; cap.CanQuery=false
+   end
+   for _,side in ipairs({-1,1}) do
+    local brace=C3.Part(m,"CapsuleFrame",Vector3.new(0.35,8.4,0.35),o+Vector3.new(x+side*3.35,5,z),trim,Enum.Material.Metal); brace.CanCollide=false
+   end
+   local cloneCfg=table.clone(Types.Pistol); cloneCfg.Name="Заготовка клона"; cloneCfg.Gun=false; cloneCfg.Male=false
+   cloneCfg.Skin=C(177+(col%3)*5,158+(row%2)*5,148); cloneCfg.Hair=C(74,80,82); cloneCfg.Eye=C(92,111,113)
+   cloneCfg.Shirt=C(97,105,108); cloneCfg.Skirt=C(66,73,77); cloneCfg.Legs=C(58,63,66); cloneCfg.Accent=C(112,126,127)
+   local clone=buildRig(cloneCfg,CFrame.new(o+Vector3.new(x,3.15,z))); clone.Name="SuspendedClone"; clone.Parent=m; anchorAll(clone)
+   for _,piece in ipairs(clone:GetDescendants()) do if piece:IsA("BasePart") then piece.CanCollide=false; piece.CanTouch=false; piece.CanQuery=false end end
+   local hum=clone:FindFirstChildOfClass("Humanoid"); if hum then hum.DisplayDistanceType=Enum.HumanoidDisplayDistanceType.None; hum.HealthDisplayType=Enum.HumanoidHealthDisplayType.AlwaysOff end
   end
  end
- for k=0,11 do C3.Part(m,"DistantProductionBlock",Vector3.new(95,80,100),o+Vector3.new(-400+k*80,20,350+k%2*80),C(35,46,61)) end
- for _,offset in ipairs({Vector3.new(-23,13,-2),Vector3.new(4,13,-4),Vector3.new(-15,17,17)}) do C3.Lamp(m,o+offset,42,2.5,"CinematicKeyLight") end
- local cfg=table.clone(Types.Neuro); cfg.Name=ANDROID_NAME
- local neuro=buildRig(cfg,CFrame.lookAt(o+Vector3.new(-15,3.5,5),screen.Position)); neuro.Parent=m; enhanceNeuroCyber(neuro); anchorAll(neuro)
- cfg=table.clone(Types.Pistol); cfg.Name="Тян C-3B1"; cfg.Male=false
- local assistant=buildRig(cfg,CFrame.lookAt(o+Vector3.new(9,3.5,2),o+Vector3.new(-15,3.5,5))); assistant.Parent=m; c2Dress(assistant,false); anchorAll(assistant)
+ -- Low-key amber work lights, mounted to the ceiling instead of glowing props.
+ for _,pos in ipairs({Vector3.new(-110,47,30),Vector3.new(0,47,95),Vector3.new(110,47,165)}) do C3.Lamp(m,o+pos,42,0.75,"FactoryWorkLight") end
+ -- The camera-side control deck remains uncluttered so characters read clearly.
+ local neuroPos=o+Vector3.new(-25,3.15,76); local assistantPos=o+Vector3.new(18,3.15,82)
+ local function faceLevel(position,target)
+  return CFrame.lookAt(position,Vector3.new(target.X,position.Y,target.Z))
+ end
+ local cfg=table.clone(Types.Neuro); cfg.Name=ANDROID_NAME; cfg.Gun=false
+ cfg.Hair=C(46,151,157); cfg.Eye=C(101,177,178); cfg.Accent=C(78,137,143); cfg.Shirt=C(28,32,38); cfg.Skirt=C(17,21,26)
+ local neuro=buildRig(cfg,faceLevel(neuroPos,screen.Position)); neuro.Parent=m; anchorAll(neuro)
+ local chest=C3.Part(neuro,"NeuroChestPlate",Vector3.new(1.45,1.1,0.12),neuro.Torso.Position+neuro.Torso.CFrame.LookVector*0.56,C(64,83,89),Enum.Material.Metal); chest.CanCollide=false
+ local assistantCfg=table.clone(Types.Pistol); assistantCfg.Name="Тян C-3B1"; assistantCfg.Male=false; assistantCfg.Gun=false
+ assistantCfg.Hair=C(75,85,92); assistantCfg.Eye=C(89,132,139); assistantCfg.Shirt=C(49,58,66); assistantCfg.Skirt=C(47,52,60)
+ local assistant=buildRig(assistantCfg,faceLevel(assistantPos,neuroPos)); assistant.Parent=m; c2Dress(assistant,false); anchorAll(assistant)
  return m,neuro,assistant,screen
 end
 function C3.BuildHome()
@@ -502,7 +551,13 @@ end
 -- END CHAPTER THREE WORLD
 function C3.MoveParty(position,look)
  for i,p in ipairs(C3.party) do
-  local r=C3.Root(p); if r then p.Character:PivotTo(CFrame.lookAt(position+Vector3.new(0,0,(i-1)*4),look)); r.AssemblyLinearVelocity=Vector3.zero end
+  local r=C3.Root(p)
+  if r then
+   local slotPosition=position+Vector3.new(0,0,(i-1)*4)
+   local flatLook=Vector3.new(look.X,slotPosition.Y,look.Z)
+   if (flatLook-slotPosition).Magnitude<0.001 then flatLook=slotPosition+Vector3.new(0,0,-1) end
+   p.Character:PivotTo(CFrame.lookAt(slotPosition,flatLook,Vector3.yAxis)); r.AssemblyLinearVelocity=Vector3.zero
+  end
  end
 end
 function C3.Intro()
@@ -529,7 +584,8 @@ function C3.Intro()
  C3RE:FireAllClients("signal"); ShakeRE:FireAllClients(2); task.wait(2)
  for i,p in ipairs(C3.party) do if C3.Root(p) then tweenCharTo(p.Character,CFrame.lookAt(C3.Pos(-153,4,(i-1)*5),C3.Pos(960,100,0)),1.5) end end
  CutsceneRE:FireAllClients("pov",C3.beacon,65)
- C3.Say("Демид","Ты это слышал?! Что там происходит?",3)
+ C3.Say(C3.party[1]:GetAttribute("Hero")=="Artem" and "Артём" or "Демид","Эммм, что это было?",3)
+ C3.Say("Демид","Чекни в окно.",3)
  focusStreaming(C3.Pos(960,103,0)); prepareView(C3.Pos(960,103,0))
  C3RE:FireAllClients("binocular",true)
  CutsceneRE:FireAllClients("cam",{cf=CFrame.lookAt(C3.Pos(-153,6,0),C3.Pos(960,103,0)),fov=7,time=1.4}); task.wait(3)

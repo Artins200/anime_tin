@@ -14,8 +14,11 @@ assert 'selectedChapter=selectedChapter%3+1' in client
 assert '(data.chapter==2 or data.chapter==3) and data.chapter or 1' in server
 assert 'C3.Protected(function() C3.Start(party) end)' in server
 assert 'if plr:GetAttribute("Chapter")==3 then if c3Attack' in server
-for feature in ('silv3r_candy','TransformationCapsule','SuspendedFigure','TowerStair','StairwellPartition','KirillRoomDoor','InvulnerableTowerShield','HardwareBreaker','ModuleCase'):
+for feature in ('silv3r_candy','TransformationCapsule','SuspendedClone','FactoryLeftWall','FactoryRightWall','FactoryRearWall','TowerStair','StairwellPartition','KirillRoomDoor','InvulnerableTowerShield','HardwareBreaker','ModuleCase'):
     assert feature in world
+assert 'Эммм, что это было?' in chapter and 'Чекни в окно.' in chapter
+assert 'Lighting.Brightness=1.65' in chapter and 'bloom.Intensity=0' in chapter
+assert 'CFrame.lookAt(slotPosition,flatLook,Vector3.yAxis)' in chapter
 assert 'SingularityLandmark' in world and 'Chapter3CityBackdrop' in world
 assert 'C3_CollisionAndGameplay' in world and 'TowerStairGate' in world
 assert 'Landmark geometry is a non-colliding visual shell' in world
