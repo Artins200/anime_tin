@@ -79,10 +79,6 @@ do
    hud.Enabled=true; flash.BackgroundTransparency=0.65; TweenService:Create(flash,TweenInfo.new(0.8),{BackgroundTransparency=1}):Play()
    local s=new("Sound",{SoundId="rbxasset://sounds/electronicpingshort.wav",Volume=0.18,PlaybackSpeed=1.2},SoundService); s:Play(); Debris:AddItem(s,2); return
   end
-  if action=="nonlethal" then
-   hitmark.TextColor3=Color3.fromRGB(100,220,170); hitmark.TextTransparency=0
-   TweenService:Create(hitmark,TweenInfo.new(0.3),{TextTransparency=1}):Play(); return
-  end
   if action=="grab" then -- local damage feedback
    flash.BackgroundColor3=Color3.fromRGB(145,65,70); flash.BackgroundTransparency=0.85; TweenService:Create(flash,TweenInfo.new(0.5),{BackgroundTransparency=1}):Play(); return
   end

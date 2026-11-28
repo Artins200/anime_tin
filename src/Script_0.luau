@@ -288,7 +288,7 @@ local function enhanceNeuroCyber(neuro)
 end
 
 ------------------------------------------------------------------ РЭГДОЛЛ NPC
-local function ragdoll(m)
+local function ragdoll(m, emitSparks)
 	local dir = m:GetAttribute("LastDir") or Vector3.new(0, 0, 0)
 	local force = math.max(m:GetAttribute("LastKnock") or 10, 12)
 	local torso = m:FindFirstChild("Torso")
@@ -312,7 +312,7 @@ local function ragdoll(m)
 			p:ApplyImpulse((dir * force + Vector3.new(0, force * 0.3, 0)) * p.AssemblyMass)
 		end
 	end
-	if torso then
+	if torso and emitSparks~=false then
 		local pe = Instance.new("ParticleEmitter")
 		pe.Color = ColorSequence.new(C(255,200,80)); pe.LightEmission = 1; pe.Size = NumberSequence.new(0.35, 0)
 		pe.Lifetime = NumberRange.new(0.4, 0.9); pe.Speed = NumberRange.new(15, 35); pe.SpreadAngle = Vector2.new(180, 180)
@@ -3424,27 +3424,10 @@ function C3.RestoreLighting()
  atm.Density=e.density; atm.Haze=e.haze; atm.Color=e.color; cc.Contrast=e.contrast; cc.Saturation=e.saturation; cc.TintColor=e.tint; cc.Brightness=e.brightness; bloom.Intensity=e.bloom
  C3.lightingSaved=nil; C3.effectsSaved=nil
 end
-function C3.ProtectCivilian(model,hum)
- model:SetAttribute("Enemy",false); model:SetAttribute("ProtectedCivilian",true)
+function C3.PrepareCapturedCivilian(model,hum)
+ model:SetAttribute("Enemy",true); model:SetAttribute("CapturedCivilian",true)
  hum.BreakJointsOnDeath=false; hum.HealthDisplayType=Enum.HumanoidHealthDisplayType.AlwaysOff
- hum:SetStateEnabled(Enum.HumanoidStateType.Dead,false)
- local field=Instance.new("ForceField"); field.Name="NonlethalProtection"; field.Visible=false; field.Parent=model
- table.insert(C3.connections,hum.HealthChanged:Connect(function(health)
-  if model.Parent and health<hum.MaxHealth then hum.Health=hum.MaxHealth end
- end))
-end
-function C3.Suppress(model,e,player,amount)
- if e.down then return end
- e.suppression=math.min(100,(e.suppression or 0)+amount); e.stun=os.clock()+2
- e.hum.Health=e.hum.MaxHealth
- if e.suppression>=80 then
-  e.down=true; e.hum:MoveTo(e.root.Position); e.hum.WalkSpeed=0; e.hum.Sit=true
-  e.root.Anchored=true; C2.SitRig(model)
-  model:SetAttribute("SubduedAlive",true)
-  for _,p in ipairs(model:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide=false end end
-  NotifyRE:FireClient(player,"Гражданин обезврежен. Жив, помощь будет оказана.",3)
- end
- C3RE:FireClient(player,"nonlethal",{subdued=e.down,progress=e.suppression})
+ hum:SetStateEnabled(Enum.HumanoidStateType.Dead,true)
 end
 function C3.Valid(player)
  return C3.active and not C3.finished and table.find(C3.party,player)~=nil and player.Parent~=nil
@@ -3949,6 +3932,35 @@ function C3.Build()
   local label=Instance.new("TextLabel"); label.Size=UDim2.fromScale(1,1); label.BackgroundTransparency=1; label.Text=text; label.TextColor3=C(238,241,236); label.TextStrokeTransparency=0.6; label.Font=Enum.Font.GothamBold; label.TextScaled=true; label.Parent=gui
   return plate
  end
+ local function buildSedan(x,z,paint,heading)
+  local model=Instance.new("Model"); model.Name="CitySedan"; model.Parent=C3.backdrop
+  local basis=CFrame.new(C3.Pos(x,0,z))*CFrame.Angles(0,math.rad(heading or 0),0)
+  local function part(name,size,offset,color,material,rotation)
+   local p=C3.Part(model,name,size,C3.Pos(x,0,z)+Vector3.zero,color,material)
+   p.CFrame=basis*CFrame.new(offset)*(rotation or CFrame.new())
+   p.CanTouch=false; return p
+  end
+  part("SedanLowerBody",Vector3.new(11.8,1.45,5.3),Vector3.new(0,1.35,0),paint,Enum.Material.Metal)
+  part("SedanHood",Vector3.new(3.9,0.5,5.15),Vector3.new(-3.7,2.05,0),paint,Enum.Material.Metal)
+  part("SedanTrunk",Vector3.new(2.7,0.55,5.1),Vector3.new(4.25,1.95,0),paint,Enum.Material.Metal)
+  part("SedanCabin",Vector3.new(5.4,1.65,4.25),Vector3.new(-0.25,2.63,0),paint,Enum.Material.Metal)
+  part("FrontWindshield",Vector3.new(0.16,1.35,4.05),Vector3.new(-2.8,2.65,0),C(63,104,123),Enum.Material.Glass,CFrame.Angles(0,0,math.rad(-13))).Transparency=0.16
+  part("RearWindshield",Vector3.new(0.16,1.2,4.0),Vector3.new(2.15,2.65,0),C(59,96,113),Enum.Material.Glass,CFrame.Angles(0,0,math.rad(13))).Transparency=0.18
+  for _,side in ipairs({-1,1}) do
+   part("SedanSideGlass",Vector3.new(3.7,1.1,0.1),Vector3.new(-0.3,2.68,side*2.15),C(66,110,129),Enum.Material.Glass).Transparency=0.2
+   part("SedanDoorHandle",Vector3.new(0.55,0.1,0.08),Vector3.new(0.75,1.85,side*2.68),C(174,179,178),Enum.Material.Metal)
+   for _,wheelX in ipairs({-3.7,3.65}) do
+    local wheel=part("SedanTire",Vector3.new(0.72,1.48,1.48),Vector3.new(wheelX,0.78,side*2.45),C(27,31,36),Enum.Material.Rubber,CFrame.Angles(math.pi/2,0,0)); wheel.Shape=Enum.PartType.Cylinder
+    local hub=part("SedanWheelHub",Vector3.new(0.22,0.8,0.8),Vector3.new(wheelX,0.78,side*2.47),C(149,159,164),Enum.Material.Metal,CFrame.Angles(math.pi/2,0,0)); hub.Shape=Enum.PartType.Cylinder
+   end
+   local headlamp=part("SedanHeadlamp",Vector3.new(0.2,0.5,0.75),Vector3.new(-5.92,1.65,side*1.65),C(250,224,167),Enum.Material.Neon)
+   light(headlamp,C(255,226,177),10,0.4)
+   part("SedanTailLamp",Vector3.new(0.2,0.58,0.72),Vector3.new(5.92,1.62,side*1.65),C(197,54,56),Enum.Material.Neon)
+  end
+  part("SedanFrontBumper",Vector3.new(0.35,0.35,5.6),Vector3.new(-6.05,0.85,0),C(113,122,127),Enum.Material.Metal)
+  part("SedanRearBumper",Vector3.new(0.35,0.35,5.6),Vector3.new(6.05,0.85,0),C(113,122,127),Enum.Material.Metal)
+  return model
+ end
 
  -- Continuous segmented road and kerbs; every physical part stays below 256 studs.
  for segment=0,4 do
@@ -3957,7 +3969,7 @@ function C3.Build()
   for _,side in ipairs({-1,1}) do
    streetPart("RaisedCurb",Vector3.new(202.5,0.8,2),center,0,side*43,C(157,158,154),Enum.Material.Concrete)
    streetPart("ContinuousSidewalk",Vector3.new(202.5,0.5,11),center,0.05,side*49,C(111,116,121),Enum.Material.Concrete)
-   streetPart("StreetEdgeWall",Vector3.new(202.5,8,1),center,4,side*104,C(55,63,76),Enum.Material.Concrete)
+   streetPart("StreetEdgeKerb",Vector3.new(202.5,2.4,1),center,1.2,side*104,C(55,63,76),Enum.Material.Concrete)
   end
  end
  for _,side in ipairs({-1,1}) do
@@ -3973,22 +3985,51 @@ function C3.Build()
   end
  end
 
- -- A restrained skyline and ten readable street fronts, not blank wall slabs.
+ -- Close-packed street fronts. Wide connected façades replace isolated slabs and gaps.
  for block=1,10 do
   local x=-35+(block-1)*95
-  local height=30+(block*17)%38
+  local height=38+(block*17)%34
   for _,side in ipairs({-1,1}) do
    local z=side*82
-   local facadeColor=block%3==0 and C(59,76,91) or block%3==1 and C(89,83,78) or C(68,81,91)
-   streetPart("BlockFacade",Vector3.new(72,height,22),x,height/2,z,facadeColor,Enum.Material.Concrete)
-   streetPart("RoofCornice",Vector3.new(75,0.9,24),x,height+0.45,z,C(39,48,61),Enum.Material.Metal)
-   streetPart("StorefrontBase",Vector3.new(58,7,0.35),x,3.7,z-side*11.2,C(33,48,59),Enum.Material.Glass)
-   for floor=1,math.floor(height/10) do
-    streetPart("LitWindowBand",Vector3.new(59,3.2,0.2),x,8+floor*9,z-side*11.25,block%4==0 and C(206,173,111) or C(100,150,168),Enum.Material.Glass)
-    streetPart("WindowDivider",Vector3.new(0.35,4.2,0.25),x,8+floor*9,z-side*11.4,C(43,54,67),Enum.Material.Metal)
+   local facadeColor=block%3==0 and C(59,76,91) or block%3==1 and C(79,75,72) or C(68,81,91)
+   streetPart("BlockFacade",Vector3.new(97,height,24),x,height/2,z,facadeColor,Enum.Material.Concrete)
+   streetPart("RoofCornice",Vector3.new(99,0.8,25),x,height+0.4,z,C(39,48,61),Enum.Material.Metal)
+   streetPart("StorefrontBase",Vector3.new(82,7,0.3),x,3.7,z-side*12.2,C(33,48,59),Enum.Material.Glass)
+   for floor=1,math.floor((height-10)/13) do
+    streetPart("LitWindowBand",Vector3.new(78,3.3,0.18),x,10+floor*12,z-side*12.25,block%4==0 and C(206,173,111) or C(100,150,168),Enum.Material.Glass)
    end
-   streetPart("RoofVent",Vector3.new(8,2.5,5),x-18,height+1.6,z,C(43,54,67),Enum.Material.Metal)
-   streetPart("FacadeAwnings",Vector3.new(61,0.6,4),x,7.6,z-side*13,C(119,84,72),Enum.Material.Fabric)
+  end
+ end
+
+ -- Two orderly rear rows and a continuous urban ground plane close the horizon without prop clutter.
+ local outerGround=C3.Part(C3.backdrop,"OuterCityGround",Vector3.new(1100,0.8,540),C3.Pos(440,-0.3,0),C(47,55,62),Enum.Material.Concrete); outerGround.CanCollide=false
+ for row=1,2 do
+  local sideDepth=row==1 and 144 or 222
+  local stride=row==1 and 112 or 132
+  local width=row==1 and 116 or 136
+  local firstX=row==1 and -90 or -120
+  local index=0
+  for x=firstX,970,stride do
+   index+=1
+   local h= row==1 and (55+(index*19)%36) or (82+(index*23)%58)
+   for _,side in ipairs({-1,1}) do
+    local z=side*sideDepth
+    local shell=C3.Part(C3.backdrop,row==1 and "MidgroundBuilding" or "FarNeighborhoodBuilding",Vector3.new(width,h,30),C3.Pos(x,h/2,z),row==1 and C(51+index%3*5,63,78) or C(39+index%3*5,50,67),Enum.Material.Concrete)
+    shell.CanCollide=false
+    for floor=1,math.floor(h/15) do
+     local band=C3.Part(C3.backdrop,"BackgroundWindowBand",Vector3.new(width-12,2.1,0.16),C3.Pos(x,floor*15,z-side*15.1),floor%4==0 and C(203,168,107) or C(83,128,151),Enum.Material.Glass)
+     band.CanCollide=false; band.CanTouch=false; band.CanQuery=false
+    end
+   end
+  end
+ end
+ -- A restrained line of trees sits in the setback between the foreground blocks and rear streets.
+ for _,side in ipairs({-1,1}) do
+  for n=0,19 do
+   local x=-92+n*52; local z=side*112
+   local trunk=C3.Part(C3.backdrop,"BoulevardTreeTrunk",Vector3.new(1.1,7,1.1),C3.Pos(x,3.5,z),C(92,72,56),Enum.Material.Wood); trunk.CanCollide=false
+   local crown=C3.Part(C3.backdrop,"BoulevardTreeCanopy",Vector3.new(7.5,8,7.5),C3.Pos(x,10,z),n%3==0 and C(49,90,75) or C(58,105,83),Enum.Material.Grass)
+   crown.Shape=Enum.PartType.Ball; crown.CanCollide=false; crown.CanTouch=false; crown.CanQuery=false
   end
  end
 
@@ -4008,10 +4049,7 @@ function C3.Build()
   for _,side in ipairs({-1,1}) do
    streetPart("RouteBarrier",Vector3.new(34,5,2),x+side*42,2.5,side*31,C(184,139,72),Enum.Material.Metal)
   end
-  local car=streetPart("WreckedCar",Vector3.new(12,3.4,6),x-8,1.7,i%2==0 and 25 or -27,C(48,55,68),Enum.Material.Metal)
-  car.CFrame*=CFrame.Angles(0,math.rad(i%2==0 and 13 or -17),0)
-  local lamp=streetPart("WreckBeacon",Vector3.new(0.4,0.4,0.4),x-8,3.5,i%2==0 and 25 or -27,C(217,91,69),Enum.Material.Neon); lamp.CanCollide=false
-  C3.Lamp(C3.backdrop,C3.Pos(x,9,0),35,1.3,"DistrictFill")
+  buildSedan(x-8,i%2==0 and 25 or -27,({C(55,88,117),C(102,83,68),C(73,103,91),C(114,64,65),C(79,87,103)})[i],i%2==0 and 4 or -7)
   local z={index=i,center=C3.Pos(x,4,0),start=C3.Pos(x-62,4,0),exit=C3.Pos(x+67,4,0),wave=0,rounds=i==3 and 3 or 2,cleared=false,objective=false,covers={}}
   C3.zones[i]=z -- Register the five street stages before the tower's stages 6-10.
   z.gate=streetPart("DistrictGate",Vector3.new(1,12,82),x+78,6,0,C(57,78,99),Enum.Material.Metal)
@@ -4032,35 +4070,11 @@ function C3.Build()
   C3.Prompt(med,"Аптечка",function(p) if not used[p] then local _,hum=C3.Root(p); if hum then hum.Health=math.min(hum.MaxHealth,hum.Health+65); used[p]=true; med.Color=C(82,91,96) end end end)
  end
 
- -- District signatures: pocket park, market awnings, elevated road, glass offices, plaza barricades.
- for _,x in ipairs({45,105}) do
-  local trunk=streetPart("ParkTreeTrunk",Vector3.new(1.4,7,1.4),x,3.5,-34,C(93,72,56),Enum.Material.Wood)
-  local crown=streetPart("ParkTreeCanopy",Vector3.new(10,9,10),x,9,-34,C(58,123,91),Enum.Material.Grass); crown.Shape=Enum.PartType.Ball; crown.CanCollide=false
- end
- for _,x in ipairs({220,275,330}) do
-  streetPart("MarketAwning",Vector3.new(17,0.8,7),x,8,-34,C(192,94,77),Enum.Material.Fabric)
-  streetPart("MarketCounter",Vector3.new(13,3,3),x,1.5,-31,C(103,76,58),Enum.Material.Wood)
- end
- streetPart("OverpassDeck",Vector3.new(74,2,76),430,17,0,C(78,87,98),Enum.Material.Concrete)
- for _,x in ipairs({400,460}) do for _,side in ipairs({-1,1}) do streetPart("OverpassPier",Vector3.new(5,17,6),x,8.5,side*31,C(81,90,101),Enum.Material.Concrete) end end
+ -- A restrained glass office frontage anchors the corporate district; the other blocks stay clean and readable.
  for _,side in ipairs({-1,1}) do
   for _,x in ipairs({570,640}) do
-   local t=streetPart("NTyanOffice",Vector3.new(24,54,21),x,27,side*77,C(68,100,120),Enum.Material.Glass); t.Transparency=0.12
-   streetPart("OfficeRoofBeacon",Vector3.new(2,3,2),x,55,side*77,C(208,60,70),Enum.Material.Neon)
-  end
- end
- for _,x in ipairs({744,815}) do
-  streetPart("PlazaSearchlight",Vector3.new(0.7,12,0.7),x,6,-33,C(69,81,99),Enum.Material.Metal)
-  local beacon=streetPart("PlazaBeacon",Vector3.new(2,0.3,2),x,12,-33,C(221,82,79),Enum.Material.Neon); beacon.CanCollide=false
- end
-
- -- Readable distant skyline, deliberately behind the combat corridor.
- for block=1,9 do
-  local x=-50+block*112; local h=48+(block*19)%75
-  for _,side in ipairs({-1,1}) do
-   local z=side*155
-   streetPart("FarSkylineTower",Vector3.new(66,h,42),x,h/2,z,C(45+block%3*8,56,76),Enum.Material.Concrete)
-   for floor=1,math.floor(h/14) do streetPart("FarWindowStrip",Vector3.new(54,1.1,0.15),x,floor*14,z-side*21.1,C(111,147,161),Enum.Material.Glass) end
+   local t=streetPart("NTyanOffice",Vector3.new(34,60,26),x,30,side*82,C(68,100,120),Enum.Material.Glass); t.Transparency=0.12; t.CanCollide=false
+   streetPart("OfficeRoofBeacon",Vector3.new(1.4,2,1.4),x,61,side*82,C(208,60,70),Enum.Material.Neon)
   end
  end
 
@@ -4260,14 +4274,11 @@ function C3.Intro()
  CutsceneRE:FireAllClients("reveal"); task.wait(1.1)
  local factory,neuro,assistant,screen=C3.BuildVillain()
  focusStreaming(neuro.Head.Position); prepareView(neuro.Head.Position)
- -- A high exterior establishing shot shows the factory embedded in a lit city, never against an empty void.
- cameraPlan(C3.Pos(-340,166,1880),C3.Pos(-310,142,1925),C3.Pos(0,26,2280),2.5,74,64); task.wait(2.5)
- -- Start wide on the production floor, then push in to the two villains at the command dais.
- cameraPlan(neuro.Head.Position+Vector3.new(-42,22,-56),neuro.Head.Position+Vector3.new(-34,16,-44),neuro.Head.Position+Vector3.new(14,9,38),2.8,72,62)
- task.wait(1.4)
- cameraPlan(neuro.Head.Position+Vector3.new(-9,2,-16),neuro.Head.Position+Vector3.new(-6,1,-10),neuro.Head.Position,1.8,60,52)
+ -- Begin at eye level with Neuro already speaking; the first frame also reads the clone floor and control dais.
+ cameraPlan(neuro.Head.Position+Vector3.new(-27,9,-34),neuro.Head.Position+Vector3.new(-20,7,-28),neuro.Head.Position+Vector3.new(12,3,27),1.25,70,62)
  CutsceneRE:FireAllClients("reveal")
  C3.Say(ANDROID_NAME,"Они уничтожили один из наших незначительных заводов... Это даже потерей тяжело назвать. Скоро весь мир покроется нашими рядами, и всё будет по нашим правилам. Идеальное общество, всё будет замечательно. Но хватит разговоров — пора действовать",12)
+ cameraPlan(neuro.Head.Position+Vector3.new(-8,2,-15),neuro.Head.Position+Vector3.new(-5,1,-11),neuro.Head.Position,1.1,58,52)
  local neuroPivot=neuro:GetPivot()
  local assistantFocus=Vector3.new(assistant.Head.Position.X,neuroPivot.Position.Y,assistant.Head.Position.Z)
  moveModel(neuro,CFrame.lookAt(neuroPivot.Position,assistantFocus,Vector3.yAxis),0.8)
@@ -4410,21 +4421,33 @@ function C3.Intro()
  )
  focusStreaming(C3.Pos(-184,18,-14)); prepareView(C3.Pos(-184,18,-14))
  local kirillRevealFocus=C3.kirill.Head.Position+Vector3.new(2,0,2)
- cameraPlan(C3.Pos(-204,24,-22),C3.Pos(-200,23,-21),kirillRevealFocus,1.2,64,58)
+ cameraPlan(C3.Pos(-205,22,-23),C3.Pos(-201,21,-20),kirillRevealFocus,1.8,62,54)
  CutsceneRE:FireAllClients("reveal")
  C3.Say("Кирилл","Тянки... тянки...",3)
  for motor,cf in pairs(C3.kirillPose) do if motor.Parent then motor.C0=cf end end
- for _=1,4 do for _,m in ipairs(C3.kirill:GetDescendants()) do if m:IsA("Motor6D") and m.Part0 and m.Part1 then m.Part1.CFrame=m.Part0.CFrame*m.C0*m.C1:Inverse() end end end
- moveModel(C3.kirill,C3.kirill:GetPivot()+Vector3.new(0,0.8,0),1)
- for _,side in ipairs({-1,1}) do
-  local eye=C3.Part(C3.kirill,"HypnotizedEye",Vector3.new(0.2,0.13,0.08),Vector3.zero,C(235,35,35),Enum.Material.Neon); eye.CanCollide=false
-  eye.CFrame=C3.kirill.Head.CFrame*CFrame.new(side*0.4,0,-0.55); light(eye,C(255,35,35),4,0.4)
+ for _=1,4 do for _,motor in ipairs(C3.kirill:GetDescendants()) do if motor:IsA("Motor6D") and motor.Part0 and motor.Part1 then motor.Part1.CFrame=motor.Part0.CFrame*motor.C0*motor.C1:Inverse() end end end
+ local kirillNeck=C3.kirill:FindFirstChild("Neck",true)
+ if kirillNeck and C3.kirillPose[kirillNeck] then
+  TweenService:Create(kirillNeck,TweenInfo.new(0.9,Enum.EasingStyle.Sine,Enum.EasingDirection.Out),{C0=C3.kirillPose[kirillNeck]*CFrame.Angles(math.rad(-10),0,0)}):Play()
  end
+ moveModel(C3.kirill,C3.kirill:GetPivot()+Vector3.new(0,0.45,0),1.2)
+ local hypnoticLights={}
+ for _,side in ipairs({-1,1}) do
+  local eye=C3.Part(C3.kirill,"HypnotizedEye",Vector3.new(0.2,0.13,0.08),C3.kirill.Head.Position,C(235,35,35),Enum.Material.Neon)
+  eye.CanCollide=false; eye.CanTouch=false; eye.CanQuery=false; eye.Anchored=false
+  eye.CFrame=C3.kirill.Head.CFrame*CFrame.new(side*0.4,0,-0.55)
+  local weld=Instance.new("WeldConstraint"); weld.Part0=C3.kirill.Head; weld.Part1=eye; weld.Parent=eye
+  local glow=light(eye,C(255,35,48),5,0.8); table.insert(hypnoticLights,glow)
+ end
+ cameraPlan(C3.kirill.Head.Position+Vector3.new(-1,0.4,-2),C3.kirill.Head.Position+Vector3.new(-0.5,0.2,-1.4),C3.kirill.Head.Position,0.8,42,38)
+ for _,glow in ipairs(hypnoticLights) do TweenService:Create(glow,TweenInfo.new(0.55,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,3,true),{Brightness=2.2,Range=8}):Play() end
  C3.Say(ANDROID_NAME,"Устранить Артёма и Демида.",3)
  local kirillPivot=C3.kirill:GetPivot()
  local heroRoot=C3.Root(C3.party[1])
  local threatPosition=heroRoot and heroRoot.Position or C3.Pos(-190,18,-12)
- moveModel(C3.kirill,CFrame.lookAt(kirillPivot.Position,Vector3.new(threatPosition.X,kirillPivot.Position.Y,threatPosition.Z),Vector3.yAxis),0.8)
+ cameraPlan(C3.Pos(-178,22,-21),C3.Pos(-181,21,-18),C3.kirill.Head.Position,1.1,58,50)
+ moveModel(C3.kirill,CFrame.lookAt(kirillPivot.Position,Vector3.new(threatPosition.X,kirillPivot.Position.Y,threatPosition.Z),Vector3.yAxis),1.05)
+ cameraPlan(C3.Pos(-194,20,-6),C3.Pos(-191,19,-8),C3.Pos(-185,18,-12),1.2,58,52)
  moveModel(C3.kirill,C3.kirill:GetPivot()+Vector3.new(0,0,4),2.5,true)
  C3.Say(C3.party[1]:GetAttribute("Hero")=="Artem" and "Артём" or "Демид","Ладно, только без летального исхода, мы не будем его бить, ок? Просто уходим!",5)
  TweenService:Create(C3.kirillDoor,TweenInfo.new(0.65),{CFrame=C3.doorClosed}):Play(); task.wait(0.7)
@@ -4452,11 +4475,43 @@ function C3.Nearest(pos)
  return best,dist
 end
 function C3.Spawn(stage,pos,civilian,elite,k)
- local cfg=table.clone(Types.Pistol); cfg.Male=civilian; if civilian then cfg.Gun=false end; cfg.Name=civilian and "Под сигналом" or elite and "Элитная охрана" or "Патруль"
- cfg.Hair=civilian and C(65+k*9,48,37) or C(62,43,87); cfg.Shirt=civilian and C(80+k*8,72,67) or elite and C(55,40,72) or C(45,62,85)
+ local cfg=table.clone(Types.Pistol)
+ local citizenStyles={
+  {male=false,skin=C(238,198,172),hair=C(92,54,48),shirt=C(169,103,88),skirt=C(52,62,83),legs=C(38,43,55),accent=C(219,184,128)},
+  {male=true,skin=C(204,160,128),hair=C(58,43,38),shirt=C(72,112,139),skirt=C(42,53,66),legs=C(36,42,50),accent=C(196,151,101)},
+  {male=false,skin=C(230,187,158),hair=C(60,72,96),shirt=C(105,139,121),skirt=C(67,53,77),legs=C(49,54,62),accent=C(218,197,159)},
+  {male=true,skin=C(187,143,115),hair=C(111,80,54),shirt=C(160,133,91),skirt=C(55,57,63),legs=C(44,47,53),accent=C(191,180,151)},
+  {male=false,skin=C(245,207,183),hair=C(151,107,70),shirt=C(143,106,151),skirt=C(70,53,86),legs=C(51,47,64),accent=C(224,190,153)},
+  {male=true,skin=C(214,177,145),hair=C(40,43,47),shirt=C(131,85,80),skirt=C(53,48,48),legs=C(38,42,48),accent=C(201,175,143)},
+ }
+ local style=civilian and citizenStyles[(k-1)%#citizenStyles+1] or nil
+ cfg.Male=style and style.male or false; cfg.Gun=not civilian
+ cfg.Name=civilian and (style.male and "Захваченный житель" or "Захваченная жительница") or elite and "Элитная охрана" or "Патруль"
+ cfg.Skin=style and style.skin or cfg.Skin
+ cfg.Hair=style and style.hair or C(62,43,87); cfg.Shirt=style and style.shirt or elite and C(55,40,72) or C(45,62,85)
+ cfg.Skirt=style and style.skirt or cfg.Skirt; cfg.Legs=style and style.legs or cfg.Legs; cfg.Accent=style and style.accent or cfg.Accent
+ cfg.Eye=civilian and C(235,74,83) or cfg.Eye; cfg.HP=civilian and 92 or cfg.HP
  local m,h,r,j=buildRig(cfg,CFrame.new(pos)); m.Parent=C3.map
  if not civilian then c2Dress(m,false) end
- c2Mobilize(m,h,r); h.MaxHealth=civilian and 80 or (elite and 310 or 85)*(C3.coop and 1.4 or 1); h.Health=h.MaxHealth; h.WalkSpeed=civilian and 9 or elite and 11 or 13
+ c2Mobilize(m,h,r); h.MaxHealth=civilian and 92 or (elite and 310 or 85)*(C3.coop and 1.4 or 1); h.Health=h.MaxHealth; h.WalkSpeed=civilian and 9 or elite and 11 or 13
+ if civilian then
+  C3.PrepareCapturedCivilian(m,h)
+  local torso=m:FindFirstChild("Torso"); local head=m:FindFirstChild("Head")
+  local function citizenDetail(base,name,size,offset,color,material)
+   local part=Instance.new("Part"); part.Name=name; part.Size=size; part.Color=color; part.Material=material or Enum.Material.SmoothPlastic
+   part.Anchored=false; part.CanCollide=false; part.CanTouch=false; part.CanQuery=false; part.Massless=true; part.CFrame=base.CFrame*offset; part.Parent=m
+   local weld=Instance.new("WeldConstraint"); weld.Part0=base; weld.Part1=part; weld.Parent=part
+   return part
+  end
+  citizenDetail(torso,"EverydayJacketCollar",Vector3.new(1.35,0.24,0.16),CFrame.new(0,0.72,-0.54),style.accent)
+  citizenDetail(torso,"EverydayJacketPlacket",Vector3.new(0.12,1.25,0.12),CFrame.new(0,0.05,-0.57),style.accent)
+  citizenDetail(torso,"CitizenIDTag",Vector3.new(0.32,0.25,0.08),CFrame.new(0.58,0.35,-0.56),C(210,198,157),Enum.Material.Metal)
+  if k%2==0 then citizenDetail(torso,"EverydayShoulderBag",Vector3.new(0.8,1.05,0.45),CFrame.new(-0.7,-0.2,0.52),C(59,73,82),Enum.Material.Fabric) end
+  for _,side in ipairs({-1,1}) do
+   local eye=citizenDetail(head,"HypnoticRedEye",Vector3.new(0.12,0.16,0.07),CFrame.new(side*0.4,0.04,-0.55),C(255,71,79),Enum.Material.Neon)
+   light(eye,C(255,58,68),3,0.35)
+  end
+ end
  if elite then
   cfg.Armor=C(56,67,80)
   local function armor(name,size,offset,color,material)
@@ -4470,11 +4525,15 @@ function C3.Spawn(stage,pos,civilian,elite,k)
   armor("NTyanRedVisor",Vector3.new(1.25,0.18,0.12),CFrame.new(0,1.55,-0.68),C(236,76,75),Enum.Material.Neon)
   for _,side in ipairs({-1,1}) do armor("NTyanShoulderGuard",Vector3.new(0.5,0.65,1.1),CFrame.new(side*1.15,0.35,0),C(71,86,99)) end
  end
- m:SetAttribute("Enemy",not civilian)
- if civilian then C3.ProtectCivilian(m,h) end
+ m:SetAttribute("Enemy",true)
  local e={stage=stage,hum=h,root=r,civilian=civilian,down=false,last=0,stun=0,joints=j,base={},pathAt=0,waypoints={},waypoint=1,tactic=k%3,cover=C3.zones[stage].covers[(k-1)%2+1]}
  for name,motor in pairs(j) do e.base[name]=motor.C0 end; C3.mobs[m]=e
- if not civilian then table.insert(C3.connections,h.Died:Connect(function() e.down=true; ragdoll(m); Debris:AddItem(m,12) end)) end
+ table.insert(C3.connections,h.Died:Connect(function()
+  if e.down then return end
+  e.down=true; h.WalkSpeed=0
+  if civilian then for _,piece in ipairs(m:GetDescendants()) do if piece:IsA("BasePart") and piece.Name~="HumanoidRootPart" then piece.CanCollide=true end end end
+  ragdoll(m,not civilian); Debris:AddItem(m,12)
+ end))
  local serial=C3.serial
  task.spawn(function()
   while C3.active and C3.serial==serial and m.Parent and h.Health>0 and not e.down do
@@ -4830,18 +4889,12 @@ c3Attack=function(p,name,origin,direction,charge)
  -- Kirill and the tower never enter the damage registry. Shield is not an HP pool.
  local model=hit.Instance:FindFirstAncestorOfClass("Model"); local e=model and C3.mobs[model]
  if not e or e.down or e.hum.Health<=0 then return end
- if e.civilian then
-  if name~="Fists" then tracer(origin,hit.Position,C(90,195,220)) end
-  C3.Suppress(model,e,p,name=="Fists" and 50 or 35)
-  return -- no death marker, TakeDamage, ragdoll or corpse cleanup for civilians
- else
-  if name~="Fists" then tracer(origin,hit.Position,w.Color) end
-  local damage=name=="Fists" and (p:GetAttribute("Hero")=="Artem" and 25 or 48) or w.Damage*(name=="Shotgun" and 5 or 1)
-  if name=="Rifle" then local c=typeof(charge)=="number" and charge==charge and math.clamp(charge,0,1) or 0; damage=45+235*c end
-  if hit.Instance.Name=="Head" then damage*=1.5 end
-  if name=="Fists" then e.stun=os.clock()+1 end
-  e.hum:TakeDamage(damage)
- end
+ if name~="Fists" then tracer(origin,hit.Position,w.Color) end
+ local damage=name=="Fists" and (p:GetAttribute("Hero")=="Artem" and 25 or 48) or w.Damage*(name=="Shotgun" and 5 or 1)
+ if name=="Rifle" then local c=typeof(charge)=="number" and charge==charge and math.clamp(charge,0,1) or 0; damage=45+235*c end
+ if hit.Instance.Name=="Head" then damage*=1.5 end
+ if name=="Fists" then e.stun=os.clock()+1 end
+ e.hum:TakeDamage(damage)
  HitRE:FireClient(p,e.down or e.hum.Health<=0)
 end
 

@@ -410,6 +410,35 @@ function C3.Build()
   local label=Instance.new("TextLabel"); label.Size=UDim2.fromScale(1,1); label.BackgroundTransparency=1; label.Text=text; label.TextColor3=C(238,241,236); label.TextStrokeTransparency=0.6; label.Font=Enum.Font.GothamBold; label.TextScaled=true; label.Parent=gui
   return plate
  end
+ local function buildSedan(x,z,paint,heading)
+  local model=Instance.new("Model"); model.Name="CitySedan"; model.Parent=C3.backdrop
+  local basis=CFrame.new(C3.Pos(x,0,z))*CFrame.Angles(0,math.rad(heading or 0),0)
+  local function part(name,size,offset,color,material,rotation)
+   local p=C3.Part(model,name,size,C3.Pos(x,0,z)+Vector3.zero,color,material)
+   p.CFrame=basis*CFrame.new(offset)*(rotation or CFrame.new())
+   p.CanTouch=false; return p
+  end
+  part("SedanLowerBody",Vector3.new(11.8,1.45,5.3),Vector3.new(0,1.35,0),paint,Enum.Material.Metal)
+  part("SedanHood",Vector3.new(3.9,0.5,5.15),Vector3.new(-3.7,2.05,0),paint,Enum.Material.Metal)
+  part("SedanTrunk",Vector3.new(2.7,0.55,5.1),Vector3.new(4.25,1.95,0),paint,Enum.Material.Metal)
+  part("SedanCabin",Vector3.new(5.4,1.65,4.25),Vector3.new(-0.25,2.63,0),paint,Enum.Material.Metal)
+  part("FrontWindshield",Vector3.new(0.16,1.35,4.05),Vector3.new(-2.8,2.65,0),C(63,104,123),Enum.Material.Glass,CFrame.Angles(0,0,math.rad(-13))).Transparency=0.16
+  part("RearWindshield",Vector3.new(0.16,1.2,4.0),Vector3.new(2.15,2.65,0),C(59,96,113),Enum.Material.Glass,CFrame.Angles(0,0,math.rad(13))).Transparency=0.18
+  for _,side in ipairs({-1,1}) do
+   part("SedanSideGlass",Vector3.new(3.7,1.1,0.1),Vector3.new(-0.3,2.68,side*2.15),C(66,110,129),Enum.Material.Glass).Transparency=0.2
+   part("SedanDoorHandle",Vector3.new(0.55,0.1,0.08),Vector3.new(0.75,1.85,side*2.68),C(174,179,178),Enum.Material.Metal)
+   for _,wheelX in ipairs({-3.7,3.65}) do
+    local wheel=part("SedanTire",Vector3.new(0.72,1.48,1.48),Vector3.new(wheelX,0.78,side*2.45),C(27,31,36),Enum.Material.Rubber,CFrame.Angles(math.pi/2,0,0)); wheel.Shape=Enum.PartType.Cylinder
+    local hub=part("SedanWheelHub",Vector3.new(0.22,0.8,0.8),Vector3.new(wheelX,0.78,side*2.47),C(149,159,164),Enum.Material.Metal,CFrame.Angles(math.pi/2,0,0)); hub.Shape=Enum.PartType.Cylinder
+   end
+   local headlamp=part("SedanHeadlamp",Vector3.new(0.2,0.5,0.75),Vector3.new(-5.92,1.65,side*1.65),C(250,224,167),Enum.Material.Neon)
+   light(headlamp,C(255,226,177),10,0.4)
+   part("SedanTailLamp",Vector3.new(0.2,0.58,0.72),Vector3.new(5.92,1.62,side*1.65),C(197,54,56),Enum.Material.Neon)
+  end
+  part("SedanFrontBumper",Vector3.new(0.35,0.35,5.6),Vector3.new(-6.05,0.85,0),C(113,122,127),Enum.Material.Metal)
+  part("SedanRearBumper",Vector3.new(0.35,0.35,5.6),Vector3.new(6.05,0.85,0),C(113,122,127),Enum.Material.Metal)
+  return model
+ end
 
  -- Continuous segmented road and kerbs; every physical part stays below 256 studs.
  for segment=0,4 do
@@ -418,7 +447,7 @@ function C3.Build()
   for _,side in ipairs({-1,1}) do
    streetPart("RaisedCurb",Vector3.new(202.5,0.8,2),center,0,side*43,C(157,158,154),Enum.Material.Concrete)
    streetPart("ContinuousSidewalk",Vector3.new(202.5,0.5,11),center,0.05,side*49,C(111,116,121),Enum.Material.Concrete)
-   streetPart("StreetEdgeWall",Vector3.new(202.5,8,1),center,4,side*104,C(55,63,76),Enum.Material.Concrete)
+   streetPart("StreetEdgeKerb",Vector3.new(202.5,2.4,1),center,1.2,side*104,C(55,63,76),Enum.Material.Concrete)
   end
  end
  for _,side in ipairs({-1,1}) do
@@ -434,22 +463,51 @@ function C3.Build()
   end
  end
 
- -- A restrained skyline and ten readable street fronts, not blank wall slabs.
+ -- Close-packed street fronts. Wide connected façades replace isolated slabs and gaps.
  for block=1,10 do
   local x=-35+(block-1)*95
-  local height=30+(block*17)%38
+  local height=38+(block*17)%34
   for _,side in ipairs({-1,1}) do
    local z=side*82
-   local facadeColor=block%3==0 and C(59,76,91) or block%3==1 and C(89,83,78) or C(68,81,91)
-   streetPart("BlockFacade",Vector3.new(72,height,22),x,height/2,z,facadeColor,Enum.Material.Concrete)
-   streetPart("RoofCornice",Vector3.new(75,0.9,24),x,height+0.45,z,C(39,48,61),Enum.Material.Metal)
-   streetPart("StorefrontBase",Vector3.new(58,7,0.35),x,3.7,z-side*11.2,C(33,48,59),Enum.Material.Glass)
-   for floor=1,math.floor(height/10) do
-    streetPart("LitWindowBand",Vector3.new(59,3.2,0.2),x,8+floor*9,z-side*11.25,block%4==0 and C(206,173,111) or C(100,150,168),Enum.Material.Glass)
-    streetPart("WindowDivider",Vector3.new(0.35,4.2,0.25),x,8+floor*9,z-side*11.4,C(43,54,67),Enum.Material.Metal)
+   local facadeColor=block%3==0 and C(59,76,91) or block%3==1 and C(79,75,72) or C(68,81,91)
+   streetPart("BlockFacade",Vector3.new(97,height,24),x,height/2,z,facadeColor,Enum.Material.Concrete)
+   streetPart("RoofCornice",Vector3.new(99,0.8,25),x,height+0.4,z,C(39,48,61),Enum.Material.Metal)
+   streetPart("StorefrontBase",Vector3.new(82,7,0.3),x,3.7,z-side*12.2,C(33,48,59),Enum.Material.Glass)
+   for floor=1,math.floor((height-10)/13) do
+    streetPart("LitWindowBand",Vector3.new(78,3.3,0.18),x,10+floor*12,z-side*12.25,block%4==0 and C(206,173,111) or C(100,150,168),Enum.Material.Glass)
    end
-   streetPart("RoofVent",Vector3.new(8,2.5,5),x-18,height+1.6,z,C(43,54,67),Enum.Material.Metal)
-   streetPart("FacadeAwnings",Vector3.new(61,0.6,4),x,7.6,z-side*13,C(119,84,72),Enum.Material.Fabric)
+  end
+ end
+
+ -- Two orderly rear rows and a continuous urban ground plane close the horizon without prop clutter.
+ local outerGround=C3.Part(C3.backdrop,"OuterCityGround",Vector3.new(1100,0.8,540),C3.Pos(440,-0.3,0),C(47,55,62),Enum.Material.Concrete); outerGround.CanCollide=false
+ for row=1,2 do
+  local sideDepth=row==1 and 144 or 222
+  local stride=row==1 and 112 or 132
+  local width=row==1 and 116 or 136
+  local firstX=row==1 and -90 or -120
+  local index=0
+  for x=firstX,970,stride do
+   index+=1
+   local h= row==1 and (55+(index*19)%36) or (82+(index*23)%58)
+   for _,side in ipairs({-1,1}) do
+    local z=side*sideDepth
+    local shell=C3.Part(C3.backdrop,row==1 and "MidgroundBuilding" or "FarNeighborhoodBuilding",Vector3.new(width,h,30),C3.Pos(x,h/2,z),row==1 and C(51+index%3*5,63,78) or C(39+index%3*5,50,67),Enum.Material.Concrete)
+    shell.CanCollide=false
+    for floor=1,math.floor(h/15) do
+     local band=C3.Part(C3.backdrop,"BackgroundWindowBand",Vector3.new(width-12,2.1,0.16),C3.Pos(x,floor*15,z-side*15.1),floor%4==0 and C(203,168,107) or C(83,128,151),Enum.Material.Glass)
+     band.CanCollide=false; band.CanTouch=false; band.CanQuery=false
+    end
+   end
+  end
+ end
+ -- A restrained line of trees sits in the setback between the foreground blocks and rear streets.
+ for _,side in ipairs({-1,1}) do
+  for n=0,19 do
+   local x=-92+n*52; local z=side*112
+   local trunk=C3.Part(C3.backdrop,"BoulevardTreeTrunk",Vector3.new(1.1,7,1.1),C3.Pos(x,3.5,z),C(92,72,56),Enum.Material.Wood); trunk.CanCollide=false
+   local crown=C3.Part(C3.backdrop,"BoulevardTreeCanopy",Vector3.new(7.5,8,7.5),C3.Pos(x,10,z),n%3==0 and C(49,90,75) or C(58,105,83),Enum.Material.Grass)
+   crown.Shape=Enum.PartType.Ball; crown.CanCollide=false; crown.CanTouch=false; crown.CanQuery=false
   end
  end
 
@@ -469,10 +527,7 @@ function C3.Build()
   for _,side in ipairs({-1,1}) do
    streetPart("RouteBarrier",Vector3.new(34,5,2),x+side*42,2.5,side*31,C(184,139,72),Enum.Material.Metal)
   end
-  local car=streetPart("WreckedCar",Vector3.new(12,3.4,6),x-8,1.7,i%2==0 and 25 or -27,C(48,55,68),Enum.Material.Metal)
-  car.CFrame*=CFrame.Angles(0,math.rad(i%2==0 and 13 or -17),0)
-  local lamp=streetPart("WreckBeacon",Vector3.new(0.4,0.4,0.4),x-8,3.5,i%2==0 and 25 or -27,C(217,91,69),Enum.Material.Neon); lamp.CanCollide=false
-  C3.Lamp(C3.backdrop,C3.Pos(x,9,0),35,1.3,"DistrictFill")
+  buildSedan(x-8,i%2==0 and 25 or -27,({C(55,88,117),C(102,83,68),C(73,103,91),C(114,64,65),C(79,87,103)})[i],i%2==0 and 4 or -7)
   local z={index=i,center=C3.Pos(x,4,0),start=C3.Pos(x-62,4,0),exit=C3.Pos(x+67,4,0),wave=0,rounds=i==3 and 3 or 2,cleared=false,objective=false,covers={}}
   C3.zones[i]=z -- Register the five street stages before the tower's stages 6-10.
   z.gate=streetPart("DistrictGate",Vector3.new(1,12,82),x+78,6,0,C(57,78,99),Enum.Material.Metal)
@@ -493,35 +548,11 @@ function C3.Build()
   C3.Prompt(med,"Аптечка",function(p) if not used[p] then local _,hum=C3.Root(p); if hum then hum.Health=math.min(hum.MaxHealth,hum.Health+65); used[p]=true; med.Color=C(82,91,96) end end end)
  end
 
- -- District signatures: pocket park, market awnings, elevated road, glass offices, plaza barricades.
- for _,x in ipairs({45,105}) do
-  local trunk=streetPart("ParkTreeTrunk",Vector3.new(1.4,7,1.4),x,3.5,-34,C(93,72,56),Enum.Material.Wood)
-  local crown=streetPart("ParkTreeCanopy",Vector3.new(10,9,10),x,9,-34,C(58,123,91),Enum.Material.Grass); crown.Shape=Enum.PartType.Ball; crown.CanCollide=false
- end
- for _,x in ipairs({220,275,330}) do
-  streetPart("MarketAwning",Vector3.new(17,0.8,7),x,8,-34,C(192,94,77),Enum.Material.Fabric)
-  streetPart("MarketCounter",Vector3.new(13,3,3),x,1.5,-31,C(103,76,58),Enum.Material.Wood)
- end
- streetPart("OverpassDeck",Vector3.new(74,2,76),430,17,0,C(78,87,98),Enum.Material.Concrete)
- for _,x in ipairs({400,460}) do for _,side in ipairs({-1,1}) do streetPart("OverpassPier",Vector3.new(5,17,6),x,8.5,side*31,C(81,90,101),Enum.Material.Concrete) end end
+ -- A restrained glass office frontage anchors the corporate district; the other blocks stay clean and readable.
  for _,side in ipairs({-1,1}) do
   for _,x in ipairs({570,640}) do
-   local t=streetPart("NTyanOffice",Vector3.new(24,54,21),x,27,side*77,C(68,100,120),Enum.Material.Glass); t.Transparency=0.12
-   streetPart("OfficeRoofBeacon",Vector3.new(2,3,2),x,55,side*77,C(208,60,70),Enum.Material.Neon)
-  end
- end
- for _,x in ipairs({744,815}) do
-  streetPart("PlazaSearchlight",Vector3.new(0.7,12,0.7),x,6,-33,C(69,81,99),Enum.Material.Metal)
-  local beacon=streetPart("PlazaBeacon",Vector3.new(2,0.3,2),x,12,-33,C(221,82,79),Enum.Material.Neon); beacon.CanCollide=false
- end
-
- -- Readable distant skyline, deliberately behind the combat corridor.
- for block=1,9 do
-  local x=-50+block*112; local h=48+(block*19)%75
-  for _,side in ipairs({-1,1}) do
-   local z=side*155
-   streetPart("FarSkylineTower",Vector3.new(66,h,42),x,h/2,z,C(45+block%3*8,56,76),Enum.Material.Concrete)
-   for floor=1,math.floor(h/14) do streetPart("FarWindowStrip",Vector3.new(54,1.1,0.15),x,floor*14,z-side*21.1,C(111,147,161),Enum.Material.Glass) end
+   local t=streetPart("NTyanOffice",Vector3.new(34,60,26),x,30,side*82,C(68,100,120),Enum.Material.Glass); t.Transparency=0.12; t.CanCollide=false
+   streetPart("OfficeRoofBeacon",Vector3.new(1.4,2,1.4),x,61,side*82,C(208,60,70),Enum.Material.Neon)
   end
  end
 

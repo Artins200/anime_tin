@@ -20,7 +20,15 @@ for feature in ('silv3r_candy','TransformationCapsule','SuspendedClone','Factory
 assert 'Эммм, что это было?' in chapter and 'Чекни в окно.' in chapter
 assert 'Lighting.ClockTime=22.15' in chapter and 'Lighting.Brightness=1.25' in chapter and 'bloom.Intensity=0.12' in chapter
 assert 'LEDStreetLampHead' in world and 'WarmStreetLamp' in world and 'NTyanArmoredTransport' in chapter
-assert 'NeuroFactoryCityBackdrop' in world and 'DistantLitWindow' in world and 'C3.Pos(-340,166,1880)' in chapter
+assert 'function buildSedan' in world and 'SedanTire' in world and 'WreckedCar' not in world
+assert 'FarNeighborhoodBuilding' in world and 'BoulevardTreeCanopy' in world and 'StreetEdgeKerb' in world
+assert 'PrepareCapturedCivilian' in chapter and 'hum:SetStateEnabled(Enum.HumanoidStateType.Dead,true)' in chapter
+assert 'e.hum:TakeDamage(damage)' in chapter and 'ragdoll(m,not civilian)' in chapter
+assert 'SubduedAlive' not in chapter and 'NonlethalProtection' not in chapter and 'nonlethal' not in ui
+assert 'C3.ProtectCivilian' not in chapter and 'C3.Suppress' not in chapter
+assert 'NeuroFactoryCityBackdrop' in world and 'DistantLitWindow' in world
+assert 'local factory,neuro,assistant,screen=C3.BuildVillain()' in chapter and 'cameraPlan(C3.Pos(-340,166,1880)' not in chapter
+assert 'Begin at eye level with Neuro already speaking' in chapter
 assert 'C3.sceneCollision[piece]=piece.CanCollide' in chapter and 'part.Name=="SofaSeat"' in world
 assert 'CinematicIgnoreObstacles' in chapter and 'followAuthoredRoute' in server
 assert 'local windowGuide=C3.coop and "Демид"' in chapter and 'recoverChapter(introError)' in chapter
@@ -78,7 +86,7 @@ assert 'C3.map:Destroy()' in chapter and 'C3.lastStateSignature=nil' in chapter
 assert 'task.delay(0.4,function() if held[p]==started then held[p]=nil end end)' in chapter
 assert 'held[p]=nil -- every activation consumes its own hold; no replay window' in chapter
 assert 'prepareView(C3.Pos(960,150,0))' in chapter
-assert 'cfg.Gun=false' in chapter and 'e.suppression' in chapter
+assert 'cfg.Gun=not civilian' in chapter and 'C3.PrepareCapturedCivilian(m,h)' in chapter and 'C3.Suppress' not in chapter
 assert 'C3.confirmPlayer==p' in chapter and 'helperRoot.Position-C3.zones[10].breaker.Position' in chapter
 assert 'C3.relayCounted' not in chapter and 'z.relayCounted=true' in chapter
 assert 'C3.shield.CanQuery=false' in chapter
@@ -215,18 +223,17 @@ for clear=0,1 do for objective=0,1 do assert(C3.Ready({cleared=clear==1,objectiv
 print("PASS: executed role-specific relays, checkpoint idempotency and gate conjunction")
 
 C3.stage=1; C3.hacker=nil; C3.shots={}; C3.mobs={}; C3.towerOff=false
-local mob={SetAttribute=function() end,GetDescendants=function() return {} end}; local hum={Health=80,MaxHealth=80,MoveTo=function() end}; function hum:TakeDamage(d) self.Health-=d end
+local mob={SetAttribute=function() end,GetDescendants=function() return {} end}; local hum={Health=92,MaxHealth=92,MoveTo=function() end}; function hum:TakeDamage(d) self.Health=math.max(0,self.Health-d) end
 C3.mobs[mob]={hum=hum,root={Position=Vector3.zero},civilian=true,down=false,stun=0}
 local hit={Instance={Name="Head",FindFirstAncestorOfClass=function() return mob end},Position=Vector3.zero}
 workspace.Raycast=function() return hit end
 C3.shield={}; clock+=1
-c3Attack(artem,"Fists",Vector3.zero,Vector3.new(1,0,0)); clock+=1
-c3Attack(artem,"Fists",Vector3.zero,Vector3.new(1,0,0))
-assert(C3.mobs[mob].down and hum.Health==80,"civilian was killed instead of suppressed")
+for _=1,4 do c3Attack(artem,"Fists",Vector3.zero,Vector3.new(1,0,0)); clock+=1 end
+assert(hum.Health==0,"captured civilian damage did not reach lethal health")
 local kirill={}; hit.Instance.FindFirstAncestorOfClass=function() return kirill end
-clock+=1; c3Attack(artem,"Pistol",Vector3.zero,Vector3.new(1,0,0)); assert(hum.Health==80)
+clock+=1; c3Attack(artem,"Pistol",Vector3.zero,Vector3.new(1,0,0)); assert(hum.Health==0)
 assert(C3.mobs[kirill]==nil)
-print("PASS: executed nonlethal civilian suppression and exclusion of original Kirill from combat registry")
+print("PASS: executed lethal captured-civilian damage and exclusion of original Kirill from combat registry")
 
 C3.collecting=true; C3.modules={}; C3.moduleParts={{},{}}; C3.party={artem,demid}; C3.coop=true; C3.case={}
 C3.Scene=function() end; C3.Say=function() end
