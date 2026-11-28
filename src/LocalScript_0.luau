@@ -90,7 +90,7 @@ local chargeFill = new("Frame", {Size=UDim2.fromScale(0,1), BackgroundColor3=Col
 
 local slots = {}
 for i, name in ipairs(WD.Order) do
-	local f = new("TextButton", {Text="",Size=UDim2.new(0.18,0,0,40), Position=UDim2.new(0.12+(i-1)*0.19,0,1,-12), AnchorPoint=Vector2.new(0.5,1),
+	local f = new("TextButton", {Text="",Size=UDim2.new(0.15,0,0,40), Position=UDim2.new(0.09+(i-1)*0.164,0,1,-12), AnchorPoint=Vector2.new(0.5,1),
 		BackgroundColor3=Color3.fromRGB(15,15,20), BackgroundTransparency=0.2, BorderSizePixel=0}, gui)
 	local st = new("UIStroke", {Color=WD.Stats[name].Color, Thickness=1}, f)
 	local tl = new("TextLabel", {Size=UDim2.fromScale(1,1), BackgroundTransparency=1, Text=i..". "..WD.Stats[name].Display,
@@ -602,6 +602,14 @@ local GunDefs = {
 		{Vector3.new(0.15,0.15,0.3),  CFrame.new(0,0.15,-5.9),  Color3.fromRGB(255,80,200), Enum.Material.Neon},
 	}},
 }
+GunDefs.ArcCarbine={muzzle=-4.1,parts={
+ {Vector3.new(0.55,0.62,2.4),CFrame.new(0,0.1,-1.2),Color3.fromRGB(26,39,48),Enum.Material.Metal},
+ {Vector3.new(0.3,0.28,2.9),CFrame.new(0,0.28,-3.35),Color3.fromRGB(78,225,235),Enum.Material.Neon},
+ {Vector3.new(0.7,0.18,2.4),CFrame.new(0,0.56,-1.8),Color3.fromRGB(44,66,76),Enum.Material.Metal},
+ {Vector3.new(0.32,0.85,0.48),CFrame.new(0,-0.48,-0.55),Color3.fromRGB(35,51,61),Enum.Material.Metal},
+ {Vector3.new(0.8,0.45,0.65),CFrame.new(0,0.1,-3.9),Color3.fromRGB(91,240,240),Enum.Material.Neon},
+ {Vector3.new(0.2,0.9,0.6),CFrame.new(0,-0.55,-1.65),Color3.fromRGB(52,75,83),Enum.Material.Metal},
+}}
 local gunParts = {}
 for name, def in pairs(GunDefs) do
 	gunParts[name] = {}
@@ -725,7 +733,7 @@ UIS.InputBegan:Connect(function(i, gpe)
 		end
 	elseif i.KeyCode == Enum.KeyCode.E then
 		if doorPrompt.Visible then Remotes.Kick:FireServer() end
-	elseif i.KeyCode.Value >= Enum.KeyCode.One.Value and i.KeyCode.Value <= Enum.KeyCode.Five.Value then
+	elseif i.KeyCode.Value >= Enum.KeyCode.One.Value and i.KeyCode.Value <= Enum.KeyCode.Six.Value then
 		selectWeapon(WD.Order[i.KeyCode.Value - Enum.KeyCode.One.Value + 1])
 	end
 end)

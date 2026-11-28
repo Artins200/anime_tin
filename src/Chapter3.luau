@@ -14,10 +14,10 @@ function C3.ApplyLighting()
  C3.lightingSaved={}
  for _,key in ipairs({"Ambient","OutdoorAmbient","Brightness","ClockTime","ExposureCompensation","FogStart","FogEnd","EnvironmentDiffuseScale","EnvironmentSpecularScale"}) do C3.lightingSaved[key]=Lighting[key] end
  C3.effectsSaved={density=atm.Density,haze=atm.Haze,color=atm.Color,contrast=cc.Contrast,saturation=cc.Saturation,tint=cc.TintColor,brightness=cc.Brightness,bloom=bloom.Intensity}
- Lighting.Ambient=C(128,135,145); Lighting.OutdoorAmbient=C(145,151,160); Lighting.Brightness=1.65; Lighting.ClockTime=14.2; Lighting.ExposureCompensation=-0.12
- Lighting.FogStart=500; Lighting.FogEnd=20000; Lighting.EnvironmentDiffuseScale=0.48; Lighting.EnvironmentSpecularScale=0.28
- atm.Density=0.07; atm.Haze=0.42; atm.Color=C(196,204,211)
- cc.Contrast=0.02; cc.Saturation=-0.1; cc.TintColor=C(248,247,241); cc.Brightness=-0.015; bloom.Intensity=0
+ Lighting.Ambient=C(42,53,76); Lighting.OutdoorAmbient=C(28,39,61); Lighting.Brightness=1.25; Lighting.ClockTime=22.15; Lighting.ExposureCompensation=-0.08
+ Lighting.FogStart=420; Lighting.FogEnd=4200; Lighting.EnvironmentDiffuseScale=0.32; Lighting.EnvironmentSpecularScale=0.38
+ atm.Density=0.11; atm.Haze=0.72; atm.Color=C(94,119,157)
+ cc.Contrast=0.08; cc.Saturation=-0.12; cc.TintColor=C(207,218,242); cc.Brightness=-0.025; bloom.Intensity=0.12
 end
 function C3.RestoreLighting()
  if not C3.lightingSaved then return end
@@ -96,7 +96,8 @@ function C3.Scene(on)
 end
 function C3.Say(name,text,time) C2.Literal(name,text,time) end
 function C3.Prompt(part_,text,callback,hold)
- local prompt=Instance.new("ProximityPrompt"); prompt.ActionText=text; prompt.ObjectText=""; prompt.MaxActivationDistance=9; prompt.RequiresLineOfSight=true; prompt.HoldDuration=hold or 0; prompt.Parent=part_
+ local labels={SignalRelay="Ретранслятор сигнала",ObjectiveConsole="Панель управления",HardwareBreaker="Размыкатель",DeploymentDoor="Дверь подкрепления",KirillRoomDoor="Дверь комнаты Кирилла",MedicalKit="Аптечка",ControlModule="Модуль управления",MemoryModule="Модуль памяти"}
+ local prompt=Instance.new("ProximityPrompt"); prompt.ActionText=text; prompt.ObjectText=labels[part_.Name] or part_.Name:gsub("([a-z])([A-Z])","%1 %2"); prompt.KeyboardKeyCode=Enum.KeyCode.E; prompt.GamepadKeyCode=Enum.KeyCode.ButtonX; prompt.MaxActivationDistance=9; prompt.RequiresLineOfSight=true; prompt.HoldDuration=hold or 0; prompt.Parent=part_
  local held={}
  if hold then
   table.insert(C3.connections,prompt.PromptButtonHoldBegan:Connect(function(p) held[p]=os.clock() end))
@@ -116,9 +117,9 @@ end
 -- BEGIN CHAPTER THREE WORLD
 -- Geometry and physical interactions for Chapter III; embedded into Chapter3.
 function C3.Lamp(parent,pos,range,brightness,name)
- local fixture=C3.Part(parent,name or "AreaLamp",Vector3.new(3,0.25,2),pos,C(235,231,216),Enum.Material.SmoothPlastic)
- fixture.CanCollide=false; fixture.CanQuery=false
- local lamp=light(fixture,C(240,238,225),range,brightness); lamp.Shadows=false
+ local fixture=C3.Part(parent,name or "AreaLamp",Vector3.new(3,0.25,2),pos,C(244,217,163),Enum.Material.Neon)
+ fixture.CanCollide=false; fixture.CanQuery=false; fixture.CastShadow=false
+ local lamp=light(fixture,C(255,220,158),range,brightness); lamp.Shadows=false
  return fixture
 end
 function C3.Beam(parent,name,a,b,width,color)
@@ -520,7 +521,10 @@ function C3.Build()
    streetPart("LaneDash",Vector3.new(16,0.04,0.35),x,0.02,0,C(220,195,126),Enum.Material.SmoothPlastic)
    local pole=streetPart("StreetLampPole",Vector3.new(0.45,11,0.45),x,5.5,side*43,C(48,57,70),Enum.Material.Metal)
    local arm=streetPart("StreetLampArm",Vector3.new(4,0.3,0.3),x+side*1.5,10.7,side*43,C(48,57,70),Enum.Material.Metal)
-   C3.Lamp(C3.backdrop,C3.Pos(x+side*3,10.25,side*42),24,1.15,"WarmStreetLamp")
+   local head=streetPart("LEDStreetLampHead",Vector3.new(3.6,0.35,1.15),x+side*3.5,10.35,side*42,C(72,83,98),Enum.Material.Metal)
+   head.CFrame*=CFrame.Angles(0,math.rad(side*8),0)
+   local lens=streetPart("LEDStreetLampLens",Vector3.new(2.8,0.08,0.8),x+side*3.5,10.12,side*42,C(255,228,174),Enum.Material.Neon); lens.CanCollide=false
+   C3.Lamp(C3.backdrop,C3.Pos(x+side*3.5,9.98,side*42),29,1.45,"WarmStreetLamp")
   end
  end
 
@@ -635,8 +639,43 @@ function C3.Build()
  end
  C3.BuildRadioMast()
  C3.beacon=C3.Part(C3.landmark,"TowerBeacon",Vector3.new(3,2,3),C3.Pos(960,325,0),C(183,52,46),Enum.Material.SmoothPlastic); table.insert(C3.redLights,C3.beacon); light(C3.beacon,C(235,65,55),42,0.7)
- C3.shield=C3.Part(C3.landmark,"InvulnerableTowerShield",Vector3.new(155,370,155),C3.Pos(960,175,0),C(125,45,95),Enum.Material.ForceField)
- C3.shield.Shape=Enum.PartType.Ball; C3.shield.CanCollide=false; C3.shield.CanTouch=false; C3.shield.CanQuery=false; C3.shield.Transparency=0.94
+ C3.shieldParts={}
+ C3.shield=C3.Part(C3.landmark,"InvulnerableTowerShield",Vector3.new(166,382,166),C3.Pos(960,175,0),C(83,167,219),Enum.Material.ForceField)
+ C3.shield.Shape=Enum.PartType.Ball; C3.shield.CanCollide=false; C3.shield.CanTouch=false; C3.shield.CanQuery=false; C3.shield.Transparency=0.965
+ table.insert(C3.shieldParts,C3.shield)
+ for layer=1,2 do
+  local shell=C3.Part(C3.landmark,"ShieldResonanceShell",Vector3.new(166+layer*8,382+layer*8,166+layer*8),C3.Pos(960,175,0),layer==1 and C(75,177,225) or C(224,97,111),Enum.Material.ForceField)
+  shell.Shape=Enum.PartType.Ball; shell.CanCollide=false; shell.CanTouch=false; shell.CanQuery=false; shell.Transparency=layer==1 and 0.976 or 0.986
+  table.insert(C3.shieldParts,shell)
+ end
+ -- Three luminous, broken equatorial bands make the dome read at night as an active barrier.
+ for band,y in ipairs({48,175,302}) do
+  local radius=band==1 and 63 or band==2 and 83 or 63
+  for segment=0,47 do
+   local a=segment*math.pi*2/48; local b=(segment+1)*math.pi*2/48
+   local color=segment%6==0 and C(245,194,121) or band==2 and C(79,211,235) or C(108,156,235)
+   local beam=C3.Beam(C3.landmark,"ShieldEnergyArc",C3.Pos(960+math.cos(a)*radius,y,math.sin(a)*radius),C3.Pos(960+math.cos(b)*radius,y,math.sin(b)*radius),0.65,color)
+   beam.Material=Enum.Material.Neon; beam.Transparency=0.12; beam.CanCollide=false; beam.CanTouch=false; beam.CanQuery=false
+   table.insert(C3.shieldParts,beam)
+  end
+ end
+ -- Four vertical energy filaments converge around the lattice mast.
+ for quadrant=0,3 do
+  local angle=quadrant*math.pi/2+math.pi/4
+  local arc=C3.Beam(C3.landmark,"ShieldMeridian",C3.Pos(960+math.cos(angle)*72,12,math.sin(angle)*72),C3.Pos(960+math.cos(angle)*72,338,math.sin(angle)*72),0.42,C(105,215,239))
+  arc.Material=Enum.Material.Neon; arc.Transparency=0.16; arc.CanCollide=false; arc.CanTouch=false; arc.CanQuery=false
+  table.insert(C3.shieldParts,arc)
+ end
+ task.spawn(function()
+  local phase=0
+  while C3.active and C3.shield and C3.shield.Parent and not C3.towerOff do
+   phase+=0.1
+   for index,part in ipairs(C3.shieldParts) do
+    if part.Parent and part~=C3.shield and part.Name~="ShieldResonanceShell" then part.Transparency=0.08+0.18*(0.5+0.5*math.sin(phase+index*0.35)) end
+   end
+   task.wait(0.12)
+  end
+ end)
 
  -- Five walkable tower floors, each with a real stair route to the next deck.
  local floorThemes={
@@ -769,6 +808,9 @@ function C3.MoveParty(position,look)
 end
 function C3.Intro()
  C3.Scene(true); FadeRE:FireAllClients(true,"ГЛАВА III • БАШНЯ НЕЙРО-СИНГУЛЯРНОСТИ"); task.wait(1)
+ -- Establish the night-city setting before cutting into the villains' lab.
+ cameraPlan(C3.Pos(620,72,-230),C3.Pos(620,64,-220),C3.Pos(960,155,0),2.8,74,66)
+ CutsceneRE:FireAllClients("reveal"); task.wait(1.1)
  local factory,neuro,assistant,screen=C3.BuildVillain()
  focusStreaming(neuro.Head.Position); prepareView(neuro.Head.Position)
  -- Start wide on the production floor, then push in to the two villains at the command dais.
@@ -823,10 +865,14 @@ function C3.Intro()
    local zOffset=C3.coop and (i==1 and -5 or 5) or -5
    local windowPosition=C3.Pos(-153,4,zOffset)
    local windowView=CFrame.lookAt(windowPosition,C3.Pos(960,100,0),Vector3.yAxis)
-   local distance=((windowPosition-root.Position)*Vector3.new(1,0,1)).Magnitude
    local character=p.Character; local windowTarget=windowView
+   local entry=C3.Pos(-174,4,zOffset)
+   local distance=((entry-root.Position)*Vector3.new(1,0,1)).Magnitude+((windowPosition-entry)*Vector3.new(1,0,1)).Magnitude
    windowDuration=math.max(windowDuration,distance/12)
-   task.spawn(function() tweenCharTo(character,windowTarget,1.5,true,12,false,false) end)
+   task.spawn(function()
+    tweenCharTo(character,CFrame.lookAt(entry,windowPosition,Vector3.yAxis),1.5,false,12,false,false)
+    if character.Parent then tweenCharTo(character,windowTarget,1.5,false,12,false,false) end
+   end)
   end
  end
  if C3.buddy then
@@ -960,7 +1006,20 @@ function C3.Spawn(stage,pos,civilian,elite,k)
  cfg.Hair=civilian and C(65+k*9,48,37) or C(62,43,87); cfg.Shirt=civilian and C(80+k*8,72,67) or elite and C(55,40,72) or C(45,62,85)
  local m,h,r,j=buildRig(cfg,CFrame.new(pos)); m.Parent=C3.map
  if not civilian then c2Dress(m,false) end
- c2Mobilize(m,h,r); h.MaxHealth=civilian and 80 or (elite and 145 or 85)*(C3.coop and 1.4 or 1); h.Health=h.MaxHealth; h.WalkSpeed=civilian and 9 or 13
+ c2Mobilize(m,h,r); h.MaxHealth=civilian and 80 or (elite and 310 or 85)*(C3.coop and 1.4 or 1); h.Health=h.MaxHealth; h.WalkSpeed=civilian and 9 or elite and 11 or 13
+ if elite then
+  cfg.Armor=C(56,67,80)
+  local function armor(name,size,offset,color,material)
+   local part=Instance.new("Part"); part.Name=name; part.Size=size; part.Color=color or cfg.Armor; part.Material=material or Enum.Material.Metal
+   part.CanCollide=false; part.CanTouch=false; part.CanQuery=false; part.Massless=true; part.Parent=m
+   local weld=Instance.new("WeldConstraint"); weld.Part0=r; weld.Part1=part; weld.Parent=part
+   part.CFrame=r.CFrame*offset
+  end
+  armor("NTyanBallisticPlate",Vector3.new(2.35,1.6,0.44),CFrame.new(0,0.1,-0.64),C(60,76,92))
+  armor("NTyanArmoredHelmet",Vector3.new(1.7,0.55,1.35),CFrame.new(0,1.48,0),C(47,60,73))
+  armor("NTyanRedVisor",Vector3.new(1.25,0.18,0.12),CFrame.new(0,1.55,-0.68),C(236,76,75),Enum.Material.Neon)
+  for _,side in ipairs({-1,1}) do armor("NTyanShoulderGuard",Vector3.new(0.5,0.65,1.1),CFrame.new(side*1.15,0.35,0),C(71,86,99)) end
+ end
  m:SetAttribute("Enemy",not civilian)
  if civilian then C3.ProtectCivilian(m,h) end
  local e={stage=stage,hum=h,root=r,civilian=civilian,down=false,last=0,stun=0,joints=j,base={},pathAt=0,waypoints={},waypoint=1,tactic=k%3,cover=C3.zones[stage].covers[(k-1)%2+1]}
@@ -988,10 +1047,10 @@ function C3.Spawn(stage,pos,civilian,elite,k)
      if civilian and d<5 and os.clock()-e.last>2.5 then
       if not e.grabStart then e.grabStart=os.clock(); C3RE:FireClient(p,"grab")
       elseif os.clock()-e.grabStart>=0.8 then e.last=os.clock(); e.grabStart=nil; ph:TakeDamage(8); p:SetAttribute("C3GrabbedUntil",os.clock()+1); e.stun=os.clock()+1.2 end
-     elseif not civilian and d<100 and os.clock()-e.last>(elite and 1.1 or 1.65) then
+     elseif not civilian and d<100 and os.clock()-e.last>(elite and 0.95 or 1.65) then
       e.last=os.clock(); local rp=RaycastParams.new(); rp.FilterType=Enum.RaycastFilterType.Exclude; rp.FilterDescendantsInstances={m,fxFolder}
       local from=m.Head.Position; local hit=workspace:Raycast(from,pr.Position-from,rp)
-      if hit and hit.Instance:IsDescendantOf(p.Character) then tracer(from,hit.Position,C(240,170,110)); ph:TakeDamage(elite and 10 or 7) end
+      if hit and hit.Instance:IsDescendantOf(p.Character) then tracer(from,hit.Position,C(240,170,110)); ph:TakeDamage(elite and 14 or 7) end
      end
     else e.grabStart=nil end
     local angle=math.sin(os.clock()*8)*math.min(r.AssemblyLinearVelocity.Magnitude/18,0.5)
@@ -1013,13 +1072,92 @@ function C3.Wave(z)
  if serial==C3.serial then z.deploying=false end
  C3.Send()
 end
+function C3.TowerReinforcement()
+ C3.Scene(true)
+ cameraPlan(C3.Pos(836,54,-104),C3.Pos(852,50,-92),C3.Pos(938,8,0),2.2,68,60)
+ local operatorCfg=table.clone(Types.Pistol); operatorCfg.Name="Связистка НТЯН"; operatorCfg.Male=false
+ operatorCfg.Shirt=C(58,74,86); operatorCfg.Skirt=C(42,51,66); operatorCfg.Hair=C(84,101,118)
+ local operator=buildRig(operatorCfg,CFrame.lookAt(C3.Pos(876,0.5,-32),C3.Pos(920,0.5,0)))
+ operator.Parent=C3.map; c2Dress(operator,false); anchorAll(operator)
+ local phone=C3.Part(operator,"FieldRadio",Vector3.new(0.22,0.7,0.18),operator.Head.Position+Vector3.new(0.72,0.05,0),C(38,50,58),Enum.Material.Metal)
+ phone.CanCollide=false; phone.CFrame*=CFrame.Angles(0,0,math.rad(-15))
+ cameraPlan(C3.Pos(883,5,-41),C3.Pos(885,4,-38),operator.Head.Position,1.4,54,50)
+ C3.Say("Связистка НТЯН","Главная, Артём и Демид уже у башни. Приближаются быстрее прогноза. Повторяю: они почти у периметра!",6)
+ cameraPlan(C3.Pos(914,176,-190),C3.Pos(918,166,-178),C3.Pos(960,175,0),1.4,66,62)
+ C3.Say(ANDROID_NAME,"Поднимайте захваченный отряд НТЯН. Два борта идут к башне. Не дайте им войти!",5)
+ -- Two visibly constructed transports descend from above the shield perimeter.
+ local helicopters={}
+ local function buildHelicopter(startPosition)
+  local model=Instance.new("Model"); model.Name="NTyanArmoredTransport"; model.Parent=C3.map
+  local function piece(name,size,offset,color,material)
+   local part=Instance.new("Part"); part.Name=name; part.Size=size; part.Color=color; part.Material=material or Enum.Material.Metal
+   part.Anchored=true; part.CanCollide=false; part.CanTouch=false; part.CanQuery=false; part.Parent=model
+   part.CFrame=CFrame.new(startPosition+offset); return part
+  end
+  piece("ArmoredCabin",Vector3.new(12,5.2,8),Vector3.new(0,0,0),C(42,53,67))
+  local canopy=piece("CockpitGlass",Vector3.new(7.8,3.7,0.3),Vector3.new(0,0.35,-4.15),C(65,155,173),Enum.Material.Glass); canopy.Transparency=0.28
+  piece("TailBoom",Vector3.new(2.1,2.2,17),Vector3.new(0,0,12),C(49,61,73))
+  piece("TailFin",Vector3.new(1,5.2,3.4),Vector3.new(0,3,19),C(58,70,84))
+  piece("SkidLeft",Vector3.new(0.45,0.45,13),Vector3.new(-5,-3.7,0),C(100,110,117))
+  piece("SkidRight",Vector3.new(0.45,0.45,13),Vector3.new(5,-3.7,0),C(100,110,117))
+  piece("SkidSupportLeft",Vector3.new(0.4,2.2,0.4),Vector3.new(-4.3,-2.5,-2),C(100,110,117))
+  piece("SkidSupportRight",Vector3.new(0.4,2.2,0.4),Vector3.new(4.3,-2.5,-2),C(100,110,117))
+  local rotor=piece("MainRotorHub",Vector3.new(1.4,0.8,1.4),Vector3.new(0,3.2,0),C(160,172,178))
+  for blade=0,3 do
+   local angle=blade*math.pi/2
+   local b=piece("MainRotorBlade",Vector3.new(1,0.18,19),Vector3.new(math.sin(angle)*9,3.55,math.cos(angle)*9),C(40,48,56))
+   b.CFrame=CFrame.new(startPosition+Vector3.new(math.sin(angle)*9,3.55,math.cos(angle)*9))*CFrame.Angles(0,angle,0)
+  end
+  for side=-1,1,2 do
+   local lamp=piece("LandingSearchLamp",Vector3.new(1,0.45,0.45),Vector3.new(side*3,-2.5,-4),C(246,225,178),Enum.Material.Neon)
+   light(lamp,C(255,226,171),36,2.2)
+   local stripe=piece("NTyanUnitMark",Vector3.new(0.25,3.2,5),Vector3.new(side*6.12,0,0),C(183,57,69),Enum.Material.Neon)
+   stripe.Transparency=0.12
+  end
+  model.PrimaryPart=rotor
+  return model
+ end
+ local left=buildHelicopter(C3.Pos(804,72,-47)); local right=buildHelicopter(C3.Pos(834,82,47))
+ table.insert(helicopters,left); table.insert(helicopters,right)
+ local function fly(model,target,duration)
+  local start=model:GetPivot(); local began=os.clock()
+  while os.clock()-began<duration and model.Parent do
+   local alpha=math.clamp((os.clock()-began)/duration,0,1)
+   local position=start.Position:Lerp(target,alpha)+Vector3.new(0,math.sin(alpha*math.pi)*9,0)
+   model:PivotTo(CFrame.lookAt(position,position+Vector3.new(1,0,0))*CFrame.Angles(0,0,math.rad(-4*(1-alpha))))
+   for _,blade in ipairs(model:GetChildren()) do if blade.Name=="MainRotorBlade" then blade.CFrame*=CFrame.Angles(0,math.rad(34),0) end end
+   task.wait()
+  end
+  if model.Parent then model:PivotTo(CFrame.new(target)*CFrame.Angles(0,math.pi/2,0)) end
+ end
+ cameraPlan(C3.Pos(812,50,-92),C3.Pos(826,43,-80),C3.Pos(908,9,-22),2.3,70,62)
+ task.spawn(function() fly(left,C3.Pos(902,7,-26),4.2) end)
+ task.spawn(function() fly(right,C3.Pos(924,7,24),4.6) end)
+ task.wait(4.8)
+ C3.Say("Демид","Вертолёты! И броня не похожа на обычную охрану.",3)
+ for _,model in ipairs(helicopters) do model:Destroy() end
+ -- The captured unit is a genuine elite wave: heavy armor, a larger health pool,
+ -- stronger accurate fire, and a distinct field silhouette.
+ for k=1,4 do
+  C3.Spawn(5,C3.Pos(900+(k%2)*17,4,(k<3 and -1 or 1)*24),false,true,k)
+ end
+ cameraPlan(C3.Pos(890,11,-45),C3.Pos(894,10,-38),C3.Pos(916,5,0),1.5,60,56)
+ C3.Say(ANDROID_NAME,"Захваченный отряд, открыть огонь!",3)
+ operator:Destroy()
+ C3.Scene(false)
+end
 function C3.Activate(index)
  if index==10 then for _,m in ipairs(C3.previewGuards or {}) do m:Destroy() end; C3.previewGuards={} end
+ if index==5 and not C3.reinforcementSeen then C3.reinforcementSeen=true; C3.TowerReinforcement() end
  for _,p in ipairs(C3.party) do if p.Parent and not C3.Root(p) then C3.RestorePlayer(p) end end
  C3.stage=index; C3.checkpoint=index; C3.checkpointPos=C3.zones[index].start
  local z=C3.zones[index]; z.wave=0; z.cleared=false; z.objective=false; z.deployed=false
  currentSpawn=CFrame.lookAt(z.start,z.center)
- for _,p in ipairs(C3.Living()) do c2Grant(p,p:GetAttribute("Hero")=="Artem" and math.min(3,2+math.floor(index/7)) or math.min(5,2+math.floor(index/2))) end
+ for _,p in ipairs(C3.Living()) do
+  local level=index>=5 and 6 or (p:GetAttribute("Hero")=="Artem" and math.min(3,2+math.floor(index/7)) or math.min(5,2+math.floor(index/2)))
+  c2Grant(p,level)
+ end
+ if index==5 then NotifyRE:FireAllClients("Подкрепление НТЯН захвачено. Дуговой карабин добавлен в арсенал. Клавиша 6.",5) end
  if index==5 and not C3.shieldSeen then
   C3.shieldSeen=true; C3.Scene(true)
   cameraPlan(C3.Pos(830,17,-55),C3.Pos(834,18,-50),C3.Pos(930,88,0),1.4,60,55)
@@ -1091,7 +1229,9 @@ function C3.Finale()
   if p.Parent then p.Color=C(38,49,58); for _,l in ipairs(p:GetChildren()) do if l:IsA("Light") then l.Enabled=false end end end
   task.wait(0.08)
  end
- TweenService:Create(C3.shield,TweenInfo.new(2),{Transparency=1}):Play(); C3.shield.CanQuery=false
+ for _,part in ipairs(C3.shieldParts or {C3.shield}) do
+  if part.Parent then TweenService:Create(part,TweenInfo.new(2),{Transparency=1}):Play(); part.CanQuery=false end
+ end
  for _,e in pairs(C3.mobs) do if e.civilian then e.down=true end end
  task.wait(3)
  C3.MoveParty(C3.Pos(950,100,6),C3.case.Position)
@@ -1189,7 +1329,7 @@ function C3.Tick(dt)
 end
 function C3.Start(party)
  assert(ServerStorage:FindFirstChild("silv3r_candy"),"Missing original Kirill model")
- C3.active=true; C3.finished=false; C3.serial+=1; C3.party=table.clone(party); C3.coop=#party>1; C3.mobs={}; C3.connections={}; C3.lastStateSignature=nil; C3.lastStateSent=nil; C3.sprint={}; C3.relays=0; C3.key=false; C3.shieldSeen=false; C3.hackPhase=1; C3.hackSerial=0; C3.shots={}; C3.recovering={}; C3.towerOff=false; C3.modules={}; C3.collecting=false; C3.confirmUntil=nil; C3.confirmPlayer=nil; C3.hacker=nil; C3.challenge=nil; C3.stage=1
+ C3.active=true; C3.finished=false; C3.serial+=1; C3.party=table.clone(party); C3.coop=#party>1; C3.mobs={}; C3.connections={}; C3.lastStateSignature=nil; C3.lastStateSent=nil; C3.sprint={}; C3.relays=0; C3.key=false; C3.shieldSeen=false; C3.hackPhase=1; C3.hackSerial=0; C3.shots={}; C3.recovering={}; C3.towerOff=false; C3.reinforcementSeen=false; C3.modules={}; C3.collecting=false; C3.confirmUntil=nil; C3.confirmPlayer=nil; C3.hacker=nil; C3.challenge=nil; C3.stage=1
  C2.originals={}; Players.RespawnTime=999999
  local physics=game:GetService("PhysicsService"); pcall(function() physics:RegisterCollisionGroup("C2Enemy") end); physics:CollisionGroupSetCollidable("C2Enemy","C2Enemy",false)
  clearLevel(); newFolders(); C3.ApplyLighting(); C3.Build()

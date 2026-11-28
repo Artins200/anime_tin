@@ -1,8 +1,8 @@
 -- Geometry and physical interactions for Chapter III; embedded into Chapter3.
 function C3.Lamp(parent,pos,range,brightness,name)
- local fixture=C3.Part(parent,name or "AreaLamp",Vector3.new(3,0.25,2),pos,C(235,231,216),Enum.Material.SmoothPlastic)
- fixture.CanCollide=false; fixture.CanQuery=false
- local lamp=light(fixture,C(240,238,225),range,brightness); lamp.Shadows=false
+ local fixture=C3.Part(parent,name or "AreaLamp",Vector3.new(3,0.25,2),pos,C(244,217,163),Enum.Material.Neon)
+ fixture.CanCollide=false; fixture.CanQuery=false; fixture.CastShadow=false
+ local lamp=light(fixture,C(255,220,158),range,brightness); lamp.Shadows=false
  return fixture
 end
 function C3.Beam(parent,name,a,b,width,color)
@@ -404,7 +404,10 @@ function C3.Build()
    streetPart("LaneDash",Vector3.new(16,0.04,0.35),x,0.02,0,C(220,195,126),Enum.Material.SmoothPlastic)
    local pole=streetPart("StreetLampPole",Vector3.new(0.45,11,0.45),x,5.5,side*43,C(48,57,70),Enum.Material.Metal)
    local arm=streetPart("StreetLampArm",Vector3.new(4,0.3,0.3),x+side*1.5,10.7,side*43,C(48,57,70),Enum.Material.Metal)
-   C3.Lamp(C3.backdrop,C3.Pos(x+side*3,10.25,side*42),24,1.15,"WarmStreetLamp")
+   local head=streetPart("LEDStreetLampHead",Vector3.new(3.6,0.35,1.15),x+side*3.5,10.35,side*42,C(72,83,98),Enum.Material.Metal)
+   head.CFrame*=CFrame.Angles(0,math.rad(side*8),0)
+   local lens=streetPart("LEDStreetLampLens",Vector3.new(2.8,0.08,0.8),x+side*3.5,10.12,side*42,C(255,228,174),Enum.Material.Neon); lens.CanCollide=false
+   C3.Lamp(C3.backdrop,C3.Pos(x+side*3.5,9.98,side*42),29,1.45,"WarmStreetLamp")
   end
  end
 
@@ -519,8 +522,43 @@ function C3.Build()
  end
  C3.BuildRadioMast()
  C3.beacon=C3.Part(C3.landmark,"TowerBeacon",Vector3.new(3,2,3),C3.Pos(960,325,0),C(183,52,46),Enum.Material.SmoothPlastic); table.insert(C3.redLights,C3.beacon); light(C3.beacon,C(235,65,55),42,0.7)
- C3.shield=C3.Part(C3.landmark,"InvulnerableTowerShield",Vector3.new(155,370,155),C3.Pos(960,175,0),C(125,45,95),Enum.Material.ForceField)
- C3.shield.Shape=Enum.PartType.Ball; C3.shield.CanCollide=false; C3.shield.CanTouch=false; C3.shield.CanQuery=false; C3.shield.Transparency=0.94
+ C3.shieldParts={}
+ C3.shield=C3.Part(C3.landmark,"InvulnerableTowerShield",Vector3.new(166,382,166),C3.Pos(960,175,0),C(83,167,219),Enum.Material.ForceField)
+ C3.shield.Shape=Enum.PartType.Ball; C3.shield.CanCollide=false; C3.shield.CanTouch=false; C3.shield.CanQuery=false; C3.shield.Transparency=0.965
+ table.insert(C3.shieldParts,C3.shield)
+ for layer=1,2 do
+  local shell=C3.Part(C3.landmark,"ShieldResonanceShell",Vector3.new(166+layer*8,382+layer*8,166+layer*8),C3.Pos(960,175,0),layer==1 and C(75,177,225) or C(224,97,111),Enum.Material.ForceField)
+  shell.Shape=Enum.PartType.Ball; shell.CanCollide=false; shell.CanTouch=false; shell.CanQuery=false; shell.Transparency=layer==1 and 0.976 or 0.986
+  table.insert(C3.shieldParts,shell)
+ end
+ -- Three luminous, broken equatorial bands make the dome read at night as an active barrier.
+ for band,y in ipairs({48,175,302}) do
+  local radius=band==1 and 63 or band==2 and 83 or 63
+  for segment=0,47 do
+   local a=segment*math.pi*2/48; local b=(segment+1)*math.pi*2/48
+   local color=segment%6==0 and C(245,194,121) or band==2 and C(79,211,235) or C(108,156,235)
+   local beam=C3.Beam(C3.landmark,"ShieldEnergyArc",C3.Pos(960+math.cos(a)*radius,y,math.sin(a)*radius),C3.Pos(960+math.cos(b)*radius,y,math.sin(b)*radius),0.65,color)
+   beam.Material=Enum.Material.Neon; beam.Transparency=0.12; beam.CanCollide=false; beam.CanTouch=false; beam.CanQuery=false
+   table.insert(C3.shieldParts,beam)
+  end
+ end
+ -- Four vertical energy filaments converge around the lattice mast.
+ for quadrant=0,3 do
+  local angle=quadrant*math.pi/2+math.pi/4
+  local arc=C3.Beam(C3.landmark,"ShieldMeridian",C3.Pos(960+math.cos(angle)*72,12,math.sin(angle)*72),C3.Pos(960+math.cos(angle)*72,338,math.sin(angle)*72),0.42,C(105,215,239))
+  arc.Material=Enum.Material.Neon; arc.Transparency=0.16; arc.CanCollide=false; arc.CanTouch=false; arc.CanQuery=false
+  table.insert(C3.shieldParts,arc)
+ end
+ task.spawn(function()
+  local phase=0
+  while C3.active and C3.shield and C3.shield.Parent and not C3.towerOff do
+   phase+=0.1
+   for index,part in ipairs(C3.shieldParts) do
+    if part.Parent and part~=C3.shield and part.Name~="ShieldResonanceShell" then part.Transparency=0.08+0.18*(0.5+0.5*math.sin(phase+index*0.35)) end
+   end
+   task.wait(0.12)
+  end
+ end)
 
  -- Five walkable tower floors, each with a real stair route to the next deck.
  local floorThemes={

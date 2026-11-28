@@ -18,7 +18,12 @@ assert 'if plr:GetAttribute("Chapter")==3 then if c3Attack' in server
 for feature in ('silv3r_candy','TransformationCapsule','SuspendedClone','FactoryLeftWall','FactoryRightWall','FactoryRearWall','TowerStair','StairwellPartition','KirillRoomDoor','InvulnerableTowerShield','HardwareBreaker','ModuleCase'):
     assert feature in world
 assert 'Эммм, что это было?' in chapter and 'Чекни в окно.' in chapter
-assert 'Lighting.Brightness=1.65' in chapter and 'bloom.Intensity=0' in chapter
+assert 'Lighting.ClockTime=22.15' in chapter and 'Lighting.Brightness=1.25' in chapter and 'bloom.Intensity=0.12' in chapter
+assert 'LEDStreetLampHead' in world and 'WarmStreetLamp' in world and 'NTyanArmoredTransport' in chapter
+assert 'function C3.TowerReinforcement()' in chapter and 'Поднимайте захваченный отряд НТЯН' in chapter
+assert 'Дуговой карабин' in Path('src/ModuleScript_0.luau').read_text() and 'Enum.KeyCode.Six' in client
+assert 'ShieldResonanceShell' in world and 'ShieldEnergyArc' in world and 'C3.shieldParts' in chapter
+assert 'KeyboardKeyCode=Enum.KeyCode.E' in chapter and 'GamepadKeyCode=Enum.KeyCode.ButtonX' in chapter
 assert 'CFrame.lookAt(slotPosition,flatLook,Vector3.yAxis)' in chapter
 assert 'CFrame.lookAt(neuroPivot.Position,assistantFocus,Vector3.yAxis)' in chapter
 for feature in ('TaperedTowerLeg','TowerXBrace','TowerAnchorShoe','TopWhipAntenna','TowerSignalMarker'):
@@ -54,7 +59,8 @@ assert 'C3.CanHack(p)' in world and 'stage==10 and 1.2 or nil' in world
 assert 'C3.Pos(pos.X,pos.Y,pos.Z),28,0.8,"HomeFillLamp"' in world
 assert 'light(tube,spec.color,18,0.45)' in world
 assert 'C3.Lamp(m,o+Vector3.new(x,47,z),72,1.45' in world
-assert 'tweenCharTo(character,windowTarget,1.5,true,12,false,false)' in chapter
+assert 'tweenCharTo(character,windowTarget,1.5,false,12,false,false)' in chapter
+assert 'local entry=C3.Pos(-174,4,zOffset)' in chapter
 assert 'if lockFacing then' in server and 'root.CFrame=CFrame.lookAt(root.Position,root.Position+faceDirection,Vector3.yAxis)' in server
 assert 'SingularityLandmark' in world and 'Chapter3CityBackdrop' in world
 assert 'C3_CollisionAndGameplay' in world and 'TowerStairGate' in world
